@@ -1,0 +1,12 @@
+[tool.black]
+line-length = 80
+target-version = ['py38']
+skip-string-normalization = true
+verbose = true
+
+[tool.isort]
+profile = 'black'
+skip_gitignore = true
+line_length = 80
+order_by_type = true
+include_trailing_comma = true
