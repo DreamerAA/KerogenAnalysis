@@ -3,7 +3,7 @@ from typing import Callable, Dict, Tuple
 import networkx as nx
 import numpy as np
 
-from kerogen_data import KerogenData
+from kerogendata import KerogenData
 
 
 class Periodizer:

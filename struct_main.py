@@ -1,17 +1,21 @@
 import os
 import random
 import time
-from typing import IO, Tuple
+from typing import IO, List, Tuple
 
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import numpy.typing as npt
 
-from kerogen_data import AtomData, KerogenData
+from kerogendata import AtomData, KerogenData
+from boundingbox import BoundingBox
 from periodizer import Periodizer
 from segmentaion import Segmentator
 from visualizer import Visualizer
+from reader import Reader
+from trajectory import Trajectory
+
 
 methan_radius = 0.0
 
@@ -23,13 +27,6 @@ ext_radius = {
     i: s for i, s in enumerate([methan_radius, methan_radius, methan_radius, 0., methan_radius])
 }
 
-def skip_line(file: IO, count: int = 1) -> None: # type: ignore
-    for _ in range(count):
-        next(file)
-
-def read_atom_info() -> None:
-    pass
-
 def random_color() -> Tuple[float, float, float, float]:
     return (
         random.randint(0, 255) / 255.0,
@@ -37,19 +34,6 @@ def random_color() -> Tuple[float, float, float, float]:
         random.randint(0, 255) / 255.0,
         1.0,
     )
-
-def type_to_type_id(type: str) -> int:
-    if type[0] == 'c':
-        return 0
-    elif type[0] == 'o':
-        return 1
-    elif type[0] == 'n':
-        return 2
-    elif type[0] == 'h':
-        return 3
-    elif type[0] == 's':
-        return 4
-    return -1
 
 def draw_kerogen_data(kerogen: KerogenData, scale:str='physical')->None:
     colors_data = {
@@ -109,6 +93,20 @@ def write_binary_file(array: npt.NDArray[np.int8], file_name:str) -> None:
             for j in range(array.shape[1]):
                 file.write(bytes(bytearray(array[:, j, i])))
 
+def filter_linked_list(link_list, atom_to_rm)->List[tuple[int,int]]:
+    return [ll for ll in link_list if ll[0] not in atom_to_rm and ll[1] not in atom_to_rm]
+
+def reset_atom_id(link_list, old_to_new)->List[tuple[int,int]]:
+    return [(old_to_new[l1], old_to_new[l2]) for l1, l2 in link_list]
+
+def create_box_mask(atoms: List[AtomData], box:BoundingBox):
+    removed_atoms = set()
+    rm_mask = np.array(range(len(atoms)),dtype=np.bool_)
+    for i,a in enumerate(atoms):
+        rm_mask[i] = box.is_inside(a.pos)
+        if ~rm_mask[i]:
+            removed_atoms.add(i)
+    return removed_atoms, rm_mask
 
 if __name__ == '__main__':
     start_time = time.time()
@@ -116,78 +114,33 @@ if __name__ == '__main__':
     path_to_structure = "../data/Kerogen/1_pbc_atom.gro"
     # path_to_structure = "../data/Kerogen/ker_wrapped.gro"
     path_to_linklist = "../data/Kerogen/ker.pdb"
-
-    graph = nx.Graph()
-    atoms = []
-    methane = []
-    atom_nums = set()
-    with open(path_to_structure) as f:
-        skip_line(f, 1)
-        count_atoms = int(next(f))
-        print(f" --- Count atoms: {count_atoms}")
-        read_error = False
-        for i in range(count_atoms):
-            line = next(f)
-            try:
-                struct_number = int(line[0:5])
-                struct_type = line[5:8]
-
-                number = int(line[15:20]) - 1
-
-                atom_id: str = str(line[8:15])
-                atom_id = atom_id.replace(" ", "")
-                type_id = type_to_type_id(atom_id)
-
-                x = float(line[20:28])
-                y = float(line[28:36])
-                z = float(line[36:44])
-
-                data = AtomData(
-                    struct_number, struct_type, atom_id, type_id, np.array([x, y, z])
-                )
-
-                atom_nums.add(number)
-
-                if "CH4" in struct_type:
-                    methane.append(data)
-                else:
-                    atoms.append(data)
-            except Exception as e:
-                read_error = True
-                print(i, line)
-        cell_sizes = next(f)
-
-        str_size = list(filter(lambda x: x != '', cell_sizes.split(' ')))
-        size = tuple([float(e) for e in str_size])
-    atoms = np.array(atoms)
-    div = 4
-    box = Segmentator.cut_cell(size, div)# type: ignore
-    print(f" --- Box size: {box.size()}")
-
-    removed_atoms = set()
-    rm_mask = np.array(range(len(atoms)),dtype=np.bool_)
-    cur_ind_atom = 0
-    for i,a in enumerate(atoms):
-        need_remove = ~box.is_inside(a.pos)
-        if need_remove:
-            removed_atoms.add(i)
-        else:
-            a.pos -= box.min()
-        rm_mask[i] = ~need_remove
+    path_to_traj = "../data/Kerogen/meth_0.5_micros.gro"
     
+    
+    atoms, size, linked_list = Reader.read_struct_and_linked_list(path_to_structure, path_to_linklist)
+
+    # div = 4
+    # box = Segmentator.cut_cell(size, div)# type: ignore
+    trajectories = Trajectory.read_trajectoryes(path_to_traj)
+    start = 2
+    num_traj = -1
+    for i,trj in enumerate(trajectories[start:]):
+        if not trj.is_intersect_borders():
+            num_traj = i + start
+            bbox = trj.trjbox()
+            print(f" --- Choose i:{i+start} trajectory")
+            break
+    
+    print(f" --- Box size: {bbox.size()}")
+
+    removed_atoms, rm_mask = create_box_mask(atoms, bbox)
     atoms = atoms[rm_mask]
-
-    old_to_new = np.cumsum(rm_mask.astype(np.int32))  
-
-    linked_list = []
-    with open(path_to_linklist) as f:
-        for line in f:
-            if "CONECT" in line:
-                n1, n2 = int(line[6:11]) - 1, int(line[11:16]) - 1
-                if n1 in removed_atoms or n2 in removed_atoms:
-                    continue
-                linked_list.append((old_to_new[n1], old_to_new[n2]))
-
+    old_to_new = np.cumsum(rm_mask.astype(np.int32)) - 1
+    linked_list = filter_linked_list(linked_list, removed_atoms)
+    linked_list = reset_atom_id(linked_list, old_to_new)
+    
+                
+    graph = nx.Graph()
     graph.add_nodes_from(
         [
             (i, {"color_id": atom.type_id, "scale_id": atom.type_id})
@@ -196,16 +149,17 @@ if __name__ == '__main__':
     )
     graph.add_edges_from(linked_list)
 
-    kerogen_data = KerogenData(graph, atoms, box) # type: ignore
+    kerogen_data = KerogenData(graph, atoms, bbox) # type: ignore
     Periodizer.rm_long_edges(kerogen_data)
     # # Periodizer.periodize(kerogen_data)
 
-    ref_size = 250
+    ref_size = 150
     file_name = (path_to_structure.split("/")[-1]).split(".")[0]
-    binarized_file_name = (
-        f"../data/Kerogen/result_img_{file_name}_rs={ref_size}_mr={methan_radius}_div={div}.npy"
+    binarized_file_name = (""
+        # f"../data/Kerogen/result_img_{file_name}_rs={ref_size}_mr={methan_radius}_div={div}.npy"
+        f"../data/Kerogen/result_img_{file_name}_rs={ref_size}_mr={methan_radius}_num_traj={num_traj}.npy"
     )
-
+    
     if os.path.isfile(binarized_file_name):
         with open(binarized_file_name, 'rb') as f: # type: ignore
             img = np.load(f) # type: ignore
@@ -213,13 +167,12 @@ if __name__ == '__main__':
         img_size = Segmentator.calc_image_size(
             kerogen_data.box.size(), reference_size=ref_size, by_min=True
         )
-        print(f" --- Image size: {img_size}")
         segmentator = Segmentator(
             kerogen_data,
             img_size,
             size_data=get_size,
             radius_extention=get_ext_size,
-            partitioning=5,
+            partitioning=1,
         )
         img = segmentator.binarize()
         print(
@@ -228,21 +181,24 @@ if __name__ == '__main__':
         with open(binarized_file_name, 'wb') as f: # type: ignore
             np.save(f, img) # type: ignore
 
+    print(f" --- Image size: {img.shape}")
     raw_file_name = (
-        f"../data/Kerogen/result_raw_img_{file_name}_is={img.shape}_mr={methan_radius}_div={div}.raw"
+        # f"../data/Kerogen/result_raw_img_{file_name}_is={img.shape}_mr={methan_radius}_div={div}.raw"        
+        f"../data/Kerogen/result_raw_img_{file_name}_is={img.shape}_mr={methan_radius}_num_traj={num_traj}.raw"
     )
     # write_binary_file(1 - img, raw_file_name)
 
-    Visualizer.draw_img(img, True)
+    # Visualizer.draw_img(1-img, True)
+    Visualizer.draw_img_trj(img, bbox, trajectories[num_traj], True)
 
-    plt.imshow(img[100,:,:])
-    plt.show()
+    # plt.imshow(img[100,:,:])
+    # plt.show()
 
-    plt.imshow(img[:,100,:])
-    plt.show()
+    # plt.imshow(img[:,100,:])
+    # plt.show()
 
-    plt.imshow(img[:,:,100])
-    plt.show()
+    # plt.imshow(img[:,:,100])
+    # plt.show()
 
     # if not read_error:
     #     # draw_kerogen_data(kerogen_data,scale="")

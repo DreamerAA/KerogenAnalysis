@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
-from boundingbox import KerogenBox
+from boundingbox import BoundingBox
 import networkx as nx
 import numpy as np
 import numpy.typing as npt
@@ -12,7 +12,7 @@ class AtomData:
     struct_type: str
     atom_id: str
     type_id: int
-    pos: npt.NDArray[np.float32]
+    pos: npt.NDArray[np.float64]
 
     def tuple_pos(self) -> Tuple[float, float, float]:
         return self.pos[0], self.pos[1], self.pos[2]
@@ -22,7 +22,7 @@ class AtomData:
 class KerogenData:
     graph: nx.Graph
     atoms: List[AtomData]
-    box: KerogenBox
+    box: BoundingBox
 
     def positionsAsDict(self) -> Dict[int, Tuple[float, float, float]]:
         return {i: a.tuple_pos() for i, a in enumerate(self.atoms)}

@@ -7,7 +7,7 @@ import numpy.typing as npt
 from joblib import Parallel, delayed
 
 from boundingbox import KerogenBox, Range
-from kerogen_data import AtomData, KerogenData
+from kerogendata import AtomData, KerogenData
 from dataclasses import dataclass
 
 
@@ -29,7 +29,7 @@ class Segmentator:
         ]
 
         steps = [ker_s / partitioning for ker_s in kerogen.box.size()]
-
+        shifts = self.kerogen.box.min()
         self.bb: List[KerogenBox] = []
         for i in range(partitioning):
             for j in range(partitioning):
@@ -37,10 +37,10 @@ class Segmentator:
                     nums = [i, j, k]
                     aranges = [
                         Range(
-                            num * step - 2 * vs - max_atom_size,
-                            (num + 1) * step + 2 * vs + max_atom_size,
+                            num * step - 2 * vs - max_atom_size + s,
+                            (num + 1) * step + 2 * vs + max_atom_size + s,
                         )
-                        for num, step, vs in zip(nums, steps, vox_sizes)
+                        for num, step, vs, s in zip(nums, steps, vox_sizes, shifts)
                     ]
                     self.bb.append(KerogenBox(*aranges))
                     for a in kerogen.atoms:
@@ -76,7 +76,7 @@ class Segmentator:
             int(reference_size * cs / ref_cell_size) for cs in l_cell_size
         )
 
-    def binarize(self, methans: List[AtomData] = []) -> npt.NDArray[np.int8]:
+    def binarize(self) -> npt.NDArray[np.int8]:
         vox_sizes = [
             ker_s / float(img_s)
             for ker_s, img_s in zip(self.kerogen.box.size(), self.img_size)
@@ -91,8 +91,8 @@ class Segmentator:
                 for iz in range(self.img_size[2]):
                     pos = np.array(
                         [
-                            (float(i) + 0.5) * vs
-                            for i, vs in zip([ix, iy, iz], vox_sizes)
+                            mm + (float(i) + 0.5) * vs
+                            for i, vs, mm in zip([ix, iy, iz], vox_sizes, self.kerogen.box.min())
                         ]
                     )
                     for bb in self.bb:
@@ -109,39 +109,4 @@ class Segmentator:
         for i, res in enumerate(sim_results):
             img[i, :, :] = res
 
-        if len(methans) != 0:
-            self.addMethans(img, methans)
-
         return img
-
-    def addMethans(
-        self, img: npt.NDArray[np.int8], methans: List[AtomData] = []
-    ):
-        vox_sizes = [
-            ker_s / float(img_s)
-            for ker_s, img_s in zip(self.kerogen.size, self.img_size)
-        ]
-
-        mpos = np.zeros(shape=(len(methans),), dtype=np.float32)
-        # mpos[:,0] = [m.pos. for m in methans]
-
-        def wrap(ix):
-            s_img = img[ix, :, :]
-
-            for iy in range(self.img_size[1]):
-                for iz in range(self.img_size[2]):
-                    pos = np.array(
-                        [
-                            (float(i) + 0.5) * vs
-                            for i, vs in zip([ix, iy, iz], vox_sizes)
-                        ]
-                    )
-                    for methan in methans:
-                        if bb.is_inside(pos) and bb.is_intersect_atom(pos):
-                            s_img[iy, iz] = 2
-            return s_img
-
-        num_proc = 16
-        sim_results = Parallel(n_jobs=num_proc)(
-            delayed(wrap)(ix) for ix in range(self.img_size[0])
-        )

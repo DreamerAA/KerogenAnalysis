@@ -5,56 +5,76 @@ import numpy.typing as npt
 from dataclasses import dataclass
 from boundingbox import Range, BoundingBox
 
+
 @dataclass
 class Trajectory:
-    points: npt.NDArray[np.float32]
-    times: npt.NDArray[np.float32]
+    points: npt.NDArray[np.float64]
+    times: npt.NDArray[np.float64]
     box: BoundingBox
     atom_size: float = 0.19
     clusters: Optional[npt.NDArray[np.int32]] = None
 
-    def dists(self)->npt.NDArray[np.float32]:
-        return Trajectory.extractDists(self.points)
+    def dists(self) -> npt.NDArray[np.float64]:
+        return Trajectory.extractDists(self.points_without_periodic())
+
+    def is_intersect_borders(self) -> bool:
+        ppoints = self.points_without_periodic()
+        xmask = np.logical_or(
+            ppoints[:, 0] > self.box.xb_.max_, ppoints[:, 0] < 0)
+        ymask = np.logical_or(
+            ppoints[:, 1] > self.box.yb_.max_, ppoints[:, 1] < 0)
+        zmask = np.logical_or(
+            ppoints[:, 2] > self.box.zb_.max_, ppoints[:, 2] < 0)
+        return np.any(xmask) or np.any(ymask) or np.any(zmask)
+
+    def trjbox(self) -> BoundingBox:
+        ppoints = self.points_without_periodic()
+        mmin = ppoints.min(axis=0)
+        mmax = ppoints.max(axis=0)
+        tmp = [Range(i, j) for i, j in zip(mmin, mmax)]
+        return BoundingBox(*tmp)
 
     @staticmethod
-    def extractDists(points:npt.NDArray[np.float32])->npt.NDArray[np.float32]:
+    def extractDists(points: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
         diff = points[1:,] - points[:-1,]
         sq_diff = diff*diff
-        sq_dist = np.sum(sq_diff,axis=1)
+        sq_dist = np.sum(sq_diff, axis=1)
         dist = np.sqrt(sq_dist)
-        return np.array(dist,dtype=np.float32)
+        return np.array(dist, dtype=np.float64)
 
-    def points_without_periodic(self)->npt.NDArray[np.float32]:
+    def points_without_periodic(self) -> npt.NDArray[np.float64]:
         borders = self.box.max()
         s_2 = borders.min()/2
         diff = self.points[1:] - self.points[:-1]
-        npoints = np.zeros(shape=self.points.shape,dtype=self.points.dtype)
+        npoints = np.zeros(shape=self.points.shape, dtype=np.float64)
 
-        npoints[0,:] = self.points[0,:]
-        
-        shift = np.zeros(shape=(3,),dtype=npoints.dtype)
+        npoints[0, :] = self.points[0, :]
+
+        shift = np.zeros(shape=(3,), dtype=np.float64)
         for i in range(diff.shape[0]):
             cdiff = diff[i]
             s_mask = np.abs(cdiff) < s_2
             ns_mask = ~s_mask
-            # if np.sum(ns_mask) > 0:
-            #    print('f') 
-            neg_mask = np.logical_and(cdiff < 0, ns_mask) # был справа появился слева
-            pos_mask = np.logical_and(cdiff >= 0, ns_mask) # наоборот
+            # был справа появился слева
+            neg_mask = np.logical_and(cdiff < 0, ns_mask)
+            pos_mask = np.logical_and(cdiff >= 0, ns_mask)  # наоборот
             shift[s_mask] = cdiff[s_mask]
             shift[neg_mask] = cdiff[neg_mask] + borders[neg_mask]
             shift[pos_mask] = cdiff[pos_mask] - borders[pos_mask]
-            
-            npoints[i+1,:] = npoints[i,:] + shift
+
+            npoints[i+1, :] = npoints[i, :] + shift
 
         return npoints
 
+    def count_points(self) -> int:
+        return self.points.shape[0]
 
-    @staticmethod 
-    def read_trajectoryes(file_name:str)->List['Trajectory']:
+    @staticmethod
+    def read_trajectoryes(file_name: str) -> List['Trajectory']:
         ax = []
         ay = []
         az = []
+
         time_steps = []
         with open(file_name) as f:
             while True:
@@ -78,20 +98,19 @@ class Trajectory:
                 if len(ax) == count:
                     line = f.readline()
                     box = BoundingBox(Range(0, float(line[:10])),
-                                     Range(0, float(line[10:20])),
-                                     Range(0, float(line[20:])))
+                                      Range(0, float(line[10:20])),
+                                      Range(0, float(line[20:])))
                 else:
                     next(f)
-            
+
         count_step = int(len(ax)/count)
         trajectories = []
         for i in range(count):
-            points = np.zeros(shape=(count_step,3),dtype=np.float32)
-            points[:,0] = [ax[i+j*count] for j in range(count_step)]
-            points[:,1] = [ay[i+j*count] for j in range(count_step)]
-            points[:,2] = [az[i+j*count] for j in range(count_step)]
-            
+            points = np.zeros(shape=(count_step, 3), dtype=np.float64)
+            points[:, 0] = [ax[i+j*count] for j in range(count_step)]
+            points[:, 1] = [ay[i+j*count] for j in range(count_step)]
+            points[:, 2] = [az[i+j*count] for j in range(count_step)]
+
             trajectories.append(Trajectory(points, np.array(time_steps), box))
 
         return trajectories
-        
