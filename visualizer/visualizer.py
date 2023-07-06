@@ -29,8 +29,8 @@ from vtkmodules.vtkRenderingCore import (
     vtkRenderWindowInteractor,
 )
 from typing import Optional
-from trajectory import Trajectory
-from boundingbox import BoundingBox
+from base.trajectory import Trajectory
+from base.boundingbox import BoundingBox
 from typing import List
 from dataclasses import dataclass
 import time
@@ -637,8 +637,8 @@ class Visualizer:
             colors = np.append(0, colors)
             colors /= colors[-1]
         elif color_type == 'clusters':
-            assert (trj.clusters is not None)
-            clusters = trj.clusters
+            assert (trj.traps is not None)
+            clusters = trj.traps
 
             # colors = ndimage.binary_erosion(clusters).astype(clusters.dtype)
             colors = measure.label(clusters, connectivity=1).astype(np.float64)
@@ -717,7 +717,8 @@ class Visualizer:
         count_points = points.shape[0]
 
         ctf = vtkColorTransferFunction()
-        ctf.AddRGBPoint(0, 0, 0, 1.)
+        ctf.AddRGBPoint(0, 0, 0, 0.)
+        ctf.AddRGBPoint(1e-6, 0, 0, 1.)
         ctf.AddRGBPoint(0.25, 0, 1., 1)
         ctf.AddRGBPoint(0.5, 0, 1, 0)
         ctf.AddRGBPoint(0.75, 1, 1, 0)
@@ -757,9 +758,13 @@ class Visualizer:
 
         actor = vtkActor()
         actor.SetMapper(mapper)
-        actor.GetProperty().SetDiffuse(0.7)
-        actor.GetProperty().SetSpecular(0.4)
-        actor.GetProperty().SetSpecularPower(1)
+        # actor.GetProperty().SetDiffuse(0.7)
+        # actor.GetProperty().SetSpecular(0.4)
+        # actor.GetProperty().SetSpecularPower(1)
+        actor.GetProperty().SetDiffuse(0)
+        actor.GetProperty().SetSpecular(0)
+        actor.GetProperty().SetAmbient(1)
+        # actor.GetProperty().SetSpecularPower(0)
         actor.GetProperty().BackfaceCullingOn()
         return actor, poly_data, tube_filter
 
@@ -777,13 +782,13 @@ class Visualizer:
         pdata.SetName("clusters")
         pdata.SetNumberOfValues(pcount)
 
-        if trj.clusters is not None:
-            count_clusters = trj.clusters.max() + 1
+        if trj.traps is not None:
+            count_clusters = trj.traps.max() + 1
 
         for i in range(pcount):
             points.SetPoint(i, tp[i, 0], tp[i, 1], tp[i, 2])
-            if trj.clusters is not None:
-                pdata.SetValue(i, float(trj.clusters[i])/trj.clusters.max())
+            if trj.traps is not None:
+                pdata.SetValue(i, float(trj.traps[i])/trj.traps.max())
             else:
                 pdata.SetValue(i, 1.)
         polydata = vtkPolyData()
@@ -799,10 +804,10 @@ class Visualizer:
         glyph.SetInputData(polydata)
 
         ctf = vtkColorTransferFunction()
-        if trj.clusters is not None:
-            count_clusters = trj.clusters.max() + 1
+        if trj.traps is not None:
+            count_clusters = trj.traps.max() + 1
             for i in range(count_clusters):
-                ctf.AddRGBPoint(float(i)/trj.clusters.max(), random.uniform(0,
+                ctf.AddRGBPoint(float(i)/trj.traps.max(), random.uniform(0,
                                 1), random.uniform(0, 1), random.uniform(0, 1))
         else:
             ctf.AddRGBPoint(0, 0, 0, 1.)

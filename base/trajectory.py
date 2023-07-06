@@ -3,7 +3,7 @@ from typing import List, Optional
 import numpy as np
 import numpy.typing as npt
 from dataclasses import dataclass
-from boundingbox import Range, BoundingBox
+from base.boundingbox import Range, BoundingBox
 
 
 @dataclass
@@ -12,7 +12,7 @@ class Trajectory:
     times: npt.NDArray[np.float64]
     box: BoundingBox
     atom_size: float = 0.19
-    clusters: Optional[npt.NDArray[np.int32]] = None
+    traps: Optional[npt.NDArray[np.bool_]] = None
 
     def dists(self) -> npt.NDArray[np.float64]:
         return Trajectory.extractDists(self.points_without_periodic())

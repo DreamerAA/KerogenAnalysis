@@ -1,19 +1,19 @@
 from typing import Any, IO, Tuple
-from kerogendata import AtomData
+from base.kerogendata import AtomData
 import numpy as np
 
 
-def skip_line(file: IO, count: int = 1) -> None: # type: ignore
+def skip_line(file: IO, count: int = 1) -> None:  # type: ignore
     for _ in range(count):
         next(file)
 
+
 class Reader:
     @staticmethod
-    def read_struct_and_linked_list(path_to_structure:str, path_to_linked_list:str)->Tuple[Any,Any,Any]:
+    def read_struct_and_linked_list(path_to_structure: str, path_to_linked_list: str) -> Tuple[Any, Any, Any]:
         atoms, size = Reader.read_raw_struct(path_to_structure)
         linked_list = Reader.read_linked_list(path_to_linked_list)
         return atoms, size, linked_list
-        
 
     @staticmethod
     def read_linked_list(path_to_linked_list):
@@ -22,12 +22,12 @@ class Reader:
             for line in f:
                 if "CONECT" in line:
                     n1, n2 = int(line[6:11]) - 1, int(line[11:16]) - 1
-                    linked_list.append((n1,n2))
+                    linked_list.append((n1, n2))
         return linked_list
 
     @staticmethod
     def read_raw_struct(path_to_structure):
-        
+
         def type_to_type_id(type: str) -> int:
             if type[0] == 'c':
                 return 0
@@ -40,7 +40,7 @@ class Reader:
             elif type[0] == 's':
                 return 4
             return -1
-        
+
         atoms = []
         methane = []
         with open(path_to_structure) as f:
@@ -64,7 +64,8 @@ class Reader:
                     z = float(line[36:44])
 
                     data = AtomData(
-                        struct_number, struct_type, atom_id, type_id, np.array([x, y, z])
+                        struct_number, struct_type, atom_id, type_id, np.array([
+                                                                               x, y, z])
                     )
 
                     if "CH4" in struct_type:

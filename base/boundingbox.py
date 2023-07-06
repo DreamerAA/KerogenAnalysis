@@ -3,15 +3,14 @@ from typing import List, Optional, Tuple
 import numpy as np
 import numpy.typing as npt
 
-# import scipy.spatial.distance
 from scipy.spatial.distance import cdist
 
 
 class Range(object):
     def __init__(
         self,
-        mmin: float = np.finfo(np.float64).max,
-        mmax: float = np.finfo(np.float64).min,
+        mmin: float = float(np.finfo(np.float64).max),
+        mmax: float = float(np.finfo(np.float64).min),
     ):
         if mmin != float(np.finfo(float).max) and mmax != float(np.finfo(float).min):
             assert mmin <= mmax
@@ -59,8 +58,7 @@ class BoundingBox(object):
         )
 
     def size(self) -> Tuple[float, float, float]:
-        # type: ignore
-        return tuple(r.diff() for r in [self.xb_, self.yb_, self.zb_])
+        return (self.xb_.diff(), self.yb_.diff(), self.zb_.diff())
 
     def min(self) -> npt.NDArray[np.float64]:
         return np.array([self.xb_.min_, self.yb_.min_, self.zb_.min_])
@@ -70,6 +68,11 @@ class BoundingBox(object):
 
     def center(self) -> npt.NDArray[np.float64]:
         return np.array([r.center() for r in [self.xb_, self.yb_, self.zb_]])
+
+    def update(self, p: npt.NDArray[np.float64]) -> None:
+        self.xb_.update(p[0])
+        self.yb_.update(p[1])
+        self.zb_.update(p[2])
 
 
 class KerogenBox(BoundingBox):

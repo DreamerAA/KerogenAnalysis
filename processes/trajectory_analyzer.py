@@ -1,4 +1,4 @@
-from trajectory import Trajectory
+from base.trajectory import Trajectory
 import numpy as np
 from sklearn.cluster import DBSCAN, AffinityPropagation, KMeans, MeanShift, SpectralClustering, AgglomerativeClustering, BisectingKMeans
 from sklearn.mixture import GaussianMixture
@@ -67,10 +67,8 @@ class SpectralAnalizer:
                                 List_min_max[ind_false_trap, 1] + 1)] = 0
 
                 list_trapped = np.logical_or(list_trapped, list_trapped_m > 0)
-        trj.clusters = list_trapped
-        print(trj.clusters.sum())
+        trj.traps = list_trapped
 
-    # +
     def laplacian_matrix(self, trj: Trajectory, T_mean: int, mu: float) -> npt.NDArray[np.float64]:
         # UNTITLED3 Summary of this function goes here
         #    Detailed explanation goes here
@@ -94,7 +92,7 @@ class SpectralAnalizer:
         S3 = S2b
         return S3
 
-    def RQA_block_measures(self, trj: Trajectory, mu: float):
+    def RQA_block_measures(self, trj: Trajectory, mu: float) -> Tuple[npt.NDArray[np.int64], npt.NDArray[np.int64], npt.NDArray[np.int64]]:
         N = trj.count_points()
         # Laplacian matrix (distance matrix)
         S3 = self.laplacian_matrix(trj, self.T_mean, mu)
@@ -145,7 +143,7 @@ class SpectralAnalizer:
             list_parallel[n] = pos_up_par - pos_down_par + 1
         return list_vertical, list_diagonal, list_parallel
 
-    def Make_list_min_max_index_equal(self, list_trapped_m):
+    def Make_list_min_max_index_equal(self, list_trapped_m: npt.NDArray[np.bool_]) -> npt.NDArray[np.int64]:
         N_vec = len(list_trapped_m)
         index = 0
         List_min_max = []
@@ -193,114 +191,3 @@ class SpectralAnalizer:
             if stop_up == 1 and stop_down == 1:
                 break
         return pos_down, pos_up
-
-
-class TrajectoryAnalizer:
-    def __init__(self, trj: Trajectory, method: int = 0):
-
-        self.trj = trj
-        if method == 0:
-            print(' --- kmeans')
-            self.kmeans()
-        elif method == 1:
-            print(' --- dbscan')
-            self.dbscan()
-        elif method == 2:
-            print(' --- mean_shift')
-            self.mean_shift()
-        elif method == 3:
-            print(' --- spectral')
-            self.spectral()
-        elif method == 4:
-            print(' --- agglomerative_clustering')
-            self.agglomerative_clustering()
-        elif method == 5:
-            print(' --- gauss')
-            self.gauss()
-        elif method == 6:
-            print(' --- bisec')
-            self.bisec()
-        elif method == 7:
-            print(' --- affinity_propagation')
-            self.affinity_propagation()
-
-    def dbscan(self) -> None:
-        data = self.trj.points_without_periodic()
-
-        model = DBSCAN(min_samples=2).fit(data)
-        self.save_results(model.labels_)
-
-    def affinity_propagation(self) -> None:
-        data = self.trj.points_without_periodic()
-        clustering = AffinityPropagation().fit(data)
-        self.save_results(clustering.labels_)
-
-    def mean_shift(self) -> None:
-        data = self.trj.points_without_periodic()
-        clustering = MeanShift().fit(data)
-        self.save_results(clustering.labels_)
-
-    @staticmethod
-    def find_best_count(data, get_labels):
-        best_n_clusters = 1
-        sil_score_max = -1  # this is the minimum possible score
-        for n_clusters in range(2, 10):
-            labels = get_labels(n_clusters)
-            sil_score = silhouette_score(data, labels)
-            print("The average silhouette score for %i clusters is %0.2f" %
-                  (n_clusters, sil_score))
-            if sil_score >= sil_score_max:
-                sil_score_max = sil_score
-                best_n_clusters = n_clusters
-        return get_labels(best_n_clusters)
-
-    def kmeans(self) -> None:
-        data = self.trj.points_without_periodic()
-
-        def kmean(n):
-            model = KMeans(n_clusters=n, init='k-means++',
-                           max_iter=100, n_init=1)
-            return model.fit_predict(data)
-
-        labels = TrajectoryAnalizer.find_best_count(data, kmean)
-        self.save_results(labels)
-
-    def spectral(self) -> None:
-        data = self.trj.points_without_periodic()
-
-        def func(n):
-            model = SpectralClustering(n_clusters=n)
-            return model.fit_predict(data)
-
-        labels = TrajectoryAnalizer.find_best_count(data, func)
-        self.save_results(labels)
-
-    def agglomerative_clustering(self) -> None:
-        data = self.trj.points_without_periodic()
-        model = AgglomerativeClustering().fit(data)
-        self.save_results(model.labels_)
-
-    def gauss(self) -> None:
-        data = self.trj.points_without_periodic()
-
-        def func(n):
-            model = GaussianMixture(n_components=n).fit(data)
-            return model.predict(data)
-
-        labels = TrajectoryAnalizer.find_best_count(data, func)
-        self.save_results(labels)
-
-    def bisec(self) -> None:
-        data = self.trj.points_without_periodic()
-
-        def func(n):
-            model = BisectingKMeans(n_clusters=n).fit(data)
-            return model.labels_
-
-        labels = TrajectoryAnalizer.find_best_count(data, func)
-        self.save_results(labels)
-
-    def save_results(self, labels: npt.NDArray[np.int32]) -> None:
-        self.trj.clusters = labels
-        print("number of cluster found: {}".format(len(set(labels))))
-        print('cluster for each point: ', labels)

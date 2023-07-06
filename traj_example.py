@@ -5,14 +5,14 @@ import networkx as nx
 import numpy as np
 import numpy.typing as npt
 import time
-from kerogendata import AtomData, KerogenData
-from periodizer import Periodizer
-from segmentaion import Segmentator
-from visualizer import Visualizer
+from base.kerogendata import AtomData, KerogenData
+from base.periodizer import Periodizer
+from processes.segmentaion import Segmentator
+from visualizer.visualizer import Visualizer
 from dataclasses import dataclass
-from trajectory import Trajectory
-from trajectory_analyzer import TrajectoryAnalizer, SpectralAnalizer
-from writer import Writer
+from base.trajectory import Trajectory
+from processes.trajectory_analyzer import TrajectoryAnalizer, SpectralAnalizer
+from base.writer import Writer
 
 
 def visualize_dist_trajectory(traj: Trajectory) -> None:
@@ -47,8 +47,6 @@ if __name__ == '__main__':
     # path_to_traj = "../data/Kerogen/h2_micros/h2_micros.1.gro"
     trajectories = Trajectory.read_trajectoryes(path_to_traj)
 
-    Writer.trajectory_to_mat(trajectories)
-
     # visualize_trajectories(trajectories)
     # animate_trajectoryes(trajectories)
 
@@ -56,10 +54,14 @@ if __name__ == '__main__':
     # visualize_trajectory(trj)
 
     # visualize_trajectory(trajectories[2])
+
     start = time.time()
     analizer = SpectralAnalizer(trajectories[2])
     end = time.time()
     print(f"Elapsed time analizer: {end-start}")
+    np.save('clusters.npy', trajectories[2].clusters)
+
+    # trajectories[2].traps = np.load("clusters.npy")
 
     visualize_trajectory(trajectories[2], 'clusters')
     # visualize_trajectory(trajectories[2], 'dist')

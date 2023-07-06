@@ -6,8 +6,8 @@ import numpy as np
 import numpy.typing as npt
 from joblib import Parallel, delayed
 
-from boundingbox import KerogenBox, Range
-from kerogendata import AtomData, KerogenData
+from base.boundingbox import KerogenBox, Range
+from base.kerogendata import AtomData, KerogenData
 from dataclasses import dataclass
 
 
@@ -47,7 +47,8 @@ class Segmentator:
                         if self.bb[-1].is_inside(a.pos):
                             self.bb[-1].add_atom(
                                 a.type_id,
-                                size_data(a.type_id) + self.radius_extention(a.type_id),
+                                size_data(a.type_id) +
+                                self.radius_extention(a.type_id),
                                 a.pos,
                             )
         # print(f" --- Count Kerogen boxes: {len(self.bb)}")
@@ -56,14 +57,14 @@ class Segmentator:
             # print(f" --- Finish commit kerogen box: {i}")
 
     @staticmethod
-    def cut_cell(size:Tuple[float,float, float], dev=4.)->KerogenBox:
+    def cut_cell(size: Tuple[float, float, float], dev=4.) -> KerogenBox:
         maxs = np.max(np.array(size))
         ax_ns = maxs/dev
-        new_cell_size = tuple(min(ax_ns,s) for s in size)
-        minb = tuple((s - ns)/2  for s,ns in zip(size,new_cell_size))
-        maxb = tuple((s + ns)/2  for s,ns in zip(size,new_cell_size))
+        new_cell_size = tuple(min(ax_ns, s) for s in size)
+        minb = tuple((s - ns)/2 for s, ns in zip(size, new_cell_size))
+        maxb = tuple((s + ns)/2 for s, ns in zip(size, new_cell_size))
         return KerogenBox(Range(minb[0], maxb[0]), Range(minb[1], maxb[1]), Range(minb[2], maxb[2]))
-    
+
     @staticmethod
     def calc_image_size(
         cell_size: Tuple[float, float, float],

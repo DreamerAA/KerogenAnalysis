@@ -1,9 +1,6 @@
-from typing import Callable, Dict, Tuple
-
-import networkx as nx
 import numpy as np
 
-from kerogendata import KerogenData
+from base.kerogendata import KerogenData
 
 
 class Periodizer:
