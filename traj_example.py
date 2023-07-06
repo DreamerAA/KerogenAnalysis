@@ -1,18 +1,12 @@
 from typing import List
 
 import matplotlib.pyplot as plt
-import networkx as nx
 import numpy as np
-import numpy.typing as npt
 import time
-from base.kerogendata import AtomData, KerogenData
-from base.periodizer import Periodizer
-from processes.segmentaion import Segmentator
 from visualizer.visualizer import Visualizer
-from dataclasses import dataclass
 from base.trajectory import Trajectory
-from processes.trajectory_analyzer import TrajectoryAnalizer, SpectralAnalizer
-from base.writer import Writer
+from processes.trajectory_analyzer import SpectralAnalizer
+import argparse
 
 
 def visualize_dist_trajectory(traj: Trajectory) -> None:
@@ -41,10 +35,20 @@ def animate_trajectoryes(trajs: List[Trajectory]) -> None:
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--path',
+        type=str,
+        default="../data/meth_traj.gro",
+        # default = "../data/methan_traj/meth_1.7_micros.1.gro"
+        # default = "../data/h2_micros/h2_micros.1.gro"
+        help='provide an integer (default: 2)'
+    )
+    path_to_traj = parser.parse_args()
 
-    path_to_traj = "../data/Kerogen/meth_traj.gro"
-    # path_to_traj = "../data/Kerogen/methan_traj/meth_1.7_micros.1.gro"
-    # path_to_traj = "../data/Kerogen/h2_micros/h2_micros.1.gro"
+    path_to_traj = "../data/meth_traj.gro"
+    # path_to_traj = "../data/methan_traj/meth_1.7_micros.1.gro"
+    # path_to_traj = "../data/h2_micros/h2_micros.1.gro"
     trajectories = Trajectory.read_trajectoryes(path_to_traj)
 
     # visualize_trajectories(trajectories)
@@ -59,7 +63,7 @@ if __name__ == '__main__':
     analizer = SpectralAnalizer(trajectories[2])
     end = time.time()
     print(f"Elapsed time analizer: {end-start}")
-    np.save('clusters.npy', trajectories[2].clusters)
+    # np.save('clusters.npy', trajectories[2].traps)
 
     # trajectories[2].traps = np.load("clusters.npy")
 

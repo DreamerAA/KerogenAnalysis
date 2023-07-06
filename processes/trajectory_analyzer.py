@@ -43,7 +43,7 @@ class SpectralAnalizer:
 
         method = self.p_val_traj_type + "_3D"
         mat = mat73.loadmat(
-            f"../data/Kerogen/list_threshold/nuc{int(self.nu*100)}diag_perc={self.diag_percentile}.mat")
+            f"./list_threshold/nuc{int(self.nu*100)}diag_perc={self.diag_percentile}.mat")
         list_threshold = mat["list_threshold"][method]
         list_trapped = np.zeros(shape=(count_points,), dtype=np.bool_)
 

@@ -5,19 +5,14 @@ import networkx as nx
 import numpy as np
 import numpy.typing as npt
 import vtk
-import vtkmodules.vtkRenderingOpenGL2
-import xarray as xr
-from matplotlib import pylab
-from matplotlib.ticker import MaxNLocator
+
 from vtkmodules.vtkCommonColor import vtkNamedColors
-from vtkmodules.vtkCommonCore import vtkDoubleArray, vtkPoints, vtkIdList, vtkLookupTable
+from vtkmodules.vtkCommonCore import vtkDoubleArray, vtkPoints
 from vtkmodules.vtkCommonDataModel import vtkCellArray, vtkPolyData
-from vtkmodules.vtkFiltersCore import vtkGlyph3D, vtkTubeFilter, vtkPolyDataNormals
+from vtkmodules.vtkFiltersCore import vtkGlyph3D, vtkTubeFilter
 from vtkmodules.vtkFiltersSources import vtkSphereSource, vtkLineSource
-from vtkmodules.vtkFiltersModeling import vtkRotationalExtrusionFilter, vtkOutlineFilter
+from vtkmodules.vtkFiltersModeling import vtkOutlineFilter
 from vtkmodules.vtkInteractionStyle import (
-    vtkInteractorStyleFlight,
-    vtkInteractorStyleTrackballActor,
     vtkInteractorStyleTrackballCamera,
 )
 from vtkmodules.vtkRenderingCore import (
@@ -33,9 +28,7 @@ from base.trajectory import Trajectory
 from base.boundingbox import BoundingBox
 from typing import List
 from dataclasses import dataclass
-import time
 import random
-from scipy import ndimage
 from skimage import measure
 
 
