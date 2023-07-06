@@ -1,4 +1,5 @@
 import time
+from dataclasses import dataclass
 from typing import Callable, List, Optional, Tuple
 
 import networkx as nx
@@ -8,7 +9,6 @@ from joblib import Parallel, delayed
 
 from base.boundingbox import KerogenBox, Range
 from base.kerogendata import AtomData, KerogenData
-from dataclasses import dataclass
 
 
 class Segmentator:
@@ -19,13 +19,14 @@ class Segmentator:
         size_data: Callable[[int], float],
         radius_extention: Callable[[int], float],
         partitioning: int = 2,
-        max_atom_size: float = 0.18
+        max_atom_size: float = 0.18,
     ):
         self.kerogen = kerogen
         self.img_size = img_size
         self.radius_extention = radius_extention
         vox_sizes = [
-            ker_s / float(img_s) for ker_s, img_s in zip(kerogen.box.size(), img_size)
+            ker_s / float(img_s)
+            for ker_s, img_s in zip(kerogen.box.size(), img_size)
         ]
 
         steps = [ker_s / partitioning for ker_s in kerogen.box.size()]
@@ -40,15 +41,17 @@ class Segmentator:
                             num * step - 2 * vs - max_atom_size + s,
                             (num + 1) * step + 2 * vs + max_atom_size + s,
                         )
-                        for num, step, vs, s in zip(nums, steps, vox_sizes, shifts)
+                        for num, step, vs, s in zip(
+                            nums, steps, vox_sizes, shifts
+                        )
                     ]
                     self.bb.append(KerogenBox(*aranges))
                     for a in kerogen.atoms:
                         if self.bb[-1].is_inside(a.pos):
                             self.bb[-1].add_atom(
                                 a.type_id,
-                                size_data(a.type_id) +
-                                self.radius_extention(a.type_id),
+                                size_data(a.type_id)
+                                + self.radius_extention(a.type_id),
                                 a.pos,
                             )
         # print(f" --- Count Kerogen boxes: {len(self.bb)}")
@@ -57,13 +60,17 @@ class Segmentator:
             # print(f" --- Finish commit kerogen box: {i}")
 
     @staticmethod
-    def cut_cell(size: Tuple[float, float, float], dev=4.) -> KerogenBox:
+    def cut_cell(size: Tuple[float, float, float], dev=4.0) -> KerogenBox:
         maxs = np.max(np.array(size))
-        ax_ns = maxs/dev
+        ax_ns = maxs / dev
         new_cell_size = tuple(min(ax_ns, s) for s in size)
-        minb = tuple((s - ns)/2 for s, ns in zip(size, new_cell_size))
-        maxb = tuple((s + ns)/2 for s, ns in zip(size, new_cell_size))
-        return KerogenBox(Range(minb[0], maxb[0]), Range(minb[1], maxb[1]), Range(minb[2], maxb[2]))
+        minb = tuple((s - ns) / 2 for s, ns in zip(size, new_cell_size))
+        maxb = tuple((s + ns) / 2 for s, ns in zip(size, new_cell_size))
+        return KerogenBox(
+            Range(minb[0], maxb[0]),
+            Range(minb[1], maxb[1]),
+            Range(minb[2], maxb[2]),
+        )
 
     @staticmethod
     def calc_image_size(
@@ -93,7 +100,9 @@ class Segmentator:
                     pos = np.array(
                         [
                             mm + (float(i) + 0.5) * vs
-                            for i, vs, mm in zip([ix, iy, iz], vox_sizes, self.kerogen.box.min())
+                            for i, vs, mm in zip(
+                                [ix, iy, iz], vox_sizes, self.kerogen.box.min()
+                            )
                         ]
                     )
                     for bb in self.bb:

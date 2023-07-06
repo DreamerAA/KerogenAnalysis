@@ -1,17 +1,18 @@
+import argparse
+import time
 from typing import List
 
 import matplotlib.pyplot as plt
 import numpy as np
-import time
-from visualizer.visualizer import Visualizer
+
 from base.trajectory import Trajectory
 from processes.trajectory_analyzer import SpectralAnalizer
-import argparse
+from visualizer.visualizer import Visualizer
 
 
 def visualize_dist_trajectory(traj: Trajectory) -> None:
     diff = traj.points[1:] - traj.points[:-1]
-    sq_diff = diff*diff
+    sq_diff = diff * diff
     sq_dist = np.sum(sq_diff, axis=1)
     dist = np.sqrt(sq_dist)
     сdist = np.cumsum(dist)
@@ -22,8 +23,7 @@ def visualize_dist_trajectory(traj: Trajectory) -> None:
 
 
 def visualize_trajectory(traj: Trajectory, color_type='dist') -> None:
-    Visualizer.draw_trajectoryes(
-        [traj],  color_type=color_type, plot_box=False)
+    Visualizer.draw_trajectoryes([traj], color_type=color_type, plot_box=False)
 
 
 def visualize_trajectories(trajs: List[Trajectory]) -> None:
@@ -42,7 +42,7 @@ if __name__ == '__main__':
         default="../data/meth_traj.gro",
         # default = "../data/methan_traj/meth_1.7_micros.1.gro"
         # default = "../data/h2_micros/h2_micros.1.gro"
-        help='provide an integer (default: 2)'
+        help='provide an integer (default: 2)',
     )
     path_to_traj = parser.parse_args()
 

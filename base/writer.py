@@ -1,7 +1,9 @@
-from base.trajectory import Trajectory
 from typing import List
-from scipy.io import savemat
+
 import numpy as np
+from scipy.io import savemat
+
+from base.trajectory import Trajectory
 
 
 class Writer:

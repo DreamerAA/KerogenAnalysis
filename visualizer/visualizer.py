@@ -1,20 +1,21 @@
 import math as m
+import random
+from dataclasses import dataclass
+from typing import List, Optional
 
 import matplotlib.pylab as plt
 import networkx as nx
 import numpy as np
 import numpy.typing as npt
 import vtk
-
+from skimage import measure
 from vtkmodules.vtkCommonColor import vtkNamedColors
 from vtkmodules.vtkCommonCore import vtkDoubleArray, vtkPoints
 from vtkmodules.vtkCommonDataModel import vtkCellArray, vtkPolyData
 from vtkmodules.vtkFiltersCore import vtkGlyph3D, vtkTubeFilter
-from vtkmodules.vtkFiltersSources import vtkSphereSource, vtkLineSource
 from vtkmodules.vtkFiltersModeling import vtkOutlineFilter
-from vtkmodules.vtkInteractionStyle import (
-    vtkInteractorStyleTrackballCamera,
-)
+from vtkmodules.vtkFiltersSources import vtkLineSource, vtkSphereSource
+from vtkmodules.vtkInteractionStyle import vtkInteractorStyleTrackballCamera
 from vtkmodules.vtkRenderingCore import (
     vtkActor,
     vtkColorTransferFunction,
@@ -23,13 +24,9 @@ from vtkmodules.vtkRenderingCore import (
     vtkRenderWindow,
     vtkRenderWindowInteractor,
 )
-from typing import Optional
-from base.trajectory import Trajectory
+
 from base.boundingbox import BoundingBox
-from typing import List
-from dataclasses import dataclass
-import random
-from skimage import measure
+from base.trajectory import Trajectory
 
 
 def Rx(theta):
@@ -109,7 +106,7 @@ class AnimationActorData:
     radius: float
 
 
-class vtkTimerCallbackActors():
+class vtkTimerCallbackActors:
     def __init__(self, data: List[AnimationActorData], iren):
         self.timer_count = 0
         self.steps = data[0].points.shape[0]
@@ -428,7 +425,6 @@ class Visualizer:
 
         lines = vtkCellArray()
         i = 0
-        count_edges = len(graph.edges())
         for u, v in graph.edges():
             # The edge e can be a 2-tuple (Graph) or a 3-tuple (Xgraph)
             lines.InsertNextCell(2)
@@ -497,15 +493,16 @@ class Visualizer:
         )
 
     @staticmethod
-    def create_img_data(img: npt.NDArray[np.int8], bbox: Optional[BoundingBox]) -> vtk.vtkImageData:
-
+    def create_img_data(
+        img: npt.NDArray[np.int8], bbox: Optional[BoundingBox]
+    ) -> vtk.vtkImageData:
         image_data = vtk.vtkImageData()
         size = img.shape
         image_data.SetDimensions(size[0], size[1], size[2])
         image_data.AllocateScalars(vtk.VTK_INT, 1)
         if bbox is not None:
             bbs = bbox.size()
-            t = [bs/iis for iis, bs in zip(size, bbs)]
+            t = [bs / iis for iis, bs in zip(size, bbs)]
             image_data.SetSpacing(*t)
         else:
             image_data.SetSpacing(1, 1, 1)
@@ -568,7 +565,12 @@ class Visualizer:
         return actor
 
     @staticmethod
-    def add_img_actor(ren: vtkRenderer, img: npt.NDArray[np.int8], volume_mode: bool, bbox: Optional[BoundingBox]) -> None:
+    def add_img_actor(
+        ren: vtkRenderer,
+        img: npt.NDArray[np.int8],
+        volume_mode: bool,
+        bbox: Optional[BoundingBox],
+    ) -> None:
         image_data = Visualizer.create_img_data(img, bbox)
 
         mactor = None
@@ -623,14 +625,16 @@ class Visualizer:
         iren.Start()
 
     @staticmethod
-    def create_trajectory_actor(trj: Trajectory, periodic: bool, color_type: str = 'dist') -> vtkActor:
+    def create_trajectory_actor(
+        trj: Trajectory, periodic: bool, color_type: str = 'dist'
+    ) -> vtkActor:
         points = trj.points_without_periodic() if not periodic else trj.points
         if color_type == 'dist':
             colors = np.cumsum(trj.dists())
             colors = np.append(0, colors)
             colors /= colors[-1]
         elif color_type == 'clusters':
-            assert (trj.traps is not None)
+            assert trj.traps is not None
             clusters = trj.traps
 
             # colors = ndimage.binary_erosion(clusters).astype(clusters.dtype)
@@ -638,15 +642,22 @@ class Visualizer:
             print(colors.max())
             colors /= colors.max()
 
-        return Visualizer.create_polyline_actor(points, colors, trj.atom_size*0.5)[0]
+        return Visualizer.create_polyline_actor(
+            points, colors, trj.atom_size * 0.5
+        )[0]
 
     @staticmethod
-    def draw_trajectoryes(trjs: List[Trajectory], color_type='dist', periodic: bool = False, plot_box: bool = True) -> None:
-
+    def draw_trajectoryes(
+        trjs: List[Trajectory],
+        color_type='dist',
+        periodic: bool = False,
+        plot_box: bool = True,
+    ) -> None:
         renderer = vtkRenderer()
         for trj in trjs:
             actor = Visualizer.create_trajectory_actor(
-                trj, periodic, color_type)
+                trj, periodic, color_type
+            )
             renderer.AddActor(actor)
 
         if plot_box:
@@ -689,7 +700,9 @@ class Visualizer:
         return outlineActor
 
     @staticmethod
-    def create_sphere_actor(pos: npt.NDArray[np.float64], radius: float) -> vtkActor:
+    def create_sphere_actor(
+        pos: npt.NDArray[np.float64], radius: float
+    ) -> vtkActor:
         colors = vtkNamedColors()
         sphereSource = vtkSphereSource()
         sphereSource.SetCenter(0.0, 0.0, 0.0)
@@ -706,22 +719,26 @@ class Visualizer:
         return actor
 
     @staticmethod
-    def create_polyline_actor(points: npt.NDArray[np.float64], colors: npt.NDArray[np.float64], radius: float) -> vtkActor:
+    def create_polyline_actor(
+        points: npt.NDArray[np.float64],
+        colors: npt.NDArray[np.float64],
+        radius: float,
+    ) -> vtkActor:
         count_points = points.shape[0]
 
         ctf = vtkColorTransferFunction()
-        ctf.AddRGBPoint(0, 0, 0, 0.)
-        ctf.AddRGBPoint(1e-6, 0, 0, 1.)
-        ctf.AddRGBPoint(0.25, 0, 1., 1)
+        ctf.AddRGBPoint(0, 0, 0, 0.0)
+        ctf.AddRGBPoint(1e-6, 0, 0, 1.0)
+        ctf.AddRGBPoint(0.25, 0, 1.0, 1)
         ctf.AddRGBPoint(0.5, 0, 1, 0)
         ctf.AddRGBPoint(0.75, 1, 1, 0)
-        ctf.AddRGBPoint(1., 1, 0, 0)
+        ctf.AddRGBPoint(1.0, 1, 0, 0)
 
         color_data = vtkDoubleArray()
         color_data.SetName("saturation")
 
-        assert (~np.any(colors > 1))
-        assert (~np.any(colors < 0))
+        assert ~np.any(colors > 1)
+        assert ~np.any(colors < 0)
 
         vpoints = vtkPoints()
         lines = vtkCellArray()
@@ -741,7 +758,7 @@ class Visualizer:
         tube_filter = vtkTubeFilter()
         tube_filter.SetNumberOfSides(16)
         tube_filter.SetInputData(poly_data)
-        tube_filter.SetRadius(radius*0.01)
+        tube_filter.SetRadius(radius * 0.01)
 
         mapper = vtkPolyDataMapper()
         mapper.SetInputConnection(tube_filter.GetOutputPort())
@@ -763,7 +780,6 @@ class Visualizer:
 
     @staticmethod
     def draw_trajectory_points(trj: Trajectory) -> None:
-
         tp = trj.points_without_periodic()
         pcount = tp.shape[0]
 
@@ -781,16 +797,16 @@ class Visualizer:
         for i in range(pcount):
             points.SetPoint(i, tp[i, 0], tp[i, 1], tp[i, 2])
             if trj.traps is not None:
-                pdata.SetValue(i, float(trj.traps[i])/trj.traps.max())
+                pdata.SetValue(i, float(trj.traps[i]) / trj.traps.max())
             else:
-                pdata.SetValue(i, 1.)
+                pdata.SetValue(i, 1.0)
         polydata = vtkPolyData()
         polydata.SetPoints(points)
         polydata.GetPointData().AddArray(pdata)
 
         # const double pore_scale = vis_set->poreScaleRadius();
         sphere_source = vtkSphereSource()
-        sphere_source.SetRadius(trj.atom_size*0.1)
+        sphere_source.SetRadius(trj.atom_size * 0.1)
         glyph = vtkGlyph3D()
         # pore_glyph.SetScaleFactor(pore_scale)
         glyph.SetSourceConnection(sphere_source.GetOutputPort())
@@ -800,10 +816,14 @@ class Visualizer:
         if trj.traps is not None:
             count_clusters = trj.traps.max() + 1
             for i in range(count_clusters):
-                ctf.AddRGBPoint(float(i)/trj.traps.max(), random.uniform(0,
-                                1), random.uniform(0, 1), random.uniform(0, 1))
+                ctf.AddRGBPoint(
+                    float(i) / trj.traps.max(),
+                    random.uniform(0, 1),
+                    random.uniform(0, 1),
+                    random.uniform(0, 1),
+                )
         else:
-            ctf.AddRGBPoint(0, 0, 0, 1.)
+            ctf.AddRGBPoint(0, 0, 0, 1.0)
 
         mapper = vtkPolyDataMapper()
         mapper.SetInputConnection(glyph.GetOutputPort())
@@ -842,7 +862,12 @@ class Visualizer:
         iren.Start()
 
     @staticmethod
-    def draw_img_trj(img: npt.NDArray[np.int8], bbox: BoundingBox, trj: Trajectory, volume_mode) -> None:
+    def draw_img_trj(
+        img: npt.NDArray[np.int8],
+        bbox: BoundingBox,
+        trj: Trajectory,
+        volume_mode,
+    ) -> None:
         ren = vtkRenderer()
 
         Visualizer.add_img_actor(ren, img, volume_mode, bbox)
@@ -880,31 +905,37 @@ class Visualizer:
         iren.Start()
 
     @staticmethod
-    def animate_trajectoryes(trjs: List[Trajectory], periodic: bool = False, plot_box: bool = True) -> None:
-
-        def discr(points: npt.NDArray[np.float64], count: int) -> npt.NDArray[np.float64]:
+    def animate_trajectoryes(
+        trjs: List[Trajectory], periodic: bool = False, plot_box: bool = True
+    ) -> None:
+        def discr(
+            points: npt.NDArray[np.float64], count: int
+        ) -> npt.NDArray[np.float64]:
             npoints = np.zeros(
-                shape=((count + 1)*(points.shape[0] - 1) + 1, 3), dtype=np.float64)
+                shape=((count + 1) * (points.shape[0] - 1) + 1, 3),
+                dtype=np.float64,
+            )
             for i in range(points.shape[0] - 1):
                 d = points[i + 1] - points[i]
                 for j in range(count + 1):
-                    npoints[j + i * (count+1)] = points[i] + j*d/(count+1)
+                    npoints[j + i * (count + 1)] = points[i] + j * d / (
+                        count + 1
+                    )
             npoints[-1] = points[-1]
             return npoints
 
         renderer = vtkRenderer()
         data = []
         for trj in trjs:
-            radius = trj.atom_size*0.25
+            radius = trj.atom_size * 0.25
             p = trj.points if periodic else trj.points_without_periodic()
             sphere_actor = Visualizer.create_sphere_actor(
-                p[0, :], trj.atom_size)
+                p[0, :], trj.atom_size
+            )
 
             renderer.AddActor(sphere_actor)
             npoints = discr(p, 5)
-            data.append(AnimationActorData(sphere_actor,
-                                           npoints,
-                                           radius))
+            data.append(AnimationActorData(sphere_actor, npoints, radius))
         if plot_box:
             outfit_actor = Visualizer.create_box_actor(trjs[0].box)
             renderer.AddActor(outfit_actor)

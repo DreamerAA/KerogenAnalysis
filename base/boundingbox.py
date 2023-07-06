@@ -2,7 +2,6 @@ from typing import List, Optional, Tuple
 
 import numpy as np
 import numpy.typing as npt
-
 from scipy.spatial.distance import cdist
 
 
@@ -12,7 +11,9 @@ class Range(object):
         mmin: float = float(np.finfo(np.float64).max),
         mmax: float = float(np.finfo(np.float64).min),
     ):
-        if mmin != float(np.finfo(float).max) and mmax != float(np.finfo(float).min):
+        if mmin != float(np.finfo(float).max) and mmax != float(
+            np.finfo(float).min
+        ):
             assert mmin <= mmax
         self.min_ = mmin
         self.max_ = mmax
@@ -36,7 +37,7 @@ class Range(object):
         return self.min_ <= v and v <= self.max_
 
     def center(self) -> float:
-        return (self.max_ + self.min_)*0.5
+        return (self.max_ + self.min_) * 0.5
 
 
 class BoundingBox(object):

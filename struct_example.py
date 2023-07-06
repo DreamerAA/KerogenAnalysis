@@ -8,14 +8,13 @@ import networkx as nx
 import numpy as np
 import numpy.typing as npt
 
-from base.kerogendata import AtomData, KerogenData
 from base.boundingbox import BoundingBox
+from base.kerogendata import AtomData, KerogenData
 from base.periodizer import Periodizer
-from processes.segmentaion import Segmentator
-from visualizer.visualizer import Visualizer
 from base.reader import Reader
 from base.trajectory import Trajectory
-
+from processes.segmentaion import Segmentator
+from visualizer.visualizer import Visualizer
 
 methan_radius = 0.0
 
@@ -24,7 +23,10 @@ atom_real_sizes = {
 }
 
 ext_radius = {
-    i: s for i, s in enumerate([methan_radius, methan_radius, methan_radius, 0., methan_radius])
+    i: s
+    for i, s in enumerate(
+        [methan_radius, methan_radius, methan_radius, 0.0, methan_radius]
+    )
 }
 
 
@@ -101,7 +103,11 @@ def write_binary_file(array: npt.NDArray[np.int8], file_name: str) -> None:
 
 
 def filter_linked_list(link_list, atom_to_rm) -> List[tuple[int, int]]:
-    return [ll for ll in link_list if ll[0] not in atom_to_rm and ll[1] not in atom_to_rm]
+    return [
+        ll
+        for ll in link_list
+        if ll[0] not in atom_to_rm and ll[1] not in atom_to_rm
+    ]
 
 
 def reset_atom_id(link_list, old_to_new) -> List[tuple[int, int]]:
@@ -127,7 +133,8 @@ if __name__ == '__main__':
     path_to_traj = "../data/Kerogen/meth_0.5_micros.gro"
 
     atoms, size, linked_list = Reader.read_struct_and_linked_list(
-        path_to_structure, path_to_linklist)
+        path_to_structure, path_to_linklist
+    )
 
     # div = 4
     # box = Segmentator.cut_cell(size, div)# type: ignore
@@ -164,10 +171,11 @@ if __name__ == '__main__':
 
     ref_size = 150
     file_name = (path_to_structure.split("/")[-1]).split(".")[0]
-    binarized_file_name = (""
-                           # f"../data/Kerogen/result_img_{file_name}_rs={ref_size}_mr={methan_radius}_div={div}.npy"
-                           f"../data/Kerogen/result_img_{file_name}_rs={ref_size}_mr={methan_radius}_num_traj={num_traj}.npy"
-                           )
+    binarized_file_name = (
+        ""
+        # f"../data/Kerogen/result_img_{file_name}_rs={ref_size}_mr={methan_radius}_div={div}.npy"
+        f"../data/Kerogen/result_img_{file_name}_rs={ref_size}_mr={methan_radius}_num_traj={num_traj}.npy"
+    )
 
     if os.path.isfile(binarized_file_name):
         with open(binarized_file_name, 'rb') as f:  # type: ignore

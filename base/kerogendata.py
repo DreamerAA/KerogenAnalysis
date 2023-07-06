@@ -1,9 +1,11 @@
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
-from base.boundingbox import BoundingBox
+
 import networkx as nx
 import numpy as np
 import numpy.typing as npt
+
+from base.boundingbox import BoundingBox
 
 
 @dataclass
