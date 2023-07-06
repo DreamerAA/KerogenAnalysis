@@ -738,11 +738,6 @@ class Visualizer:
             lines.InsertCellPoint(i)
 
             color_data.InsertNextValue(colors[i])
-            # if i != 0:
-            #     v = cdists[i-1]/cdists[-1]
-            #     color_data.InsertNextValue(v)
-            # else:
-            #     color_data.InsertNextValue(0)
 
         poly_data = vtkPolyData()
         poly_data.SetPoints(vpoints)
@@ -764,7 +759,7 @@ class Visualizer:
         actor.SetMapper(mapper)
         actor.GetProperty().SetDiffuse(0.7)
         actor.GetProperty().SetSpecular(0.4)
-        actor.GetProperty().SetSpecularPower(0)
+        actor.GetProperty().SetSpecularPower(1)
         actor.GetProperty().BackfaceCullingOn()
         return actor, poly_data, tube_filter
 

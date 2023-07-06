@@ -63,11 +63,12 @@ class SpectralAnalizer:
                         (List_min_max[:, 1]-List_min_max[:, 0]+1) <= crit)[0]
                     if len(list_index_false_trap) != 0:
                         for ind_false_trap in list_index_false_trap:
-                            list_trapped_m[List_min_max[ind_false_trap, 0]
-                                :List_min_max[ind_false_trap, 1]] = 0
+                            list_trapped_m[List_min_max[ind_false_trap, 0]:(
+                                List_min_max[ind_false_trap, 1] + 1)] = 0
 
                 list_trapped = np.logical_or(list_trapped, list_trapped_m > 0)
         trj.clusters = list_trapped
+        print(trj.clusters.sum())
 
     # +
     def laplacian_matrix(self, trj: Trajectory, T_mean: int, mu: float) -> npt.NDArray[np.float64]:
@@ -76,14 +77,15 @@ class SpectralAnalizer:
         No = trj.count_points()
         points = trj.points_without_periodic()
         inc = points[1:,] - points[:-1,]
-        std = np.std(inc, 0)
+        std = np.std(inc, 0, ddof=1)
         tmp = np.zeros(shape=(No, 3), dtype=np.float64)
         tmp[1:, :] = inc/std
         normal_inc = np.cumsum(tmp, 0)
         S = np.zeros(shape=(No, No))
         for i in range(No):
             # ((Xo-Xo(i,1)).^2+(Yo-Yo(i,1)).^2).^0.5;
-            S[:, i] = np.sum((normal_inc-normal_inc[i, :])**2, 1)
+            ts = (normal_inc-normal_inc[i, :])**2
+            S[:, i] = np.sum(ts, 1)
             S[i, :] = S[:, i]
 
         S2b = np.exp(-0.5*S/mu**2)
@@ -101,7 +103,7 @@ class SpectralAnalizer:
         np.fill_diagonal(mat, True)  # first diagonal
         #  other diagonal depending on the radius size
         num_max = self.diag_fill_list[int(2*mu) - 1]
-        for num in range(num_max):
+        for num in range(1, num_max + 1):
             ind = np.array(range(N-num))
             mat[ind, ind+num] = True
             mat[ind+num, ind] = True
@@ -145,7 +147,7 @@ class SpectralAnalizer:
 
     def Make_list_min_max_index_equal(self, list_trapped_m):
         N_vec = len(list_trapped_m)
-        index = 1
+        index = 0
         List_min_max = []
         stop = 0
         while stop == 0:
