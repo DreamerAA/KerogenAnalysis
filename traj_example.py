@@ -59,6 +59,7 @@ if __name__ == '__main__':
 
     # visualize_trajectory(trajectories[2])
 
+    print('shape', trajectories[2].points.shape)
     start = time.time()
     analizer = SpectralAnalizer(trajectories[2])
     end = time.time()
