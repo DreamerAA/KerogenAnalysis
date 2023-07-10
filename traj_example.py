@@ -39,17 +39,16 @@ if __name__ == '__main__':
     parser.add_argument(
         '--path',
         type=str,
-        default="../data/meth_traj.gro",
+        default="../data/meth_traj.gro"
         # default = "../data/methan_traj/meth_1.7_micros.1.gro"
         # default = "../data/h2_micros/h2_micros.1.gro"
-        help='provide an integer (default: 2)',
     )
     path_to_traj = parser.parse_args()
 
-    path_to_traj = "../data/meth_traj.gro"
+    # path_to_traj = "../data/meth_traj.gro"
     # path_to_traj = "../data/methan_traj/meth_1.7_micros.1.gro"
     # path_to_traj = "../data/h2_micros/h2_micros.1.gro"
-    trajectories = Trajectory.read_trajectoryes(path_to_traj)
+    trajectories = Trajectory.read_trajectoryes(path_to_traj.path)
 
     # visualize_trajectories(trajectories)
     # animate_trajectoryes(trajectories)

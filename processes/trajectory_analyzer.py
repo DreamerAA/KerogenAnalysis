@@ -54,19 +54,41 @@ async def afind_min_max_index(index: int,
 
 @dataclass
 class AnalizerParams:
-    traj_type = 'fBm'  # can be `fbm` or `Bm`
-    nu: float = 0.1  # can be 0.1,0.3,0.5,0.75,0.9,1; (0.75 in the article)
-    diag_percentile: int = 50  # can be 0,5,10 or 50 (10 in the article)
+    """ reference motion type for simulations
+        can be `fBm` or `Bm`
+        fBm - fractional Brownian Motion 
+    """
+    traj_type: str = 'fBm'
+
+    """ Critical value for the invariant (1 is perfect square)
+        can be 0.1,0.3,0.5,0.75,0.9,1; (0.75 in the article)
+    """
+    nu: float = 0.1
+
+    """ Percentile of block time from reference free motion to be used to fill diagonal lines
+        can be 0,5,10 or 50 (10 in the article)
+    """
+    diag_percentile: int = 50
+
+    """ Kenrel size for convolution of distance matrix
+    """
     kernel_size: int = 2
+
+    """ 
+        maximum range ([0.5,1,1.5,2,2.5,3])
+    """
+    list_mu: npt.NDArray[np.float64] = np.array([1, 1.5, 2])
+
+    """ can be any percentile (minimum 0.01), (0.05 in the article)
+        from 0 to 1
+    """
+    p_value: float = 0.01
 
 
 class TrajectoryAnalizer:
     def __init__(self, trj: Trajectory, params: AnalizerParams):
         self.params = params
-        # can be any percentile (minimum 0.01), (0.05 in the article)
-        self.p_value = 0.01
-        # maximum range ([0.5,1,1.5,2,2.5,3])
-        self.list_mu = np.array([1, 1.5, 2])
+
         self.kernel = np.ones(shape=(2 * params.kernel_size + 1, 2 * params.kernel_size + 1)) / (2 * params.kernel_size + 1)**2
 
         self.diag_fill_list = list_vert_median[
@@ -81,9 +103,9 @@ class TrajectoryAnalizer:
         list_threshold = mat["list_threshold"][method]
         list_trapped = np.zeros(shape=(count_points,), dtype=np.bool_)
 
-        for mu in self.list_mu:
+        for mu in params.list_mu:
             ind1 = int(mu * 2) - 1
-            ind2 = int((1.0 - self.p_value) * 100.0) - 1
+            ind2 = int((1.0 - params.p_value) * 100.0) - 1
             crit = list_threshold[ind1, ind2]
             if count_points > crit:
                 (
