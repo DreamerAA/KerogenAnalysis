@@ -7,24 +7,12 @@ import numpy.typing as npt
 import scipy.io
 
 # %matplotlib inline
-from mpl_toolkits.mplot3d import Axes3D
 from scipy import ndimage
 from scipy.signal import convolve2d
 from skimage import measure
-from sklearn.cluster import (
-    DBSCAN,
-    AffinityPropagation,
-    AgglomerativeClustering,
-    BisectingKMeans,
-    KMeans,
-    MeanShift,
-    SpectralClustering,
-)
-from sklearn.metrics import silhouette_score
-from sklearn.mixture import GaussianMixture
-
+import asyncio
 from base.trajectory import Trajectory
-
+from dataclasses import dataclass
 list_mu = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6]
 
 list_vert_median = {
@@ -39,25 +27,56 @@ list_vert_median = {
 }
 
 
-class SpectralAnalizer:
-    def __init__(self, trj: Trajectory):
-        self.p_val_traj_type = 'fBm'
-        self.diag_percentile = 50  # can be 0,5,10 or 50 (10 in the article)
-        self.nu = 0.1  # can be 0.1,0.3,0.5,0.75,0.9,1; (0.75 in the article)
+def find_min_max_index(
+    index: int,
+    arr: npt.NDArray[np.int64]
+) -> Tuple[int, int]:
+
+    N = len(arr)
+    tpos_up = index
+    tpos_down = index
+    for v in arr[(index + 1):]:
+        if v == 0 or tpos_up == N - 1:
+            break
+        tpos_up += 1
+    for v in arr[:(index)][::-1]:
+        if v == 0 or tpos_down == 0:
+            break
+        tpos_down -= 1
+
+    return tpos_down, tpos_up
+
+
+async def afind_min_max_index(index: int,
+                              arr: npt.NDArray[np.int64]) -> Tuple[int, int]:
+    return find_min_max_index(index, arr)
+
+
+@dataclass
+class AnalizerParams:
+    traj_type = 'fBm'  # can be `fbm` or `Bm`
+    nu: float = 0.1  # can be 0.1,0.3,0.5,0.75,0.9,1; (0.75 in the article)
+    diag_percentile: int = 50  # can be 0,5,10 or 50 (10 in the article)
+    kernel_size: int = 2
+
+
+class TrajectoryAnalizer:
+    def __init__(self, trj: Trajectory, params: AnalizerParams):
+        self.params = params
         # can be any percentile (minimum 0.01), (0.05 in the article)
         self.p_value = 0.01
         # maximum range ([0.5,1,1.5,2,2.5,3])
         self.list_mu = np.array([1, 1.5, 2])
-        self.T_mean = 2
-        self.sig_noise = 0
+        self.kernel = np.ones(shape=(2 * params.kernel_size + 1, 2 * params.kernel_size + 1)) / (2 * params.kernel_size + 1)**2
+
         self.diag_fill_list = list_vert_median[
-            (self.diag_percentile, self.p_val_traj_type)
+            (self.params.diag_percentile, self.params.traj_type)
         ]
         count_points = trj.count_points()
 
-        method = self.p_val_traj_type + "_3D"
+        method = self.params.traj_type + "_3D"
         mat = mat73.loadmat(
-            f"./list_threshold/nuc{int(self.nu*100)}diag_perc={self.diag_percentile}.mat"
+            f"./list_threshold/nuc{int(self.params.nu*100)}diag_perc={self.params.diag_percentile}.mat"
         )
         list_threshold = mat["list_threshold"][method]
         list_trapped = np.zeros(shape=(count_points,), dtype=np.bool_)
@@ -74,7 +93,7 @@ class SpectralAnalizer:
                 ) = self.RQA_block_measures(trj, mu)
                 list_trapped_m = (
                     list_vertical_m / (list_parallel_m + list_diagonal_m - 1)
-                    > self.nu
+                    > self.params.nu
                 )
                 List_min_max = self.Make_list_min_max_index_equal(
                     list_trapped_m
@@ -95,7 +114,7 @@ class SpectralAnalizer:
         trj.traps = list_trapped
 
     def laplacian_matrix(
-        self, trj: Trajectory, T_mean: int, mu: float
+        self, trj: Trajectory, mu: float
     ) -> npt.NDArray[np.float64]:
         # UNTITLED3 Summary of this function goes here
         #    Detailed explanation goes here
@@ -114,9 +133,8 @@ class SpectralAnalizer:
             S[i, :] = S[:, i]
 
         S2b = np.exp(-0.5 * S / mu**2)
-        # mfilter = np.ones(shape=(2*T_mean+1, 2*T_mean+1))/(2*T_mean+1)**2
-        # S3: npt.NDArray[np.float64] = convolve2d(S2b, mfilter, 'same')
-        S3 = S2b
+        S3: npt.NDArray[np.float64] = convolve2d(S2b, self.kernel, 'same')
+        # S3 = S2b
         return S3
 
     def RQA_block_measures(
@@ -126,7 +144,7 @@ class SpectralAnalizer:
     ]:
         N = trj.count_points()
         # Laplacian matrix (distance matrix)
-        S3 = self.laplacian_matrix(trj, self.T_mean, mu)
+        S3 = self.laplacian_matrix(trj, mu)
         mat = S3 > np.exp(-1)
         # fill diagonals
         np.fill_diagonal(mat, True)  # first diagonal
@@ -160,19 +178,16 @@ class SpectralAnalizer:
             index = np.where(
                 np.logical_and(list_diag_ind == n, list_diag_ind[::-1] == n)
             )[0][0]
-            pos_down, pos_up = self.find_min_max_index_equal(
-                index, list_bin_vert == 1, 1
-            )
-            # vertical
-            pos_down_v, pos_up_v = self.find_min_max_index_equal(
-                n, matrix[:, n] == 1
-            )
+
+            ud_bin, ud_ver = asyncio.run(TrajectoryAnalizer.get_up_down(index, n , list_bin_vert == 1, matrix[:, n] == 1))
+            pos_down, pos_up = ud_bin
+            pos_down_v, pos_up_v = ud_ver
             list_vertical[n] = pos_up_v - pos_down_v + 1
 
             #  diagonal
             list_diagonal[n] = pos_up - pos_down + 1
             #  parallel
-            pos_down_par, pos_up_par = self.find_min_max_index_equal(
+            pos_down_par, pos_up_par = find_min_max_index(
                 n - (list_diagonal[n] - 1) // 2,
                 matrix.diagonal(list_diagonal[n] - 1),
             )
@@ -188,7 +203,7 @@ class SpectralAnalizer:
         stop = 0
         while stop == 0:
             if list_trapped_m[index] == 1:
-                pos_down, pos_up = self.find_min_max_index_equal(
+                pos_down, pos_up = find_min_max_index(
                     index, list_trapped_m
                 )
                 List_min_max.append((pos_down, pos_up))
@@ -203,35 +218,9 @@ class SpectralAnalizer:
         result[:, 1] = [a for _, a in List_min_max]
         return result
 
-    def find_min_max_index_equal(
-        self,
-        index: int,
-        vector_to_test: npt.NDArray[np.int64],
-        quantity: int = 1,
-    ) -> Tuple[int, int]:
-        N = len(vector_to_test)
-        stop_up = 0
-        stop_down = 0
-        pos_up = index
-        pos_down = index
-        for z in range(N):
-            if stop_up == 0:
-                if pos_up + 1 < N:
-                    if vector_to_test[pos_up + 1] == quantity:
-                        pos_up = pos_up + 1
-                    else:
-                        stop_up = 1
-                else:
-                    stop_up = 1
-            if stop_down == 0:
-                if pos_down - 1 >= 0:
-                    if vector_to_test[pos_down - 1] == quantity:
-                        pos_down = pos_down - 1
-                    else:
-                        stop_down = 1
-                else:
-                    stop_down = 1
-
-            if stop_up == 1 and stop_down == 1:
-                break
-        return pos_down, pos_up
+    @staticmethod
+    async def get_up_down(index, n, bin_arr, vert_arr):
+        bin_task = asyncio.create_task(afind_min_max_index(index, bin_arr))
+        ver_task = asyncio.create_task(afind_min_max_index(n, vert_arr))
+        done, _ = await asyncio.wait([bin_task, ver_task])
+        return [fut.result() for fut in done]

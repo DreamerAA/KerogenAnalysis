@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from base.trajectory import Trajectory
-from processes.trajectory_analyzer import SpectralAnalizer
+from processes.trajectory_analyzer import TrajectoryAnalizer, AnalizerParams
 from visualizer.visualizer import Visualizer
 
 
@@ -61,14 +61,15 @@ if __name__ == '__main__':
 
     print('shape', trajectories[2].points.shape)
     start = time.time()
-    analizer = SpectralAnalizer(trajectories[2])
+    params = AnalizerParams()
+    analizer = TrajectoryAnalizer(trajectories[2], params)
     end = time.time()
     print(f"Elapsed time analizer: {end-start}")
     # np.save('clusters.npy', trajectories[2].traps)
 
     # trajectories[2].traps = np.load("clusters.npy")
 
-    visualize_trajectory(trajectories[2], 'clusters')
+    # visualize_trajectory(trajectories[2], 'clusters')
     # visualize_trajectory(trajectories[2], 'dist')
 
     # for method in range(1):

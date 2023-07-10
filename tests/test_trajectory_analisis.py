@@ -4,7 +4,7 @@ import pytest
 
 from base.boundingbox import BoundingBox
 from base.trajectory import Trajectory
-from processes.trajectory_analyzer import SpectralAnalizer
+from processes.trajectory_analyzer import TrajectoryAnalizer
 import os
 
 
@@ -30,7 +30,7 @@ def expected_result(test_path: str) -> npt.NDArray[np.bool_]:
 
 
 def test_trajectory_analizer_regression(trajectory: Trajectory, expected_result: npt.NDArray[np.bool_], test_path: str) -> None:
-    _ = SpectralAnalizer(trajectory)
+    _ = TrajectoryAnalizer(trajectory)
     print(trajectory.traps)
     print("trajectory.traps")
     assert trajectory.traps is not None
