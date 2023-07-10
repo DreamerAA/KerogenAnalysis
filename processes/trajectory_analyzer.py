@@ -47,9 +47,9 @@ def find_min_max_index(
     return tpos_down, tpos_up
 
 
-async def afind_min_max_index(index: int,
-                              arr: npt.NDArray[np.int64]) -> Tuple[int, int]:
-    return find_min_max_index(index, arr)
+# async def afind_min_max_index(index: int,
+#                               arr: npt.NDArray[np.int64]) -> Tuple[int, int]:
+#     return find_min_max_index(index, arr)
 
 
 @dataclass
@@ -163,8 +163,8 @@ class TrajectoryAnalizer:
             S[i, :] = S[:, i]
 
         S2b = np.exp(-0.5 * S / mu**2)
-        S3: npt.NDArray[np.float64] = convolve2d(S2b, self.kernel, 'same')
-        # S3 = S2b
+        # S3: npt.NDArray[np.float64] = convolve2d(S2b, self.kernel, 'same')
+        S3 = S2b
         return S3
 
     def RQA_block_measures(
@@ -209,7 +209,8 @@ class TrajectoryAnalizer:
                 np.logical_and(list_diag_ind == n, list_diag_ind[::-1] == n)
             )[0][0]
 
-            ud_bin, ud_ver = asyncio.run(TrajectoryAnalizer.get_up_down(index, n , list_bin_vert == 1, matrix[:, n] == 1))
+            # ud_bin, ud_ver = asyncio.run(TrajectoryAnalizer.get_up_down(index, n , list_bin_vert == 1, matrix[:, n] == 1))
+            ud_bin, ud_ver = TrajectoryAnalizer.get_up_down(index, n , list_bin_vert == 1, matrix[:, n] == 1)
             pos_down, pos_up = ud_bin
             pos_down_v, pos_up_v = ud_ver
             list_vertical[n] = pos_up_v - pos_down_v + 1
@@ -248,9 +249,12 @@ class TrajectoryAnalizer:
         result[:, 1] = [a for _, a in List_min_max]
         return result
 
-    @staticmethod
-    async def get_up_down(index, n, bin_arr, vert_arr):
-        bin_task = asyncio.create_task(afind_min_max_index(index, bin_arr))
-        ver_task = asyncio.create_task(afind_min_max_index(n, vert_arr))
-        done, _ = await asyncio.wait([bin_task, ver_task])
-        return [fut.result() for fut in done]
+    # @staticmethod
+    # async def get_up_down(index, n, bin_arr, vert_arr):
+    #     bin_task = asyncio.create_task(afind_min_max_index(index, bin_arr))
+    #     ver_task = asyncio.create_task(afind_min_max_index(n, vert_arr))
+    #     done, _ = await asyncio.wait([bin_task, ver_task])
+    #     return [fut.result() for fut in done]
+
+    def get_up_down(index, n, bin_arr, vert_arr):
+        return find_min_max_index(index, bin_arr), find_min_max_index(n, vert_arr)
