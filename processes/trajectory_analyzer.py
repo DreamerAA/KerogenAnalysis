@@ -61,6 +61,7 @@ class AnalizerParams:
     traj_type: str = 'fBm'
 
     """ Critical value for the invariant (1 is perfect square)
+        a parameter that affects the condition, which is a trap. The maximum value for the invariant.
         can be 0.1,0.3,0.5,0.75,0.9,1; (0.75 in the article)
     """
     nu: float = 0.1
@@ -70,17 +71,24 @@ class AnalizerParams:
     """
     diag_percentile: int = 50
 
-    """ Kenrel size for convolution of distance matrix
+    """ + Kenrel size for convolution of distance matrix
     """
     kernel_size: int = 2
 
     """ 
         maximum range ([0.5,1,1.5,2,2.5,3])
+        Used to normalize the distance matrix. (lambda in article)
+        and by default affects the number of filled diagonals in the distance matrix
     """
     list_mu: npt.NDArray[np.float64] = np.array([1, 1.5, 2])
 
     """ can be any percentile (minimum 0.01), (0.05 in the article)
         from 0 to 1
+        affects the maximum size of the trap, in time, 
+        if the size is larger than the critical one (crit),
+        such a trap is not accepted by the algorithm
+        In this case, the number of points in the trajectory 
+        must be greater than the critical value (crit)
     """
     p_value: float = 0.01
 
@@ -92,14 +100,14 @@ class TrajectoryAnalizer:
         self.kernel = np.ones(shape=(2 * params.kernel_size + 1, 2 * params.kernel_size + 1)) / (2 * params.kernel_size + 1)**2
 
         self.diag_fill_list = list_vert_median[
-            (self.params.diag_percentile, self.params.traj_type)
+            (self.params.diag_percentile, params.traj_type)
         ]
         count_points = trj.count_points()
 
-        method = self.params.traj_type + "_3D"
         mat = mat73.loadmat(
             f"./list_threshold/nuc{int(self.params.nu*100)}diag_perc={self.params.diag_percentile}.mat"
         )
+        method = params.traj_type + "_3D"
         list_threshold = mat["list_threshold"][method]
         list_trapped = np.zeros(shape=(count_points,), dtype=np.bool_)
 
@@ -217,16 +225,16 @@ class TrajectoryAnalizer:
         return list_vertical, list_diagonal, list_parallel
 
     def Make_list_min_max_index_equal(
-        self, list_trapped_m: npt.NDArray[np.bool_]
+        self, list_trapped: npt.NDArray[np.bool_]
     ) -> npt.NDArray[np.int64]:
-        N_vec = len(list_trapped_m)
+        N_vec = len(list_trapped)
         index = 0
         List_min_max = []
         stop = 0
         while stop == 0:
-            if list_trapped_m[index] == 1:
+            if list_trapped[index] == 1:
                 pos_down, pos_up = find_min_max_index(
-                    index, list_trapped_m
+                    index, list_trapped
                 )
                 List_min_max.append((pos_down, pos_up))
                 index = pos_up + 1
