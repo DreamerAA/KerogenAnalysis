@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
 import scipy.io
-
+from numba import njit, jit
 # %matplotlib inline
 from scipy import ndimage
 from scipy.signal import convolve2d
@@ -26,7 +26,7 @@ list_vert_median = {
     (50, 'fBm'): [1, 2, 9, 20, 37, 62, 93, 132, 181, 238, 302, 376],
 }
 
-
+@njit
 def find_min_max_index(
     index: int,
     arr: npt.NDArray[np.int64]
@@ -45,11 +45,6 @@ def find_min_max_index(
         tpos_down -= 1
 
     return tpos_down, tpos_up
-
-
-# async def afind_min_max_index(index: int,
-#                               arr: npt.NDArray[np.int64]) -> Tuple[int, int]:
-#     return find_min_max_index(index, arr)
 
 
 @dataclass
@@ -209,7 +204,6 @@ class TrajectoryAnalizer:
                 np.logical_and(list_diag_ind == n, list_diag_ind[::-1] == n)
             )[0][0]
 
-            # ud_bin, ud_ver = asyncio.run(TrajectoryAnalizer.get_up_down(index, n , list_bin_vert == 1, matrix[:, n] == 1))
             ud_bin, ud_ver = TrajectoryAnalizer.get_up_down(index, n , list_bin_vert == 1, matrix[:, n] == 1)
             pos_down, pos_up = ud_bin
             pos_down_v, pos_up_v = ud_ver
@@ -248,13 +242,6 @@ class TrajectoryAnalizer:
         result[:, 0] = [a for a, _ in List_min_max]
         result[:, 1] = [a for _, a in List_min_max]
         return result
-
-    # @staticmethod
-    # async def get_up_down(index, n, bin_arr, vert_arr):
-    #     bin_task = asyncio.create_task(afind_min_max_index(index, bin_arr))
-    #     ver_task = asyncio.create_task(afind_min_max_index(n, vert_arr))
-    #     done, _ = await asyncio.wait([bin_task, ver_task])
-    #     return [fut.result() for fut in done]
 
     def get_up_down(index, n, bin_arr, vert_arr):
         return find_min_max_index(index, bin_arr), find_min_max_index(n, vert_arr)
