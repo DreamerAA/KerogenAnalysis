@@ -39,7 +39,8 @@ if __name__ == '__main__':
     parser.add_argument(
         '--path',
         type=str,
-        default="../data/meth_traj.gro"
+        # default="../data/meth_traj.gro"
+        default="../data/Kerogen/meth_traj.gro"
         # default = "../data/methan_traj/meth_1.7_micros.1.gro"
         # default = "../data/h2_micros/h2_micros.1.gro"
     )

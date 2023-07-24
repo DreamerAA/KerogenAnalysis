@@ -8,7 +8,7 @@ import networkx as nx
 import numpy as np
 import numpy.typing as npt
 
-from base.boundingbox import BoundingBox
+from base.boundingbox import BoundingBox, Range
 from base.kerogendata import AtomData, KerogenData
 from base.periodizer import Periodizer
 from base.reader import Reader
@@ -90,8 +90,7 @@ def test_kerogen_data() -> KerogenData:
             for i, atom in enumerate(atoms)
         ]
     )
-
-    kerogen_data = KerogenData(g, atoms, (1.0, 1.0, 1.0))
+    kerogen_data = KerogenData(g, atoms, BoundingBox(Range(0, 1), Range(0, 1), Range(0, 1)))
     return kerogen_data
 
 

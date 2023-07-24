@@ -13,10 +13,10 @@ class Periodizer:
                 return old - s
             return old
 
-        sx, sy, sz = kerogen.size
+        sx, sy, sz = kerogen.box.max()
         for a in kerogen.atoms:
             x, y, z = a.pos
-            a.pos = (new_coord(x, sx), new_coord(y, sy), new_coord(z, sz))
+            a.pos = np.array([new_coord(x, sx), new_coord(y, sy), new_coord(z, sz)])
 
         Periodizer.rm_long_edges(kerogen)
 

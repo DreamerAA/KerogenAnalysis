@@ -29,7 +29,7 @@ def expected_result(test_path: str) -> npt.NDArray[np.bool_]:
     return np.load(test_path + "expected_result.npy")  # type: ignore
 
 
-def test_trajectory_analizer_regression(trajectory: Trajectory, expected_result: npt.NDArray[np.bool_], test_path: str) -> None:
+def test_trajectory_analizer_regression(trajectory: Trajectory, expected_result: npt.NDArray[np.bool_]) -> None:
     _ = TrajectoryAnalizer(trajectory, AnalizerParams())
     print(trajectory.traps)
     print("trajectory.traps")

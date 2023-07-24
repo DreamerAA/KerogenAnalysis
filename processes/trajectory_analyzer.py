@@ -26,6 +26,7 @@ list_vert_median = {
     (50, 'fBm'): [1, 2, 9, 20, 37, 62, 93, 132, 181, 238, 302, 376],
 }
 
+
 @njit
 def find_min_max_index(
     index: int,
@@ -79,7 +80,7 @@ class AnalizerParams:
 
     """ can be any percentile (minimum 0.01), (0.05 in the article)
         from 0 to 1
-        affects the maximum size of the trap, in time, 
+        affects the minimum size of the trap, in time, 
         if the size is larger than the critical one (crit),
         such a trap is not accepted by the algorithm
         In this case, the number of points in the trajectory 
@@ -106,36 +107,42 @@ class TrajectoryAnalizer:
         list_threshold = mat["list_threshold"][method]
         list_trapped = np.zeros(shape=(count_points,), dtype=np.bool_)
 
+        # def analyse_by_mu(mu):
+
         for mu in params.list_mu:
             ind1 = int(mu * 2) - 1
-            ind2 = int((1.0 - params.p_value) * 100.0) - 1
+            ind2 = int((1.0 - params.p_value) * 100.0) - 1  # check this shift
             crit = list_threshold[ind1, ind2]
-            if count_points > crit:
-                (
-                    list_vertical_m,
-                    list_diagonal_m,
-                    list_parallel_m,
-                ) = self.RQA_block_measures(trj, mu)
-                list_trapped_m = (
-                    list_vertical_m / (list_parallel_m + list_diagonal_m - 1)
-                    > self.params.nu
-                )
-                List_min_max = self.Make_list_min_max_index_equal(
-                    list_trapped_m
-                )
-                if len(List_min_max) != 0:
-                    list_index_false_trap = np.where(
-                        (List_min_max[:, 1] - List_min_max[:, 0] + 1) <= crit
-                    )[0]
-                    if len(list_index_false_trap) != 0:
-                        for ind_false_trap in list_index_false_trap:
-                            list_trapped_m[
-                                List_min_max[ind_false_trap, 0] : (
-                                    List_min_max[ind_false_trap, 1] + 1
-                                )
-                            ] = 0
+            if count_points < crit:
+                continue
+            (
+                list_vertical_m,
+                list_diagonal_m,
+                list_parallel_m,
+            ) = self.RQA_block_measures(trj, mu)
 
-                list_trapped = np.logical_or(list_trapped, list_trapped_m > 0)
+            list_trapped_m = (
+                list_vertical_m / (list_parallel_m + list_diagonal_m - 1)
+                > self.params.nu
+            )
+
+            List_min_max = self.Make_list_min_max_index_equal(
+                list_trapped_m
+            )
+
+            if len(List_min_max) == 0:
+                continue
+            length_traps = List_min_max[:, 1] - List_min_max[:, 0] + 1
+            list_index_false_trap = np.where(length_traps <= crit)[0]
+
+            if len(list_index_false_trap) == 0:
+                continue
+
+            for ind_false_trap in list_index_false_trap:
+                i1, i2 = List_min_max[ind_false_trap, 0], List_min_max[ind_false_trap, 1] + 1
+                list_trapped_m[i1:i2] = 0
+
+            list_trapped = np.logical_or(list_trapped, list_trapped_m > 0)
         trj.traps = list_trapped
 
     def laplacian_matrix(
@@ -159,7 +166,7 @@ class TrajectoryAnalizer:
 
         S2b = np.exp(-0.5 * S / mu**2)
         # S3: npt.NDArray[np.float64] = convolve2d(S2b, self.kernel, 'same')
-        S3 = S2b
+        S3 = S2b.astype(dtype=np.float64)
         return S3
 
     def RQA_block_measures(

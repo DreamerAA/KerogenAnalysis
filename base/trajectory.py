@@ -18,7 +18,7 @@ class Trajectory:
     def dists(self) -> npt.NDArray[np.float64]:
         return Trajectory.extractDists(self.points_without_periodic())
 
-    def is_intersect_borders(self) -> bool:
+    def is_intersect_borders(self) -> np.bool_:
         ppoints = self.points_without_periodic()
         xmask = np.logical_or(
             ppoints[:, 0] > self.box.xb_.max_, ppoints[:, 0] < 0
