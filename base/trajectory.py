@@ -3,7 +3,7 @@ from typing import List, Optional
 
 import numpy as np
 import numpy.typing as npt
-
+from functools import cached_property
 from base.boundingbox import BoundingBox, Range
 
 
@@ -14,6 +14,7 @@ class Trajectory:
     box: BoundingBox
     atom_size: float = 0.19
     traps: Optional[npt.NDArray[np.bool_]] = None
+    # non_periodic_points: Optional[npt.NDArray[np.float64]] = None
 
     def dists(self) -> npt.NDArray[np.float64]:
         return Trajectory.extractDists(self.points_without_periodic())
@@ -48,6 +49,7 @@ class Trajectory:
         dist = np.sqrt(sq_dist)
         return np.array(dist, dtype=np.float64)
 
+    @cached_property
     def points_without_periodic(self) -> npt.NDArray[np.float64]:
         borders = self.box.max()
         s_2 = borders.min() / 2
