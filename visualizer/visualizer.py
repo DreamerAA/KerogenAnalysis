@@ -99,8 +99,8 @@ class vtkTimerCallbackCamera:
 class AnimationActorData:
     sphere_actor: vtkActor
     # polyline_actor: vtkActor
-    points: npt.NDArray[np.float64]
-    # dists: npt.NDArray[np.float64]
+    points: npt.NDArray[np.float32]
+    # dists: npt.NDArray[np.float32]
     # polydata: vtkPolyData
     # tube_filter: vtkTubeFilter
     radius: float
@@ -582,14 +582,14 @@ class Visualizer:
             ren.AddActor(mactor)
 
         if bbox is not None:
-            pmin = bbox.min()
-            mactor.SetPosition(*pmin)
+            pcenter = bbox.center()
+            mactor.SetPosition(*pcenter)
 
     @staticmethod
-    def draw_img(img: npt.NDArray[np.int8], volume_mode, **kwargs):
+    def draw_img(img: npt.NDArray[np.int8], volume_mode: bool, bbox: BoundingBox, **kwargs) -> None:
         ren = vtkRenderer()
 
-        Visualizer.add_img_actor(ren, img, volume_mode)
+        Visualizer.add_img_actor(ren, img, volume_mode, bbox)
 
         colors = vtkNamedColors()
         ren.SetBackground(colors.GetColor3d("White"))
@@ -603,11 +603,13 @@ class Visualizer:
         iren.SetInteractorStyle(style)
 
         # Add the actors
+        center = bbox.center()
+        cm_pos = center + bbox.size()
 
         camera = ren.GetActiveCamera()
         size = img.shape
-        camera.SetFocalPoint(size[0] / 2, size[1] / 2, size[2] / 2)
-        camera.SetPosition(size[0] * 2, size[1] * 2, size[2] * 2)
+        camera.SetFocalPoint(*center)
+        camera.SetPosition(*cm_pos)
         # renWin.SetSize(640, 640)
 
         renWin.Render()
@@ -638,8 +640,8 @@ class Visualizer:
             clusters = trj.traps
 
             # colors = ndimage.binary_erosion(clusters).astype(clusters.dtype)
-            colors = measure.label(clusters, connectivity=1).astype(np.float64)
-            print(colors.max())
+            colors = measure.label(clusters, connectivity=1).astype(np.float32)
+            # print(colors.max())
             colors /= colors.max()
 
         return Visualizer.create_polyline_actor(
@@ -701,7 +703,7 @@ class Visualizer:
 
     @staticmethod
     def create_sphere_actor(
-        pos: npt.NDArray[np.float64], radius: float
+        pos: npt.NDArray[np.float32], radius: float
     ) -> vtkActor:
         colors = vtkNamedColors()
         sphereSource = vtkSphereSource()
@@ -720,8 +722,8 @@ class Visualizer:
 
     @staticmethod
     def create_polyline_actor(
-        points: npt.NDArray[np.float64],
-        colors: npt.NDArray[np.float64],
+        points: npt.NDArray[np.float32],
+        colors: npt.NDArray[np.float32],
         radius: float,
     ) -> vtkActor:
         count_points = points.shape[0]
@@ -909,11 +911,11 @@ class Visualizer:
         trjs: List[Trajectory], periodic: bool = False, plot_box: bool = True
     ) -> None:
         def discr(
-            points: npt.NDArray[np.float64], count: int
-        ) -> npt.NDArray[np.float64]:
+            points: npt.NDArray[np.float32], count: int
+        ) -> npt.NDArray[np.float32]:
             npoints = np.zeros(
                 shape=((count + 1) * (points.shape[0] - 1) + 1, 3),
-                dtype=np.float64,
+                dtype=np.float32,
             )
             for i in range(points.shape[0] - 1):
                 d = points[i + 1] - points[i]

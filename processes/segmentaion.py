@@ -62,7 +62,8 @@ class Segmentator:
     @staticmethod
     def cut_cell(size: Tuple[float, float, float], dev=4.0) -> KerogenBox:
         maxs = np.max(np.array(size))
-        ax_ns = maxs / dev
+        mins = np.min(np.array(size))
+        ax_ns = min(maxs / dev, mins)
         new_cell_size = tuple(min(ax_ns, s) for s in size)
         minb = tuple((s - ns) / 2 for s, ns in zip(size, new_cell_size))
         maxb = tuple((s + ns) / 2 for s, ns in zip(size, new_cell_size))

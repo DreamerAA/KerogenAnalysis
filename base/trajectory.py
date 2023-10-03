@@ -9,13 +9,13 @@ from base.boundingbox import BoundingBox, Range
 
 @dataclass
 class Trajectory:
-    points: npt.NDArray[np.float64]
-    times: npt.NDArray[np.float64]
+    points: npt.NDArray[np.float32]
+    times: npt.NDArray[np.float32]
     box: BoundingBox
     atom_size: float = 0.19
     traps: Optional[npt.NDArray[np.bool_]] = None
 
-    def dists(self) -> npt.NDArray[np.float64]:
+    def dists(self) -> npt.NDArray[np.float32]:
         return Trajectory.extractDists(self.points_without_periodic())
 
     def is_intersect_borders(self) -> bool:
@@ -40,23 +40,23 @@ class Trajectory:
 
     @staticmethod
     def extractDists(
-        points: npt.NDArray[np.float64],
-    ) -> npt.NDArray[np.float64]:
+        points: npt.NDArray[np.float32],
+    ) -> npt.NDArray[np.float32]:
         diff = points[1:,] - points[:-1,]
         sq_diff = diff * diff
         sq_dist = np.sum(sq_diff, axis=1)
         dist = np.sqrt(sq_dist)
-        return np.array(dist, dtype=np.float64)
+        return np.array(dist, dtype=np.float32)
 
-    def points_without_periodic(self) -> npt.NDArray[np.float64]:
+    def points_without_periodic(self) -> npt.NDArray[np.float32]:
         borders = self.box.max()
         s_2 = borders.min() / 2
         diff = self.points[1:] - self.points[:-1]
-        npoints = np.zeros(shape=self.points.shape, dtype=np.float64)
+        npoints = np.zeros(shape=self.points.shape, dtype=np.float32)
 
         npoints[0, :] = self.points[0, :]
 
-        shift = np.zeros(shape=(3,), dtype=np.float64)
+        shift = np.zeros(shape=(3,), dtype=np.float32)
         for i in range(diff.shape[0]):
             cdiff = diff[i]
             s_mask = np.abs(cdiff) < s_2
@@ -112,12 +112,15 @@ class Trajectory:
                     next(f)
 
         count_step = int(len(ax) / count)
+        count_step = count_step // 5
         trajectories = []
         for i in range(count):
-            points = np.zeros(shape=(count_step, 3), dtype=np.float64)
+            points = np.zeros(shape=(count_step, 3), dtype=np.float32)
             points[:, 0] = [ax[i + j * count] for j in range(count_step)]
             points[:, 1] = [ay[i + j * count] for j in range(count_step)]
             points[:, 2] = [az[i + j * count] for j in range(count_step)]
+
+            points = points[:(count_step // 3), :]
 
             trajectories.append(Trajectory(points, np.array(time_steps), box))
 

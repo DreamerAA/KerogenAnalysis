@@ -26,6 +26,7 @@ list_vert_median = {
     (50, 'fBm'): [1, 2, 9, 20, 37, 62, 93, 132, 181, 238, 302, 376],
 }
 
+
 @njit
 def find_min_max_index(
     index: int,
@@ -75,7 +76,7 @@ class AnalizerParams:
         Used to normalize the distance matrix. (lambda in article)
         and by default affects the number of filled diagonals in the distance matrix
     """
-    list_mu: npt.NDArray[np.float64] = np.array([1, 1.5, 2])
+    list_mu: npt.NDArray[np.float32] = np.array([1, 1.5, 2])
 
     """ can be any percentile (minimum 0.01), (0.05 in the article)
         from 0 to 1
@@ -92,7 +93,7 @@ class TrajectoryAnalizer:
     def __init__(self, trj: Trajectory, params: AnalizerParams):
         self.params = params
 
-        self.kernel = np.ones(shape=(2 * params.kernel_size + 1, 2 * params.kernel_size + 1)) / (2 * params.kernel_size + 1)**2
+        self.kernel = np.ones(shape=(2 * params.kernel_size + 1, 2 * params.kernel_size + 1), dtype=np.float32) / (2 * params.kernel_size + 1)**2
 
         self.diag_fill_list = list_vert_median[
             (self.params.diag_percentile, params.traj_type)
@@ -140,26 +141,24 @@ class TrajectoryAnalizer:
 
     def laplacian_matrix(
         self, trj: Trajectory, mu: float
-    ) -> npt.NDArray[np.float64]:
+    ) -> npt.NDArray[np.float32]:
         # UNTITLED3 Summary of this function goes here
         #    Detailed explanation goes here
         No = trj.count_points()
         points = trj.points_without_periodic()
         inc = points[1:,] - points[:-1,]
         std = np.std(inc, 0, ddof=1)
-        tmp = np.zeros(shape=(No, 3), dtype=np.float64)
+        tmp = np.zeros(shape=(No, 3), dtype=np.float32)
         tmp[1:, :] = inc / std
-        normal_inc = np.cumsum(tmp, 0)
-        S = np.zeros(shape=(No, No))
+        normal_inc = np.cumsum(tmp, 0, dtype=np.float32)
+        S = np.zeros(shape=(No, No), dtype=np.float32)
         for i in range(No):
-            # ((Xo-Xo(i,1)).^2+(Yo-Yo(i,1)).^2).^0.5;
             ts = (normal_inc - normal_inc[i, :]) ** 2
-            S[:, i] = np.sum(ts, 1)
+            S[:, i] = np.sum(ts, 1, dtype=np.float32)
             S[i, :] = S[:, i]
 
         S2b = np.exp(-0.5 * S / mu**2)
-        # S3: npt.NDArray[np.float64] = convolve2d(S2b, self.kernel, 'same')
-        S3 = S2b
+        S3: npt.NDArray[np.float32] = convolve2d(S2b, self.kernel, 'same') if self.params.kernel_size > 0 else S2b
         return S3
 
     def RQA_block_measures(

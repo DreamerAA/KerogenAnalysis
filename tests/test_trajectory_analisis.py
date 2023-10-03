@@ -16,7 +16,7 @@ def test_path() -> str:
 @pytest.fixture
 def trajectory(test_path: str) -> Trajectory:
     fpoints = np.load(test_path + "fpoints.npy")
-    times = np.array(range(fpoints.shape[0]), dtype=np.float64) * 100
+    times = np.array(range(fpoints.shape[0]), dtype=np.float32) * 100
     bbox = BoundingBox()
     bbox.update(np.array([0, 0, 0]))
     bbox.update(np.array([4, 4, 4]))

@@ -14,7 +14,7 @@ class AtomData:
     struct_type: str
     atom_id: str
     type_id: int
-    pos: npt.NDArray[np.float64]
+    pos: npt.NDArray[np.float32]
 
     def tuple_pos(self) -> Tuple[float, float, float]:
         return self.pos[0], self.pos[1], self.pos[2]

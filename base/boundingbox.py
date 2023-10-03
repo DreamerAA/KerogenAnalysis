@@ -8,8 +8,8 @@ from scipy.spatial.distance import cdist
 class Range(object):
     def __init__(
         self,
-        mmin: float = float(np.finfo(np.float64).max),
-        mmax: float = float(np.finfo(np.float64).min),
+        mmin: float = float(np.finfo(np.float32).max),
+        mmax: float = float(np.finfo(np.float32).min),
     ):
         if mmin != float(np.finfo(float).max) and mmax != float(
             np.finfo(float).min
@@ -51,7 +51,7 @@ class BoundingBox(object):
         self.yb_ = Range() if yb is None else yb
         self.zb_ = Range() if zb is None else zb
 
-    def is_inside(self, pos: npt.NDArray[np.float64]) -> bool:
+    def is_inside(self, pos: npt.NDArray[np.float32]) -> bool:
         return (
             self.xb_.is_inside(pos[0])
             and self.yb_.is_inside(pos[1])
@@ -61,16 +61,16 @@ class BoundingBox(object):
     def size(self) -> Tuple[float, float, float]:
         return (self.xb_.diff(), self.yb_.diff(), self.zb_.diff())
 
-    def min(self) -> npt.NDArray[np.float64]:
+    def min(self) -> npt.NDArray[np.float32]:
         return np.array([self.xb_.min_, self.yb_.min_, self.zb_.min_])
 
-    def max(self) -> npt.NDArray[np.float64]:
+    def max(self) -> npt.NDArray[np.float32]:
         return np.array([self.xb_.max_, self.yb_.max_, self.zb_.max_])
 
-    def center(self) -> npt.NDArray[np.float64]:
+    def center(self) -> npt.NDArray[np.float32]:
         return np.array([r.center() for r in [self.xb_, self.yb_, self.zb_]])
 
-    def update(self, p: npt.NDArray[np.float64]) -> None:
+    def update(self, p: npt.NDArray[np.float32]) -> None:
         self.xb_.update(p[0])
         self.yb_.update(p[1])
         self.zb_.update(p[2])
@@ -99,9 +99,9 @@ class KerogenBox(BoundingBox):
 
     def commit(self) -> None:
         self.atom_ids = np.array(self.tmp_atom_ids, dtype=np.int32)
-        self.atom_sizes = np.array(self.tmp_atom_sizes, dtype=np.float64)
+        self.atom_sizes = np.array(self.tmp_atom_sizes, dtype=np.float32)
         self.positions = np.zeros(
-            shape=(len(self.tmp_positions), 3), dtype=np.float64
+            shape=(len(self.tmp_positions), 3), dtype=np.float32
         )
         for i, p in enumerate(self.tmp_positions):
             self.positions[i] = p
@@ -110,7 +110,7 @@ class KerogenBox(BoundingBox):
         self.tmp_positions.clear()
         self.tmp_atom_sizes.clear()
 
-    def is_intersect_atom(self, pos: npt.NDArray[np.float64]) -> bool:
+    def is_intersect_atom(self, pos: npt.NDArray[np.float32]) -> bool:
         p = pos.reshape(1, 3)
         dist = cdist(p, self.positions)
         return np.any(dist < self.atom_sizes)  # type: ignore
