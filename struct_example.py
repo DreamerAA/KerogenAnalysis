@@ -19,7 +19,7 @@ import scipy.stats as stats
 from scipy.interpolate import UnivariateSpline
 from scipy.stats import weibull_min, exponweib
 from joblib import Parallel, delayed
-
+from sklearn.metrics import pairwise_distances
 from matplotlib.collections import PolyCollection
 from matplotlib import cm
 from matplotlib.ticker import LinearLocator
@@ -228,12 +228,12 @@ def main_part_struct():
 
 def extract_weibull_psd(path_to_pnm: str, scale: float, border: float = 0.02):
     path_to_node_2 = path_to_pnm + "_node2.dat"
-    path_to_link_2 = path_to_pnm + "_link2.dat"
+    path_to_link_1 = path_to_pnm + "_link1.dat"
 
     radiuses = Reader.read_psd(path_to_node_2)
     radiuses *= scale
 
-    linked_list, t_throat_lengths = Reader.read_pnm_linklist(path_to_link_2)
+    linked_list, t_throat_lengths = Reader.read_pnm_linklist(path_to_link_1)
     mask0 = linked_list[:, 0] < 0
     mask1 = linked_list[:, 1] < 0
     nn1 = linked_list[mask0, 1] - 1
@@ -249,7 +249,7 @@ def extract_weibull_psd(path_to_pnm: str, scale: float, border: float = 0.02):
 
     t_throat_lengths = t_throat_lengths[~np.logical_or(mask0, mask1), :]
     throat_lengths = t_throat_lengths[:, 2]
-    throat_lengths *= 1e9
+    throat_lengths *= scale
     throat_lengths.sort()
 
     psd_params = exponweib.fit(radiuses)
@@ -297,111 +297,100 @@ def generate_distribution() -> None:
     psd_params, tld_params, radiuses, throat_lengths = extract_weibull_psd("../data/tmp/1_pbc_atom/result", 1e9, 0.02)
 
     max_rad = radiuses[-1]
-    max_diam = (2 * max_rad)
-    max_length = 1.5 * max_diam
-    nx_rad = np.linspace(0, max_rad, 50)
-    nx_lan = np.linspace(0, max_length, 50)
+    max_length = np.sqrt(3 * ((1.5 * max_rad)**2))
 
-    rng = np.random.default_rng()
-    count_segm = 100_000_000
-    count_points = 1_000_000
+    cl = 100
+    nx_len = np.linspace(0, max_length, cl)
 
+    dl = nx_len[1] - nx_len[0]
+
+    count_points = 10_000
     xyz = np.zeros(shape=(count_points, 3), dtype=np.float32)
-    xyz[:, 0] = np.random.uniform(-1.5 * max_rad, 1.5 * max_rad, size=count_points)
-    xyz[:, 1] = np.random.uniform(-1.5 * max_rad, 1.5 * max_rad, size=count_points)
-    xyz[:, 2] = np.random.uniform(-1.5 * max_rad, 1.5 * max_rad, size=count_points)
+    xyz[:, 0] = np.random.uniform(-1, 1, size=count_points)
+    xyz[:, 1] = np.random.uniform(-1, 1, size=count_points)
+    xyz[:, 2] = np.random.uniform(-1, 1, size=count_points)
     dist = np.sqrt(np.sum(xyz**2, axis=1))
+    xyz = xyz[dist < 1, :]
 
-    def sim(ind: int, sl: float, el: float) -> npt.NDArray[np.int32]:
-        len_distr = np.zeros(shape=nx_rad.shape, dtype=np.int32)
-        for i, rad in enumerate(nx_rad):
+    def upper_tri_masking(A: npt.NDArray[np.float32]) -> npt.NDArray[np.float32]:
+        m = A.shape[0]
+        r = np.arange(m)
+        mask = r[:, None] < r
+        return A[mask]
 
-            inside = dist < rad
+    def sim(num: int, m: int, radius: float) -> npt.NDArray[np.float32]:
+        len_distr = np.zeros(shape=(cl - 1,), dtype=np.int32)
+        xyz_scaled = xyz * radius
+        distances = pairwise_distances(xyz_scaled, xyz_scaled, n_jobs=4)
+        distances = upper_tri_masking(distances)
 
-            indexes = rng.integers(0, count_points, size=2 * count_segm, dtype=np.int32)
-            indexes = indexes.reshape(count_segm, 2)
+        for i in range(1, cl):
+            ll, rl = nx_len[(i - 1):(i + 1)]
+            len_distr[i - 1] = np.sum(np.logical_and(distances > ll, distances <= rl))
+        print(f" --- Result of {num+1} from {m}")
+        return len_distr / np.sum(len_distr * dl)
 
-            out_ind_1 = inside[indexes[:, 0]]
-            out_ind_2 = inside[indexes[:, 1]]
+    def PiLD_3D():
+        cr = 50
+        nx_rad = np.linspace(0, max_rad, cr)
 
-            ind_mask = np.logical_and(out_ind_1, out_ind_2)
-            indexes = indexes[ind_mask, :]
+        pi_l_d = np.zeros(shape=(cr - 1, cl - 1))
 
-            p1xyz = xyz[indexes[:, 0], :]
-            p2xyz = xyz[indexes[:, 1], :]
-            dxyz = p1xyz - p2xyz
-            lengthes = np.sqrt(np.sum(dxyz**2, axis=1))
-            len_distr[i] = np.sum(np.logical_and(lengthes >= sl, lengthes <= el))
-        print(f" -- Finish {ind}")
-        return len_distr
+        # for i, radius in enumerate(nx_rad[1:]):
+        #     pi_l_d[i, :] = sim(i, len(nx_rad[1:]), radius)
 
-    pi_l_d = Parallel(n_jobs=10)(
-        delayed(sim)(i, nx_lan[i - 1], nx_lan[i]) for i in range(1, len(nx_lan))
+        pres = Parallel(n_jobs=10)(
+            delayed(sim)(i, len(nx_rad[1:]), rad) for i, rad in enumerate(nx_rad[1:])
+        )
+        for i, res in enumerate(pres):
+            pi_l_d[i, :] = res
+
+        new_l = nx_len[:-1] + (nx_len[1:] - nx_len[:-1]) * 0.5
+
+        X = np.copy(new_l)
+        Y = nx_rad[1:]
+        X, Y = np.meshgrid(X, Y)
+        Z = np.copy(pi_l_d)
+
+        fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+        # Plot the surface.
+        surf = ax.plot_surface(X, Y, Z, cmap=cm.coolwarm,
+                               linewidth=0, antialiased=False)
+        # Add a color bar which maps values to colors.
+        fig.colorbar(surf, shrink=0.5, aspect=5)
+        ax.set_xlabel("Segemnt length (nm)")
+        ax.set_ylabel("Domain radius (nm)")
+        ax.set_zlabel("Count")
+
+    # PiLD_3D()
+
+    sample_rad = radiuses[::30]
+    pi_l_d = np.zeros(shape=(sample_rad.shape[0], cl - 1))
+
+    # for i, radius in enumerate(sample_rad):
+    #     pi_l_d[i, :] = sim(i, len(sample_rad), radius)
+
+    pres = Parallel(n_jobs=10)(
+        delayed(sim)(i, len(sample_rad), rad) for i, rad in enumerate(sample_rad)
     )
-    # plt.hist(sim_results)
-    # n = 50
-    # p, bb = np.histogram(pi_l, bins=n)
-    # xdel = bb[1] - bb[0]
-    # x = bb[:-1] + xdel * 0.5
-    # pn = p / np.sum(p * xdel)
-    # plt.plot(x, pn, label=f"Diameter = {2*max_rad}")
-    # print(len(pi_l) , pi_l)
-    # print(len(nx_lan[1:]))
-    # plt.plot(nx_lan[:-1] + (nx_lan[1:] - nx_lan[:-1]) * 0.5, pi_l, label="Histogram of Pi(L)")
-    # plt.xlabel("Length (nm)")
-    # plt.ylabel("Count")
-    # plt.legend()
-    # plt.show()
-    dr = nx_rad[1] - nx_rad[0]
-    dl = nx_lan[1] - nx_lan[0]
-    new_l = nx_lan[:-1] + (nx_lan[1:] - nx_lan[:-1]) * 0.5
 
-    X = nx_lan[:-1] + (nx_lan[1:] - nx_lan[:-1]) * 0.5
-    Y = nx_rad
-    X, Y = np.meshgrid(X, Y)
-    Z = np.zeros(shape=(len(nx_rad), len(nx_lan) - 1), dtype=np.float32)
-    for i, pi in enumerate(pi_l_d):
-        Z[:, i] = pi
+    for i, res in enumerate(pres):
+        pi_l_d[i, :] = res
 
-    print(f" --- Z shape = {Z.shape}")
-    print(f" --- Len nx_rad = {nx_rad.shape}")
+    pi_l = np.mean(pi_l_d, axis=0)
+    new_l = nx_len[:-1] + (nx_len[1:] - nx_len[:-1]) * 0.5
 
-    for i, r in enumerate(nx_rad):
-        s = np.sum(Z[i, :] * dl)
-        Z[i, :] /= s if s != 0 else 1
-
-    fit_prob_psd = exponweib.pdf(nx_rad, *psd_params)
-
-    pi_l = np.zeros(shape=(len(nx_rad) - 1,), dtype=np.float32)
-    for i, l in enumerate(nx_lan[1:]):
-        pi_l[i] = np.sum(Z[:, i] * fit_prob_psd * dr)
-
-    fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-    # Plot the surface.
-    surf = ax.plot_surface(X, Y, Z, cmap=cm.coolwarm,
-                           linewidth=0, antialiased=False)
-
-    # Customize the z axis.
-    # ax.set_zlim(-1.01, 1.01)
-    # ax.zaxis.set_major_locator(LinearLocator(10))
-    # A StrMethodFormatter is used automatically
-    # ax.zaxis.set_major_formatter('{x:.02f}')
-
-    # Add a color bar which maps values to colors.
-    fig.colorbar(surf, shrink=0.5, aspect=5)
-    ax.set_xlabel("Segemnt length (nm)")
-    ax.set_ylabel("Domain radius (nm)")
-    ax.set_zlabel("Count")
-
-    print(nx_rad.max())
-
-    pi_l /= np.sum(dl * pi_l)
+    p, bb = np.histogram(throat_lengths, bins=50)
+    xdel = bb[1] - bb[0]
+    x = bb[:-1] + xdel * 0.5
+    pn = p / np.sum(p * xdel)
 
     plt.figure()
-    plt.plot(new_l, pi_l, label="")
+    plt.plot(new_l, pi_l, label="Pi(L)")
+    plt.plot(x, pn, label='Throat lengths - histogram data')
     plt.xlabel("Segemnt length (nm)")
     plt.title("PDF (Segment length inside pore) - Pi(L)")
-
+    plt.legend()
     plt.show()
 
 

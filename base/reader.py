@@ -37,19 +37,22 @@ class Reader:
 
     @staticmethod
     def read_pnm_linklist(filename: str) -> npt.NDArray[np.int32]:
+        count = -1
         with open(filename) as f:
+            if count == -1:
+                count = int(next(f))
             splited_lines = [line.split("    ") for line in f]
             n1 = [int(line[1]) for line in splited_lines]
             n2 = [int(line[2]) for line in splited_lines]
-            dtp1 = [float(line[3]) for line in splited_lines]
-            dtp2 = [float(line[4]) for line in splited_lines]
+            rad = [float(line[3]) for line in splited_lines]
+            shape_factor = [float(line[4]) for line in splited_lines]
             length = [float(line[5]) for line in splited_lines]
             res = np.zeros(shape=(len(n1), 2), dtype=np.int32)
             res[:, 0] = n1
             res[:, 1] = n2
 
-            res_l = np.zeros(shape=(len(dtp1), 3), dtype=np.float32)
-            res_l[:, 0], res_l[:, 1], res_l[:, 2] = dtp1, dtp2, length
+            res_l = np.zeros(shape=(len(rad), 3), dtype=np.float32)
+            res_l[:, 0], res_l[:, 1], res_l[:, 2] = rad, shape_factor, length
         return res, res_l
 
     @staticmethod
