@@ -1,7 +1,7 @@
 import math as m
 import random
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Any
 
 import matplotlib.pylab as plt
 import networkx as nx
@@ -18,6 +18,7 @@ from vtkmodules.vtkFiltersSources import vtkLineSource, vtkSphereSource
 from vtkmodules.vtkInteractionStyle import vtkInteractorStyleTrackballCamera
 from vtkmodules.vtkRenderingCore import (
     vtkActor,
+    vtkCamera,
     vtkColorTransferFunction,
     vtkPolyDataMapper,
     vtkRenderer,
@@ -29,38 +30,39 @@ from base.boundingbox import BoundingBox
 from base.trajectory import Trajectory
 
 
-def Rx(theta):
-    return np.matrix(
+def Rx(theta: float) -> npt.NDArray[np.float64]:
+    return np.matrix(np.array(
         [
             [1, 0, 0],
             [0, m.cos(theta), -m.sin(theta)],
             [0, m.sin(theta), m.cos(theta)],
         ]
     )
+    )
 
 
-def Ry(theta):
-    return np.matrix(
+def Ry(theta: float) -> npt.NDArray[np.float64]:
+    return np.matrix(np.array(
         [
             [m.cos(theta), 0, m.sin(theta)],
             [0, 1, 0],
             [-m.sin(theta), 0, m.cos(theta)],
-        ]
+        ])
     )
 
 
-def Rz(theta):
-    return np.matrix(
+def Rz(theta: float) -> npt.NDArray[np.float64]:
+    return np.matrix(np.array(
         [
             [m.cos(theta), -m.sin(theta), 0],
             [m.sin(theta), m.cos(theta), 0],
             [0, 0, 1],
-        ]
+        ])
     )
 
 
 class vtkTimerCallbackCamera:
-    def __init__(self, steps, actors, cameras, iren):
+    def __init__(self, steps: int, actors: vtkActor, cameras: List[vtkCamera], iren: List[vtkRenderWindowInteractor]):
         self.timer_count = 0
         self.steps = steps
         self.actors = actors
@@ -74,12 +76,12 @@ class vtkTimerCallbackCamera:
         # a = self.astep*np.pi/180
         # self.Rxyz = Rz(a) * Ry(a) * Rx(a)
 
-    def calcXYZ(self):
+    def calcXYZ(self) -> npt.NDArray[np.float64]:
         a = self.angle * np.pi / 180
         self.Rxyz = Ry(a) * Rx(a)
-        return (self.cur_pos * self.Rxyz).T.A.squeeze()
+        return (self.cur_pos * self.Rxyz).T.A.squeeze()  # type: ignore
 
-    def execute(self, obj, event):
+    def execute(self, obj, event):  # type: ignore
         step = 0
         while step < self.steps:
             self.angle += self.astep

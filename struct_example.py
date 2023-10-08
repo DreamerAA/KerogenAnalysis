@@ -98,8 +98,7 @@ def test_kerogen_data() -> KerogenData:
             for i, atom in enumerate(atoms)
         ]
     )
-
-    kerogen_data = KerogenData(g, atoms, (1.0, 1.0, 1.0))
+    kerogen_data = KerogenData(g, atoms, BoundingBox(Range(0, 1), Range(0, 1), Range(0, 1)))
     return kerogen_data
 
 

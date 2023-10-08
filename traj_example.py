@@ -21,11 +21,11 @@ def visualize_dist_trajectory(traj: Trajectory) -> None:
     sq_diff = diff * diff
     sq_dist = np.sum(sq_diff, axis=1)
     dist = np.sqrt(sq_dist)
-    сdist = np.cumsum(dist)
+    cdist = np.cumsum(dist)
     plt.subplot(2, 1, 1)
     plt.plot(traj.times[1:], dist)
     plt.subplot(2, 1, 2)
-    plt.plot(traj.times[1:], сdist)
+    plt.plot(traj.times[1:], cdist)
 
 
 def visualize_trajectory(traj: Trajectory, color_type='dist') -> None:

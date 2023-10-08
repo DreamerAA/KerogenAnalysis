@@ -13,7 +13,8 @@ from skimage import measure
 import asyncio
 from base.trajectory import Trajectory
 from dataclasses import dataclass
-list_mu = [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6]
+from joblib import Parallel, delayed
+import pickle
 
 list_vert_median = {
     (0, 'Bm'): [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -80,7 +81,7 @@ class AnalizerParams:
 
     """ can be any percentile (minimum 0.01), (0.05 in the article)
         from 0 to 1
-        affects the maximum size of the trap, in time, 
+        affects the minimum size of the trap, in time, 
         if the size is larger than the critical one (crit),
         such a trap is not accepted by the algorithm
         In this case, the number of points in the trajectory 
@@ -106,46 +107,63 @@ class TrajectoryAnalizer:
         method = params.traj_type + "_3D"
         list_threshold = mat["list_threshold"][method]
         list_trapped = np.zeros(shape=(count_points,), dtype=np.bool_)
+        points = trj.points_without_periodic
 
-        for mu in params.list_mu:
-            ind1 = int(mu * 2) - 1
-            ind2 = int((1.0 - params.p_value) * 100.0) - 1
-            crit = list_threshold[ind1, ind2]
-            if count_points > crit:
-                (
-                    list_vertical_m,
-                    list_diagonal_m,
-                    list_parallel_m,
-                ) = self.RQA_block_measures(trj, mu)
-                list_trapped_m = (
-                    list_vertical_m / (list_parallel_m + list_diagonal_m - 1)
-                    > self.params.nu
-                )
-                List_min_max = self.Make_list_min_max_index_equal(
-                    list_trapped_m
-                )
-                if len(List_min_max) != 0:
-                    list_index_false_trap = np.where(
-                        (List_min_max[:, 1] - List_min_max[:, 0] + 1) <= crit
-                    )[0]
-                    if len(list_index_false_trap) != 0:
-                        for ind_false_trap in list_index_false_trap:
-                            list_trapped_m[
-                                List_min_max[ind_false_trap, 0] : (
-                                    List_min_max[ind_false_trap, 1] + 1
-                                )
-                            ] = 0
+        def analyse(mu: float) -> Tuple[bool, npt.NDArray[np.bool_]]:
+            return self.analyse_by_mu(points, params.p_value, params.nu, mu, list_threshold)
 
-                list_trapped = np.logical_or(list_trapped, list_trapped_m > 0)
+        results = Parallel(n_jobs=3)(
+            delayed(analyse)(mu) for mu in params.list_mu
+        )
+        list_trapped = np.zeros((trj.count_points(),), dtype=np.bool_)
+        for flag, result in results:
+            if flag:
+                list_trapped = np.logical_or(list_trapped, result > 0)
         trj.traps = list_trapped
 
+    def analyse_by_mu(self, points: npt.NDArray[np.float64], p_value: float, nu: float, mu: float, list_threshold: npt.NDArray[np.int32]) -> Tuple[bool, npt.NDArray[np.bool_]]:
+        count_points = points.shape[0]
+        ind1 = int(mu * 2) - 1
+        ind2 = int((1.0 - p_value) * 100.0) - 1  # check this shift
+        crit = list_threshold[ind1, ind2]
+        if count_points < crit:
+            return (False, np.zeros(shape=(0, 0), dtype=np.bool_))
+        (
+            list_vertical_m,
+            list_diagonal_m,
+            list_parallel_m,
+        ) = TrajectoryAnalizer.RQA_block_measures(points, mu, self.diag_fill_list[int(2 * mu) - 1])
+
+        list_trapped_m = (
+            list_vertical_m / (list_parallel_m + list_diagonal_m - 1)
+            > nu
+        )
+
+        List_min_max = TrajectoryAnalizer.Make_list_min_max_index_equal(
+            list_trapped_m
+        )
+
+        if len(List_min_max) == 0:
+            return (False, np.zeros(shape=(0, 0), dtype=np.bool_))
+        length_traps = List_min_max[:, 1] - List_min_max[:, 0] + 1
+        list_index_false_trap = np.where(length_traps <= crit)[0]
+
+        if len(list_index_false_trap) == 0:
+            return (False, np.zeros(shape=(0, 0), dtype=np.bool_))
+
+        for ind_false_trap in list_index_false_trap:
+            i1, i2 = List_min_max[ind_false_trap, 0], List_min_max[ind_false_trap, 1] + 1
+            list_trapped_m[i1:i2] = False
+
+        return (True, list_trapped_m)
+
+    @staticmethod
     def laplacian_matrix(
-        self, trj: Trajectory, mu: float
-    ) -> npt.NDArray[np.float32]:
+        points: npt.NDArray[np.float64], mu: float
+    ) -> npt.NDArray[np.float64]:
         # UNTITLED3 Summary of this function goes here
         #    Detailed explanation goes here
-        No = trj.count_points()
-        points = trj.points_without_periodic()
+        No = points.shape[0]
         inc = points[1:,] - points[:-1,]
         std = np.std(inc, 0, ddof=1)
         tmp = np.zeros(shape=(No, 3), dtype=np.float32)
@@ -161,20 +179,20 @@ class TrajectoryAnalizer:
         S3: npt.NDArray[np.float32] = convolve2d(S2b, self.kernel, 'same') if self.params.kernel_size > 0 else S2b
         return S3
 
+    @staticmethod
     def RQA_block_measures(
-        self, trj: Trajectory, mu: float
+        points: npt.NDArray[np.float64], mu: float, diagonal_max: int
     ) -> Tuple[
         npt.NDArray[np.int64], npt.NDArray[np.int64], npt.NDArray[np.int64]
     ]:
-        N = trj.count_points()
+        N = points.shape[0]
         # Laplacian matrix (distance matrix)
-        S3 = self.laplacian_matrix(trj, mu)
+        S3 = TrajectoryAnalizer.laplacian_matrix(points, mu)
         mat = S3 > np.exp(-1)
         # fill diagonals
         np.fill_diagonal(mat, True)  # first diagonal
         #  other diagonal depending on the radius size
-        num_max = self.diag_fill_list[int(2 * mu) - 1]
-        for num in range(1, num_max + 1):
+        for num in range(1, diagonal_max + 1):
             ind = np.array(range(N - num))
             mat[ind, ind + num] = True
             mat[ind + num, ind] = True
@@ -218,8 +236,9 @@ class TrajectoryAnalizer:
             list_parallel[n] = pos_up_par - pos_down_par + 1
         return list_vertical, list_diagonal, list_parallel
 
+    @staticmethod
     def Make_list_min_max_index_equal(
-        self, list_trapped: npt.NDArray[np.bool_]
+        list_trapped: npt.NDArray[np.bool_]
     ) -> npt.NDArray[np.int64]:
         N_vec = len(list_trapped)
         index = 0
