@@ -111,3 +111,33 @@ class Reader:
             size = tuple([float(e) for e in str_size])
         atoms = np.array(atoms)
         return atoms, size
+
+    @staticmethod
+    def read_pnm_data(
+        path_to_pnm: str, scale: float, border: float
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        path_to_node_2 = path_to_pnm + "_node2.dat"
+        path_to_link_1 = path_to_pnm + "_link1.dat"
+
+        radiuses = Reader.read_psd(path_to_node_2)
+        radiuses *= scale
+
+        linked_list, t_throat_lengths = Reader.read_pnm_linklist(path_to_link_1)
+        mask0 = linked_list[:, 0] < 0
+        mask1 = linked_list[:, 1] < 0
+        nn1 = linked_list[mask0, 1] - 1
+        nn0 = linked_list[mask1, 0] - 1
+
+        node_mask = np.ones(shape=(len(radiuses),), dtype=np.bool_)
+        node_mask[nn0] = False
+        node_mask[nn1] = False
+
+        radiuses = radiuses[node_mask]
+        radiuses.sort()
+        radiuses = radiuses[radiuses > border]
+
+        t_throat_lengths = t_throat_lengths[~np.logical_or(mask0, mask1), :]
+        throat_lengths = t_throat_lengths[:, 2]
+        throat_lengths *= scale
+        throat_lengths.sort()
+        return radiuses, throat_lengths

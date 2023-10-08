@@ -31,38 +31,49 @@ from base.trajectory import Trajectory
 
 
 def Rx(theta: float) -> npt.NDArray[np.float64]:
-    return np.matrix(np.array(
-        [
-            [1, 0, 0],
-            [0, m.cos(theta), -m.sin(theta)],
-            [0, m.sin(theta), m.cos(theta)],
-        ]
-    )
+    return np.matrix(
+        np.array(
+            [
+                [1, 0, 0],
+                [0, m.cos(theta), -m.sin(theta)],
+                [0, m.sin(theta), m.cos(theta)],
+            ]
+        )
     )
 
 
 def Ry(theta: float) -> npt.NDArray[np.float64]:
-    return np.matrix(np.array(
-        [
-            [m.cos(theta), 0, m.sin(theta)],
-            [0, 1, 0],
-            [-m.sin(theta), 0, m.cos(theta)],
-        ])
+    return np.matrix(
+        np.array(
+            [
+                [m.cos(theta), 0, m.sin(theta)],
+                [0, 1, 0],
+                [-m.sin(theta), 0, m.cos(theta)],
+            ]
+        )
     )
 
 
 def Rz(theta: float) -> npt.NDArray[np.float64]:
-    return np.matrix(np.array(
-        [
-            [m.cos(theta), -m.sin(theta), 0],
-            [m.sin(theta), m.cos(theta), 0],
-            [0, 0, 1],
-        ])
+    return np.matrix(
+        np.array(
+            [
+                [m.cos(theta), -m.sin(theta), 0],
+                [m.sin(theta), m.cos(theta), 0],
+                [0, 0, 1],
+            ]
+        )
     )
 
 
 class vtkTimerCallbackCamera:
-    def __init__(self, steps: int, actors: vtkActor, cameras: List[vtkCamera], iren: List[vtkRenderWindowInteractor]):
+    def __init__(
+        self,
+        steps: int,
+        actors: vtkActor,
+        cameras: List[vtkCamera],
+        iren: List[vtkRenderWindowInteractor],
+    ):
         self.timer_count = 0
         self.steps = steps
         self.actors = actors
@@ -588,7 +599,12 @@ class Visualizer:
             mactor.SetPosition(*pcenter)
 
     @staticmethod
-    def draw_img(img: npt.NDArray[np.int8], volume_mode: bool, bbox: BoundingBox, **kwargs) -> None:
+    def draw_img(
+        img: npt.NDArray[np.int8],
+        volume_mode: bool,
+        bbox: BoundingBox,
+        **kwargs,
+    ) -> None:
         ren = vtkRenderer()
 
         Visualizer.add_img_actor(ren, img, volume_mode, bbox)
@@ -632,7 +648,7 @@ class Visualizer:
     def create_trajectory_actor(
         trj: Trajectory, periodic: bool, color_type: str = 'dist'
     ) -> vtkActor:
-        points = trj.points_without_periodic() if not periodic else trj.points
+        points = trj.points_without_periodic if not periodic else trj.points
         if color_type == 'dist':
             colors = np.cumsum(trj.dists())
             colors = np.append(0, colors)
@@ -784,7 +800,7 @@ class Visualizer:
 
     @staticmethod
     def draw_trajectory_points(trj: Trajectory) -> None:
-        tp = trj.points_without_periodic()
+        tp = trj.points_without_periodic
         pcount = tp.shape[0]
 
         points = vtkPoints()
@@ -932,7 +948,7 @@ class Visualizer:
         data = []
         for trj in trjs:
             radius = trj.atom_size * 0.25
-            p = trj.points if periodic else trj.points_without_periodic()
+            p = trj.points if periodic else trj.points_without_periodic
             sphere_actor = Visualizer.create_sphere_actor(
                 p[0, :], trj.atom_size
             )

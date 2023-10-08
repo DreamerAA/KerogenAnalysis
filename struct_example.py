@@ -1,3 +1,4 @@
+import sys
 import os
 import random
 import time
@@ -8,13 +9,6 @@ import networkx as nx
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
-from base.boundingbox import BoundingBox
-from base.kerogendata import AtomData, KerogenData
-from base.periodizer import Periodizer
-from base.reader import Reader
-from base.trajectory import Trajectory
-from processes.segmentaion import Segmentator
-from visualizer.visualizer import Visualizer
 import scipy.stats as stats
 from scipy.interpolate import UnivariateSpline
 from scipy.stats import weibull_min, exponweib
@@ -23,6 +17,14 @@ from sklearn.metrics import pairwise_distances
 from matplotlib.collections import PolyCollection
 from matplotlib import cm
 from matplotlib.ticker import LinearLocator
+from base.boundingbox import BoundingBox
+from base.kerogendata import AtomData, KerogenData
+from base.periodizer import Periodizer
+from base.reader import Reader
+from base.trajectory import Trajectory
+from processes.segmentaion import Segmentator
+from visualizer.visualizer import Visualizer
+
 
 additional_radius = 0.0
 
@@ -33,7 +35,13 @@ atom_real_sizes = {
 ext_radius = {
     i: s
     for i, s in enumerate(
-        [additional_radius, additional_radius, additional_radius, 0.0, additional_radius]
+        [
+            additional_radius,
+            additional_radius,
+            additional_radius,
+            0.0,
+            additional_radius,
+        ]
     )
 }
 
@@ -98,7 +106,9 @@ def test_kerogen_data() -> KerogenData:
             for i, atom in enumerate(atoms)
         ]
     )
-    kerogen_data = KerogenData(g, atoms, BoundingBox(Range(0, 1), Range(0, 1), Range(0, 1)))
+    kerogen_data = KerogenData(
+        g, atoms, BoundingBox(Range(0, 1), Range(0, 1), Range(0, 1))
+    )
     return kerogen_data
 
 
@@ -226,38 +236,18 @@ def main_part_struct():
 
 
 def extract_weibull_psd(path_to_pnm: str, scale: float, border: float = 0.02):
-    path_to_node_2 = path_to_pnm + "_node2.dat"
-    path_to_link_1 = path_to_pnm + "_link1.dat"
-
-    radiuses = Reader.read_psd(path_to_node_2)
-    radiuses *= scale
-
-    linked_list, t_throat_lengths = Reader.read_pnm_linklist(path_to_link_1)
-    mask0 = linked_list[:, 0] < 0
-    mask1 = linked_list[:, 1] < 0
-    nn1 = linked_list[mask0, 1] - 1
-    nn0 = linked_list[mask1, 0] - 1
-
-    node_mask = np.ones(shape=(len(radiuses),), dtype=np.bool_)
-    node_mask[nn0] = False
-    node_mask[nn1] = False
-
-    radiuses = radiuses[node_mask]
-    radiuses.sort()
-    radiuses = radiuses[radiuses > border]
-
-    t_throat_lengths = t_throat_lengths[~np.logical_or(mask0, mask1), :]
-    throat_lengths = t_throat_lengths[:, 2]
-    throat_lengths *= scale
-    throat_lengths.sort()
-
+    radiuses, throat_lengths = Reader.read_pnm_data(
+        path_to_pnm, scale=scale, border=border
+    )
     psd_params = exponweib.fit(radiuses)
     tld_params = exponweib.fit(throat_lengths)
     return psd_params, tld_params, radiuses, throat_lengths
 
 
 def main_pnm_psd_analizer() -> None:
-    psd_params, tld_params, radiuses, throat_lengths = extract_weibull_psd("../data/tmp/1_pbc_atom/result", 1e9, 0.02)
+    psd_params, tld_params, radiuses, throat_lengths = extract_weibull_psd(
+        "../data/tmp/1_pbc_atom/result", 1e9, 0.02
+    )
 
     params = exponweib.fit(radiuses)
     nx_rad = np.linspace(radiuses[0], radiuses[-1], 1000)
@@ -293,10 +283,12 @@ def main_pnm_psd_analizer() -> None:
 
 
 def generate_distribution() -> None:
-    psd_params, tld_params, radiuses, throat_lengths = extract_weibull_psd("../data/tmp/1_pbc_atom/result", 1e9, 0.02)
+    psd_params, tld_params, radiuses, throat_lengths = extract_weibull_psd(
+        "../data/Kerogen/tmp/1_pbc_atom/result", 1e9, 0.02
+    )
 
     max_rad = radiuses[-1]
-    max_length = np.sqrt(3 * ((1.5 * max_rad)**2))
+    max_length = np.sqrt(3 * ((1.5 * max_rad) ** 2))
 
     cl = 100
     nx_len = np.linspace(0, max_length, cl)
@@ -311,7 +303,9 @@ def generate_distribution() -> None:
     dist = np.sqrt(np.sum(xyz**2, axis=1))
     xyz = xyz[dist < 1, :]
 
-    def upper_tri_masking(A: npt.NDArray[np.float32]) -> npt.NDArray[np.float32]:
+    def upper_tri_masking(
+        A: npt.NDArray[np.float32],
+    ) -> npt.NDArray[np.float32]:
         m = A.shape[0]
         r = np.arange(m)
         mask = r[:, None] < r
@@ -324,8 +318,10 @@ def generate_distribution() -> None:
         distances = upper_tri_masking(distances)
 
         for i in range(1, cl):
-            ll, rl = nx_len[(i - 1):(i + 1)]
-            len_distr[i - 1] = np.sum(np.logical_and(distances > ll, distances <= rl))
+            ll, rl = nx_len[(i - 1) : (i + 1)]
+            len_distr[i - 1] = np.sum(
+                np.logical_and(distances > ll, distances <= rl)
+            )
         print(f" --- Result of {num+1} from {m}")
         return len_distr / np.sum(len_distr * dl)
 
@@ -339,7 +335,8 @@ def generate_distribution() -> None:
         #     pi_l_d[i, :] = sim(i, len(nx_rad[1:]), radius)
 
         pres = Parallel(n_jobs=10)(
-            delayed(sim)(i, len(nx_rad[1:]), rad) for i, rad in enumerate(nx_rad[1:])
+            delayed(sim)(i, len(nx_rad[1:]), rad)
+            for i, rad in enumerate(nx_rad[1:])
         )
         for i, res in enumerate(pres):
             pi_l_d[i, :] = res
@@ -353,8 +350,9 @@ def generate_distribution() -> None:
 
         fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
         # Plot the surface.
-        surf = ax.plot_surface(X, Y, Z, cmap=cm.coolwarm,
-                               linewidth=0, antialiased=False)
+        surf = ax.plot_surface(
+            X, Y, Z, cmap=cm.coolwarm, linewidth=0, antialiased=False
+        )
         # Add a color bar which maps values to colors.
         fig.colorbar(surf, shrink=0.5, aspect=5)
         ax.set_xlabel("Segemnt length (nm)")
@@ -370,7 +368,8 @@ def generate_distribution() -> None:
     #     pi_l_d[i, :] = sim(i, len(sample_rad), radius)
 
     pres = Parallel(n_jobs=10)(
-        delayed(sim)(i, len(sample_rad), rad) for i, rad in enumerate(sample_rad)
+        delayed(sim)(i, len(sample_rad), rad)
+        for i, rad in enumerate(sample_rad)
     )
 
     for i, res in enumerate(pres):
@@ -383,6 +382,12 @@ def generate_distribution() -> None:
     xdel = bb[1] - bb[0]
     x = bb[:-1] + xdel * 0.5
     pn = p / np.sum(p * xdel)
+
+    pi_l_save = np.zeros(shape=(pi_l.shape[0], 2), dtype=np.float32)
+    pi_l_save[:, 1] = pi_l
+    pi_l_save[:, 0] = new_l
+    np.save("../data/Kerogen/tmp/1_pbc_atom/pi_l.npy", pi_l_save)
+    np.save("../data/Kerogen/tmp/1_pbc_atom/throat_lengths.npy", throat_lengths)
 
     plt.figure()
     plt.plot(new_l, pi_l, label="Pi(L)")

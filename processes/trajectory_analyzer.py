@@ -6,6 +6,7 @@ import numpy as np
 import numpy.typing as npt
 import scipy.io
 from numba import njit, jit
+
 # %matplotlib inline
 from scipy import ndimage
 from scipy.signal import convolve2d
@@ -30,14 +31,12 @@ list_vert_median = {
 
 @njit
 def find_min_max_index(
-    index: int,
-    arr: npt.NDArray[np.int64]
+    index: int, arr: npt.NDArray[np.int64]
 ) -> Tuple[int, int]:
-
     N = len(arr)
     tpos_up = index
     tpos_down = index
-    for v in arr[(index + 1):]:
+    for v in arr[(index + 1) :]:
         if v == 0 or tpos_up == N - 1:
             break
         tpos_up += 1
@@ -51,10 +50,11 @@ def find_min_max_index(
 
 @dataclass
 class AnalizerParams:
-    """ reference motion type for simulations
-        can be `fBm` or `Bm`
-        fBm - fractional Brownian Motion 
+    """reference motion type for simulations
+    can be `fBm` or `Bm`
+    fBm - fractional Brownian Motion
     """
+
     traj_type: str = 'fBm'
 
     """ Critical value for the invariant (1 is perfect square)
@@ -94,7 +94,13 @@ class TrajectoryAnalizer:
     def __init__(self, trj: Trajectory, params: AnalizerParams):
         self.params = params
 
-        self.kernel = np.ones(shape=(2 * params.kernel_size + 1, 2 * params.kernel_size + 1), dtype=np.float32) / (2 * params.kernel_size + 1)**2
+        self.kernel = (
+            np.ones(
+                shape=(2 * params.kernel_size + 1, 2 * params.kernel_size + 1),
+                dtype=np.float32,
+            )
+            / (2 * params.kernel_size + 1) ** 2
+        )
 
         self.diag_fill_list = list_vert_median[
             (self.params.diag_percentile, params.traj_type)
@@ -110,7 +116,9 @@ class TrajectoryAnalizer:
         points = trj.points_without_periodic
 
         def analyse(mu: float) -> Tuple[bool, npt.NDArray[np.bool_]]:
-            return self.analyse_by_mu(points, params.p_value, params.nu, mu, list_threshold)
+            return self.analyse_by_mu(
+                points, params.p_value, params.nu, mu, list_threshold
+            )
 
         results = Parallel(n_jobs=3)(
             delayed(analyse)(mu) for mu in params.list_mu
@@ -121,7 +129,14 @@ class TrajectoryAnalizer:
                 list_trapped = np.logical_or(list_trapped, result > 0)
         trj.traps = list_trapped
 
-    def analyse_by_mu(self, points: npt.NDArray[np.float64], p_value: float, nu: float, mu: float, list_threshold: npt.NDArray[np.int32]) -> Tuple[bool, npt.NDArray[np.bool_]]:
+    def analyse_by_mu(
+        self,
+        points: npt.NDArray[np.float64],
+        p_value: float,
+        nu: float,
+        mu: float,
+        list_threshold: npt.NDArray[np.int32],
+    ) -> Tuple[bool, npt.NDArray[np.bool_]]:
         count_points = points.shape[0]
         ind1 = int(mu * 2) - 1
         ind2 = int((1.0 - p_value) * 100.0) - 1  # check this shift
@@ -132,11 +147,12 @@ class TrajectoryAnalizer:
             list_vertical_m,
             list_diagonal_m,
             list_parallel_m,
-        ) = TrajectoryAnalizer.RQA_block_measures(points, mu, self.diag_fill_list[int(2 * mu) - 1])
+        ) = TrajectoryAnalizer.RQA_block_measures(
+            points, mu, self.diag_fill_list[int(2 * mu) - 1]
+        )
 
         list_trapped_m = (
-            list_vertical_m / (list_parallel_m + list_diagonal_m - 1)
-            > nu
+            list_vertical_m / (list_parallel_m + list_diagonal_m - 1) > nu
         )
 
         List_min_max = TrajectoryAnalizer.Make_list_min_max_index_equal(
@@ -152,14 +168,16 @@ class TrajectoryAnalizer:
             return (False, np.zeros(shape=(0, 0), dtype=np.bool_))
 
         for ind_false_trap in list_index_false_trap:
-            i1, i2 = List_min_max[ind_false_trap, 0], List_min_max[ind_false_trap, 1] + 1
+            i1, i2 = (
+                List_min_max[ind_false_trap, 0],
+                List_min_max[ind_false_trap, 1] + 1,
+            )
             list_trapped_m[i1:i2] = False
 
         return (True, list_trapped_m)
 
-    @staticmethod
     def laplacian_matrix(
-        points: npt.NDArray[np.float64], mu: float
+        self, points: npt.NDArray[np.float64], mu: float
     ) -> npt.NDArray[np.float64]:
         # UNTITLED3 Summary of this function goes here
         #    Detailed explanation goes here
@@ -176,7 +194,11 @@ class TrajectoryAnalizer:
             S[i, :] = S[:, i]
 
         S2b = np.exp(-0.5 * S / mu**2)
-        S3: npt.NDArray[np.float32] = convolve2d(S2b, self.kernel, 'same') if self.params.kernel_size > 0 else S2b
+        S3: npt.NDArray[np.float32] = (
+            convolve2d(S2b, self.kernel, 'same')
+            if self.params.kernel_size > 0
+            else S2b
+        )
         return S3
 
     @staticmethod
@@ -221,7 +243,9 @@ class TrajectoryAnalizer:
                 np.logical_and(list_diag_ind == n, list_diag_ind[::-1] == n)
             )[0][0]
 
-            ud_bin, ud_ver = TrajectoryAnalizer.get_up_down(index, n , list_bin_vert == 1, matrix[:, n] == 1)
+            ud_bin, ud_ver = TrajectoryAnalizer.get_up_down(
+                index, n, list_bin_vert == 1, matrix[:, n] == 1
+            )
             pos_down, pos_up = ud_bin
             pos_down_v, pos_up_v = ud_ver
             list_vertical[n] = pos_up_v - pos_down_v + 1
@@ -238,7 +262,7 @@ class TrajectoryAnalizer:
 
     @staticmethod
     def Make_list_min_max_index_equal(
-        list_trapped: npt.NDArray[np.bool_]
+        list_trapped: npt.NDArray[np.bool_],
     ) -> npt.NDArray[np.int64]:
         N_vec = len(list_trapped)
         index = 0
@@ -246,9 +270,7 @@ class TrajectoryAnalizer:
         stop = 0
         while stop == 0:
             if list_trapped[index] == 1:
-                pos_down, pos_up = find_min_max_index(
-                    index, list_trapped
-                )
+                pos_down, pos_up = find_min_max_index(index, list_trapped)
                 List_min_max.append((pos_down, pos_up))
                 index = pos_up + 1
             else:
@@ -262,4 +284,6 @@ class TrajectoryAnalizer:
         return result
 
     def get_up_down(index, n, bin_arr, vert_arr):
-        return find_min_max_index(index, bin_arr), find_min_max_index(n, vert_arr)
+        return find_min_max_index(index, bin_arr), find_min_max_index(
+            n, vert_arr
+        )
