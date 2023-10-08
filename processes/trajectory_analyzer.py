@@ -6,14 +6,13 @@ import numpy as np
 import numpy.typing as npt
 import scipy.io
 from numba import njit, jit
-
-# %matplotlib inline
+from collections import defaultdict
 from scipy import ndimage
 from scipy.signal import convolve2d
 from skimage import measure
 import asyncio
 from base.trajectory import Trajectory
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from joblib import Parallel, delayed
 import pickle
 
@@ -77,7 +76,9 @@ class AnalizerParams:
         Used to normalize the distance matrix. (lambda in article)
         and by default affects the number of filled diagonals in the distance matrix
     """
-    list_mu: npt.NDArray[np.float32] = np.array([1, 1.5, 2])
+    list_mu: npt.NDArray[np.float32] = field(
+        default_factory=lambda: np.array([1, 1.5, 2])
+    )
 
     """ can be any percentile (minimum 0.01), (0.05 in the article)
         from 0 to 1
@@ -91,7 +92,7 @@ class AnalizerParams:
 
 
 class TrajectoryAnalizer:
-    def __init__(self, trj: Trajectory, params: AnalizerParams):
+    def __init__(self, params: AnalizerParams):
         self.params = params
 
         self.kernel = (
@@ -105,29 +106,32 @@ class TrajectoryAnalizer:
         self.diag_fill_list = list_vert_median[
             (self.params.diag_percentile, params.traj_type)
         ]
+
+    def run(self, trj: Trajectory) -> npt.NDArray[np.int32]:
         count_points = trj.count_points()
 
         mat = mat73.loadmat(
             f"./list_threshold/nuc{int(self.params.nu*100)}diag_perc={self.params.diag_percentile}.mat"
         )
-        method = params.traj_type + "_3D"
+        method = self.params.traj_type + "_3D"
         list_threshold = mat["list_threshold"][method]
         list_trapped = np.zeros(shape=(count_points,), dtype=np.bool_)
+
         points = trj.points_without_periodic
 
         def analyse(mu: float) -> Tuple[bool, npt.NDArray[np.bool_]]:
             return self.analyse_by_mu(
-                points, params.p_value, params.nu, mu, list_threshold
+                points, self.params.p_value, self.params.nu, mu, list_threshold
             )
 
         results = Parallel(n_jobs=3)(
-            delayed(analyse)(mu) for mu in params.list_mu
+            delayed(analyse)(mu) for mu in self.params.list_mu
         )
         list_trapped = np.zeros((trj.count_points(),), dtype=np.bool_)
         for flag, result in results:
             if flag:
                 list_trapped = np.logical_or(list_trapped, result > 0)
-        trj.traps = list_trapped
+        return list_trapped
 
     def analyse_by_mu(
         self,
@@ -147,7 +151,7 @@ class TrajectoryAnalizer:
             list_vertical_m,
             list_diagonal_m,
             list_parallel_m,
-        ) = TrajectoryAnalizer.RQA_block_measures(
+        ) = self.RQA_block_measures(
             points, mu, self.diag_fill_list[int(2 * mu) - 1]
         )
 
@@ -201,15 +205,14 @@ class TrajectoryAnalizer:
         )
         return S3
 
-    @staticmethod
     def RQA_block_measures(
-        points: npt.NDArray[np.float64], mu: float, diagonal_max: int
+        self, points: npt.NDArray[np.float64], mu: float, diagonal_max: int
     ) -> Tuple[
         npt.NDArray[np.int64], npt.NDArray[np.int64], npt.NDArray[np.int64]
     ]:
         N = points.shape[0]
         # Laplacian matrix (distance matrix)
-        S3 = TrajectoryAnalizer.laplacian_matrix(points, mu)
+        S3 = self.laplacian_matrix(points, mu)
         mat = S3 > np.exp(-1)
         # fill diagonals
         np.fill_diagonal(mat, True)  # first diagonal

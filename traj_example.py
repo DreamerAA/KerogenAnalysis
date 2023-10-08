@@ -1,8 +1,4 @@
 import sys
-
-sys.path.insert(0, './processes')
-sys.path.insert(0, './base')
-
 from pathlib import Path
 import argparse
 import time
@@ -148,12 +144,20 @@ def run_extended_analizer(
 
     aparams = get_params([154, 162, 186])
     params = aparams[0]
-    ext_params = ExtendedParams(params, 0.1)
+    ext_params = ExtendedParams(
+        params.traj_type,
+        params.nu,
+        params.diag_percentile,
+        params.kernel_size,
+        params.list_mu,
+        params.p_value,
+        0.1,
+    )
 
     throat_lengthes = np.load(throat_len_path)
     pi_l = np.load(pil_path)
 
-    analizer = TrajectoryExtendedAnalizer(ext_params, throat_lengthes, pi_l)
+    analizer = TrajectoryExtendedAnalizer(ext_params, pi_l, throat_lengthes)
     analizer.run(trj)
     visualize_trajectory(trj, 'clusters')
 

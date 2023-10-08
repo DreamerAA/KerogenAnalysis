@@ -11,7 +11,7 @@ import vtk
 from skimage import measure
 from vtkmodules.vtkCommonColor import vtkNamedColors
 from vtkmodules.vtkCommonCore import vtkDoubleArray, vtkPoints
-from vtkmodules.vtkCommonDataModel import vtkCellArray, vtkPolyData
+from vtkmodules.vtkCommonDataModel import vtkCellArray, vtkPolyData, vtkLine
 from vtkmodules.vtkFiltersCore import vtkGlyph3D, vtkTubeFilter
 from vtkmodules.vtkFiltersModeling import vtkOutlineFilter
 from vtkmodules.vtkFiltersSources import vtkLineSource, vtkSphereSource
@@ -763,12 +763,25 @@ class Visualizer:
         vpoints = vtkPoints()
         lines = vtkCellArray()
 
-        lines.InsertNextCell(count_points)
-        for i in range(count_points):
-            vpoints.InsertPoint(i, points[i, 0], points[i, 1], points[i, 2])
-            lines.InsertCellPoint(i)
+        active_throat = 0
+        for i in range(1, count_points):
+            vpoints.InsertNextPoint(
+                points[i - 1, 0], points[i - 1, 1], points[i - 1, 2]
+            )
+            vpoints.InsertNextPoint(points[i, 0], points[i, 1], points[i, 2])
+            line = vtkLine()
+            line.GetPointIds().SetId(0, 2 * active_throat)
+            line.GetPointIds().SetId(1, 2 * active_throat + 1)
+            active_throat += 1
 
-            color_data.InsertNextValue(colors[i])
+            lines.InsertNextCell(line)
+            if len(colors) == count_points:
+                c1, c2 = colors[i - 1], colors[i]
+            else:
+                c1, c2 = colors[i - 1], colors[i - 1]
+
+            color_data.InsertNextValue(c1)
+            color_data.InsertNextValue(c2)
 
         poly_data = vtkPolyData()
         poly_data.SetPoints(vpoints)
@@ -785,6 +798,7 @@ class Visualizer:
         mapper.SetScalarModeToUsePointFieldData()
         mapper.SelectColorArray(color_data.GetName())
         mapper.SetLookupTable(ctf)
+        mapper.Update()
 
         actor = vtkActor()
         actor.SetMapper(mapper)

@@ -1,9 +1,9 @@
-from trajectory_analyzer import TrajectoryAnalizer, AnalizerParams
+from processes.trajectory_analyzer import TrajectoryAnalizer, AnalizerParams
 import numpy as np
 import numpy.typing as npt
 from base.trajectory import Trajectory
 from dataclasses import dataclass
-from distribution_fitter import (
+from processes.distribution_fitter import (
     WeibullFitter,
     FittingData,
     GammaFitter,
@@ -29,29 +29,31 @@ class TrajectoryExtendedAnalizer:
         self.pi_l = pi_l
 
     def run(self, trj: Trajectory) -> None:
-        points = trj.points_without_periodic
-        distances = self.distances(points)
+        analizer = TrajectoryAnalizer(self.params)
+        traps = analizer.run(trj)
 
-        fd_lenthes = FittingData(self.throat_lengthes, np.array(), None)
-        fd_pi_l = FittingData(self.pi_l[1, :], np.array(), None)
-
+        fd_lengthes = FittingData(self.throat_lengthes, np.array([]), None)
         wfitter = WeibullFitter()
-        wfitter.run(fd_lenthes)
+        wfitter.run(fd_lengthes)
 
+        fd_pi_l = FittingData(self.pi_l, np.array([]), None)
         gfitter = GammaCurveFitter()
         gfitter.run(fd_pi_l)
 
-        p, bb = np.histogram(self.throat_lengths, bins=50)
-        xdel = bb[1] - bb[0]
-        x = bb[:-1] + xdel * 0.5
-        pn = p / np.sum(p * xdel)
-        plt.figure()
-        plt.hist(self.throat_lengths, bins=50)
-        plt.plot(x, pn, label='Throat lengths - histogram data')
-        plt.xlabel("Segemnt length (nm)")
-        plt.title("PDF (Segment length inside pore) - Pi(L)")
-        plt.legend()
-        plt.show()
+        points = trj.points_without_periodic
+        distances = self.distances(points)
+        pore_probability = gfitter.pdf(distances, fd_pi_l)
+        throat_probability = wfitter.pdf(distances, fd_lengthes)
+
+        mask = (
+            pore_probability - throat_probability
+        ) > self.params.critical_probability
+
+        result = np.zeros(shape=(distances.shape[0],), dtype=np.int32)
+        result[mask] = 1
+        result[~mask] = traps[1:][~mask]
+        trj.traps = result
+        print(" --- Finish!")
 
     @staticmethod
     def distances(points: npt.NDArray[np.float32]) -> npt.NDArray[np.float32]:
