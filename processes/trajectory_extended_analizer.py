@@ -45,13 +45,28 @@ class TrajectoryExtendedAnalizer:
         pore_probability = gfitter.pdf(distances, fd_pi_l)
         throat_probability = wfitter.pdf(distances, fd_lengthes)
 
-        mask = (
+        x = np.linspace(0, distances.max(), 1000)
+        yp = gfitter.pdf(x, fd_pi_l)
+        yt = wfitter.pdf(x, fd_lengthes)
+
+        pore_mask = (
             pore_probability - throat_probability
         ) > self.params.critical_probability
 
+        throat_mask = (
+            throat_probability - pore_probability
+        ) > self.params.critical_probability
+        btw_mask = (
+            np.abs(throat_probability - pore_probability)
+            < self.params.critical_probability
+        )
+
         result = np.zeros(shape=(distances.shape[0],), dtype=np.int32)
-        result[mask] = 1
-        result[~mask] = traps[1:][~mask]
+        result[btw_mask] = traps[1:][btw_mask]
+        result[pore_mask] = 1
+        result[throat_mask] = 0
+        result[distances < x[np.argmax(yp)]] = 1
+        result[distances > x[np.argmax(yt)]] = 0
         trj.traps = result
         print(" --- Finish!")
 

@@ -28,11 +28,17 @@ def visualize_dist_trajectory(traj: Trajectory) -> None:
     plt.plot(traj.times[1:], cdist)
 
 
-def visualize_trajectory(traj: Trajectory, color_type='dist') -> None:
-    Visualizer.draw_trajectoryes([traj], color_type=color_type, plot_box=False)
+def visualize_trajectory(
+    traj: Trajectory, color_type='dist', win_name: str = ""
+) -> None:
+    Visualizer.draw_trajectoryes(
+        [traj], color_type=color_type, plot_box=False, window_name=win_name
+    )
 
 
-def visualize_trajectories(trajs: List[Trajectory]) -> None:
+def visualize_trajectories(
+    trajs: List[Trajectory],
+) -> None:
     Visualizer.draw_trajectoryes(trajs)
 
 
@@ -55,11 +61,12 @@ def all_params():
     return params
 
 
-def analizy_visualize(trj, params):
-    analizer = TrajectoryAnalizer(trj, params)
+def analizy_visualize(trj, params, win_name: str):
+    analizer = TrajectoryAnalizer(params)
+    trj.traps = analizer.run(trj)
     clusters = measure.label(trj.traps, connectivity=1).astype(np.float32)
     print(f" --- Count clusters: {clusters.max()}")
-    visualize_trajectory(trj, 'clusters')
+    visualize_trajectory(trj, 'clusters', win_name)
 
 
 def run_and_plot_trap_time_distribution(
@@ -106,8 +113,8 @@ def get_params(indexes: List[int]) -> List[AnalizerParams]:
     return aparams
 
 
-def run_default_analizer(path: str) -> None:
-    trajectories = Trajectory.read_trajectoryes(args.path)
+def run_default_analizer(path: str, win_name: str) -> None:
+    trajectories = Trajectory.read_trajectoryes(path)
     aparams = get_params([154, 162, 186])
     params = aparams[0]
 
@@ -118,8 +125,9 @@ def run_default_analizer(path: str) -> None:
     #     visualize_trajectory(trajectories[i])
 
     # params = AnalizerParams(traj_type='fBm', nu=0.9, diag_percentile=50 , kernel_size=1, list_mu=np.array([0.5, 1. , 1.5, 2. , 2.5, 3.]), p_value=0.01)
-    params.list_mu = np.array([1.5, 2])
-    analizy_visualize(trajectories[5], params)
+    # params.list_mu = np.array([1.5, 2])
+    trj = trajectories[0]
+    analizy_visualize(trj, params, win_name)
 
     # visualize_trajectories(trajectories)
     # animate_trajectoryes(trajectories)
@@ -137,7 +145,7 @@ def run_default_analizer(path: str) -> None:
 
 
 def run_extended_analizer(
-    traj_path: str, throat_len_path: str, pil_path: str
+    traj_path: str, throat_len_path: str, pil_path: str, win_name: str
 ) -> None:
     trajectories = Trajectory.read_trajectoryes(traj_path)
     trj = trajectories[0]
@@ -151,7 +159,7 @@ def run_extended_analizer(
         params.kernel_size,
         params.list_mu,
         params.p_value,
-        0.1,
+        1.2,
     )
 
     throat_lengthes = np.load(throat_len_path)
@@ -159,7 +167,7 @@ def run_extended_analizer(
 
     analizer = TrajectoryExtendedAnalizer(ext_params, pi_l, throat_lengthes)
     analizer.run(trj)
-    visualize_trajectory(trj, 'clusters')
+    visualize_trajectory(trj, 'clusters', win_name=win_name)
 
 
 if __name__ == '__main__':
@@ -182,5 +190,11 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
 
-    # run_default_analizer(path_to_traj.path)
-    run_extended_analizer(args.traj_path, args.throat_len_path, args.pil_path)
+    run_extended_analizer(
+        args.traj_path,
+        args.throat_len_path,
+        args.pil_path,
+        "Article algorithm + PSD",
+    )
+    run_default_analizer(args.traj_path, "Article algorithm")
+    Visualizer.show()

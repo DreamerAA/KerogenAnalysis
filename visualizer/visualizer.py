@@ -30,6 +30,27 @@ from base.boundingbox import BoundingBox
 from base.trajectory import Trajectory
 
 
+class KeyPressInteractorStyle(vtkInteractorStyleTrackballCamera):
+    def __init__(self, parent=None, status=True):
+        self.parent = vtkRenderWindowInteractor()
+        self.status = status
+        if parent is not None:
+            self.parent = parent
+
+        self.AddObserver('KeyPressEvent', self.key_press_event)
+
+    def key_press_event(self, obj, event):
+        key = self.parent.GetKeySym().lower()
+        if key == 'e' or key == 'q':
+            self.status = False
+        return
+
+
+interactors: List[vtkRenderWindowInteractor] = []
+kpis: List[KeyPressInteractorStyle] = []
+running: List[bool] = []
+
+
 def Rx(theta: float) -> npt.NDArray[np.float64]:
     return np.matrix(
         np.array(
@@ -672,6 +693,7 @@ class Visualizer:
         color_type='dist',
         periodic: bool = False,
         plot_box: bool = True,
+        window_name: str = 'Trajectory',
     ) -> None:
         renderer = vtkRenderer()
         for trj in trjs:
@@ -693,7 +715,7 @@ class Visualizer:
         renWin = vtkRenderWindow()
         renWin.AddRenderer(renderer)
         renWin.SetSize(640, 512)
-        renWin.SetWindowName('Trajectory')
+        renWin.SetWindowName(window_name)
         renWin.Render()
 
         style = vtkInteractorStyleTrackballCamera()
@@ -701,7 +723,29 @@ class Visualizer:
         iren = vtkRenderWindowInteractor()
         iren.SetRenderWindow(renWin)
         iren.SetInteractorStyle(style)
-        iren.Start()
+
+        i = len(interactors)
+        interactors.append(iren)
+        running.append(True)
+        kpis.append(KeyPressInteractorStyle(parent=iren))
+
+        interactors[i].SetInteractorStyle(kpis[i])
+        kpis[i].status = running[i]
+
+    @staticmethod
+    def show() -> None:
+        if len(interactors) == 0:
+            return
+        interactors[0].Initialize()
+        while all(x is True for x in running):
+            for i in range(len(kpis)):
+                running[i] = kpis[i].status
+                if running[i]:
+                    interactors[i].ProcessEvents()
+                    interactors[i].Render()
+                else:
+                    interactors[i].TerminateApp()
+                    print('Window', i, 'has stopped running.')
 
     @staticmethod
     def create_box_actor(box: BoundingBox) -> vtkActor:
