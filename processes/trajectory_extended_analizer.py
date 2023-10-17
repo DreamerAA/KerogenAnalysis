@@ -10,6 +10,7 @@ from processes.distribution_fitter import (
     GammaCurveFitter,
 )
 import matplotlib.pyplot as plt
+from typing import Optional
 
 
 @dataclass
@@ -28,11 +29,16 @@ class TrajectoryExtendedAnalizer:
         self.throat_lengthes = throat_lengthes
         self.pi_l = pi_l
 
-    def run(self, trj: Trajectory) -> None:
-        analizer = TrajectoryAnalizer(self.params)
-        print(" --- Matrix Algorithm finished")
+    def run(
+        self,
+        trj: Trajectory,
+        trap_approx: Optional[npt.NDArray[np.int32]] = None,
+    ) -> None:
+        if trap_approx is None:
+            analizer = TrajectoryAnalizer(self.params)
+            trap_approx = analizer.run(trj)
 
-        traps = analizer.run(trj)
+        print(" --- Matrix Algorithm finished")
 
         fd_lengthes = FittingData(self.throat_lengthes, np.array([]), None)
         wfitter = WeibullFitter()
@@ -69,7 +75,7 @@ class TrajectoryExtendedAnalizer:
         ex_t_mask = distances > x[np.argmax(yt)]
 
         result = np.zeros(shape=(distances.shape[0],), dtype=np.int32)
-        result[btw_mask] = traps[1:][btw_mask]
+        result[btw_mask] = trap_approx[1:][btw_mask]
         result[pore_mask] = 1
         result[throat_mask] = 0
         result[ex_p_mask] = 1
@@ -77,7 +83,14 @@ class TrajectoryExtendedAnalizer:
         trj.traps = result
 
         print(" --- Probability Algorithm finished")
-        return pore_probability, throat_probability, ex_p_mask, ex_t_mask, traps
+        return (
+            result,
+            trap_approx,
+            pore_probability,
+            throat_probability,
+            ex_p_mask,
+            ex_t_mask,
+        )
 
     @staticmethod
     def distances(points: npt.NDArray[np.float32]) -> npt.NDArray[np.float32]:

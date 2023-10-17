@@ -46,9 +46,15 @@ class KeyPressInteractorStyle(vtkInteractorStyleTrackballCamera):
         return
 
 
-interactors: List[vtkRenderWindowInteractor] = []
-kpis: List[KeyPressInteractorStyle] = []
-running: List[bool] = []
+class WinStructCollection:
+    def __init__(self, interactor: vtkRenderWindowInteractor):
+        self.interactor = interactor
+        self.kpis = KeyPressInteractorStyle(parent=self.interactor)
+        self.interactor.SetInteractorStyle(self.kpis)
+        self.running = True
+
+
+collection: List[WinStructCollection] = []
 
 
 def Rx(theta: float) -> npt.NDArray[np.float64]:
@@ -646,7 +652,7 @@ class Visualizer:
         cm_pos = center + bbox.size()
 
         camera = ren.GetActiveCamera()
-        size = img.shape
+        # size = img.shape
         camera.SetFocalPoint(*center)
         camera.SetPosition(*cm_pos)
         # renWin.SetSize(640, 640)
@@ -724,27 +730,25 @@ class Visualizer:
         iren.SetRenderWindow(renWin)
         iren.SetInteractorStyle(style)
 
-        i = len(interactors)
-        interactors.append(iren)
-        running.append(True)
-        kpis.append(KeyPressInteractorStyle(parent=iren))
-
-        interactors[i].SetInteractorStyle(kpis[i])
-        kpis[i].status = running[i]
+        collection.append(
+            WinStructCollection(
+                iren, KeyPressInteractorStyle(parent=iren), True
+            )
+        )
 
     @staticmethod
     def show() -> None:
-        if len(interactors) == 0:
+        if len(collection) == 0:
             return
-        interactors[0].Initialize()
-        while all(x is True for x in running):
-            for i in range(len(kpis)):
-                running[i] = kpis[i].status
-                if running[i]:
-                    interactors[i].ProcessEvents()
-                    interactors[i].Render()
+        collection[0].interactor.Initialize()
+        while all(x.running is True for x in collection):
+            for i, col in enumerate(collection):
+                col.running = col.kpis.status
+                if col.running:
+                    col.interactor.ProcessEvents()
+                    col.interactor.Render()
                 else:
-                    interactors[i].TerminateApp()
+                    col.interactor.TerminateApp()
                     print('Window', i, 'has stopped running.')
 
     @staticmethod

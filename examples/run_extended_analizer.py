@@ -8,22 +8,17 @@ from processes.trajectory_extended_analizer import (
 import pandas as pd
 import seaborn as sns
 from base.trajectory import Trajectory
-from base.utils import get_params
+from examples.utils import get_params
 
 
 def run_extended_analizer(
     traj_path: str, throat_len_path: str, pil_path: str, win_name: str
 ) -> None:
     trajectories = Trajectory.read_trajectoryes(traj_path)
-    # trj = trajectories[0]
 
     count_dp = 11
     ldp = np.linspace(0, 0.5, count_dp)
 
-    # without_classification = {dp: [] for dp in ldp}
-    # without_classification = np.zeros(
-    #     shape=(count_dp, len(trajectories)), dtype=np.int32
-    # )
     wc_data = []
     full_neq_data = []
     full_mp_data = []
@@ -48,17 +43,18 @@ def run_extended_analizer(
 
         analizer = TrajectoryExtendedAnalizer(ext_params, pi_l, throat_lengthes)
         (
+            traps_result,
+            traps_approx,
             pore_probability,
             throat_probability,
             ex_p_mask,
             ex_t_mask,
-            traps,
         ) = analizer.run(trj)
 
-        not_eq = traps[1:] != trj.traps
+        not_eq = traps_approx[1:] != traps_result
 
-        m_p = traps[1:] - trj.traps
-        p_m = trj.traps - traps[1:]
+        m_p = traps_approx[1:] - traps_result
+        p_m = traps_result - traps_approx[1:]
         m_p[m_p < 0] = 0
         p_m[p_m < 0] = 0
 
@@ -66,15 +62,13 @@ def run_extended_analizer(
         full_mp_data.append((f"trj_{j}", np.sum(m_p)))
         full_pm_data.append((f"trj_{j}", np.sum(p_m)))
 
-        # print(np.sum(m_p), np.sum(p_m), np.sum(not_eq))
-
         for i, dp in enumerate(ldp):
             btw_mask = np.abs(throat_probability - pore_probability) < dp
 
             btw_mask = np.logical_and(btw_mask, ~ex_p_mask)
             btw_mask = np.logical_and(btw_mask, ~ex_t_mask)
 
-            matrix_res = traps[1:][btw_mask]
+            matrix_res = traps_approx[1:][btw_mask]
 
             cross_ma_1_data.append(
                 (
@@ -177,14 +171,6 @@ def run_extended_analizer(
     sns.histplot(data=df_full_pm_distr, x="matrix=0_prob=1", ax=axs[2][1])
 
     plt.show()
-    # count_wc = pd.DataFrame(
-    #     data=np.transpose(without_classification), index=, columns={},
-    # )
-    # count_wc = count_wc.rename_axis("delta_probability", axis="columns")
-    # count_wc = count_wc.rename_axis("trajectories", axis="index")
-
-    # visualize_trajectory(trj, 'clusters', win_name=win_name)
-    # Visualizer.show()
 
 
 if __name__ == '__main__':

@@ -15,7 +15,7 @@ import seaborn as sns
 from base.trajectory import Trajectory
 from processes.trajectory_analyzer import TrajectoryAnalizer, AnalizerParams
 from visualizer.visualizer import Visualizer
-from base.utils import get_params
+from examples.utils import get_params, visualize_trajectory
 
 
 def visualize_dist_trajectory(traj: Trajectory) -> None:
@@ -28,14 +28,6 @@ def visualize_dist_trajectory(traj: Trajectory) -> None:
     plt.plot(traj.times[1:], dist)
     plt.subplot(2, 1, 2)
     plt.plot(traj.times[1:], cdist)
-
-
-def visualize_trajectory(
-    traj: Trajectory, color_type='dist', win_name: str = ""
-) -> None:
-    Visualizer.draw_trajectoryes(
-        [traj], color_type=color_type, plot_box=False, window_name=win_name
-    )
 
 
 def visualize_trajectories(
