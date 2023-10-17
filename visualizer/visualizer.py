@@ -31,27 +31,42 @@ from base.trajectory import Trajectory
 
 
 class KeyPressInteractorStyle(vtkInteractorStyleTrackballCamera):
-    def __init__(self, parent=None, status=True):
-        self.parent = vtkRenderWindowInteractor()
+    def __init__(
+        self,
+        iren: vtkRenderWindowInteractor,
+        status: bool = True,
+    ):
+        self.iren = iren
         self.status = status
-        if parent is not None:
-            self.parent = parent
-
+        self.camera = (
+            iren.GetRenderWindow()
+            .GetRenderers()
+            .GetFirstRenderer()
+            .GetActiveCamera()
+        )
+        self.camera_default_position = self.camera.GetPosition()
         self.AddObserver('KeyPressEvent', self.key_press_event)
 
     def key_press_event(self, obj, event):
-        key = self.parent.GetKeySym().lower()
+        key = self.iren.GetKeySym().lower()
         if key == 'e' or key == 'q':
             self.status = False
+        if key == 'r' or key == 'q':
+            self.camera.SetPosition(self.camera_default_position)
         return
 
 
 class WinStructCollection:
     def __init__(self, interactor: vtkRenderWindowInteractor):
         self.interactor = interactor
-        self.kpis = KeyPressInteractorStyle(parent=self.interactor)
+        self.renWin = self.interactor.GetRenderWindow()
+        self.kpis = KeyPressInteractorStyle(iren=self.interactor)
         self.interactor.SetInteractorStyle(self.kpis)
         self.running = True
+
+    def clear(self):
+        self.renWin.Finalize()
+        del self.renWin, self.interactor
 
 
 collection: List[WinStructCollection] = []
@@ -730,11 +745,7 @@ class Visualizer:
         iren.SetRenderWindow(renWin)
         iren.SetInteractorStyle(style)
 
-        collection.append(
-            WinStructCollection(
-                iren, KeyPressInteractorStyle(parent=iren), True
-            )
-        )
+        collection.append(WinStructCollection(iren))
 
     @staticmethod
     def show() -> None:
@@ -742,14 +753,21 @@ class Visualizer:
             return
         collection[0].interactor.Initialize()
         while all(x.running is True for x in collection):
+            to_rm = []
             for i, col in enumerate(collection):
                 col.running = col.kpis.status
                 if col.running:
                     col.interactor.ProcessEvents()
                     col.interactor.Render()
                 else:
-                    col.interactor.TerminateApp()
-                    print('Window', i, 'has stopped running.')
+                    to_rm.append((col, col.renWin.GetWindowName()))
+                    # col.interactor.TerminateApp()
+            for col, win_name in to_rm:
+                col.clear()
+                collection.remove(col)
+                print('Window', win_name, 'has stopped running.')
+            if len(collection) == 0:
+                break
 
     @staticmethod
     def create_box_actor(box: BoundingBox) -> vtkActor:
