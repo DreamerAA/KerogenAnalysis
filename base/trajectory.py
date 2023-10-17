@@ -114,7 +114,7 @@ class Trajectory:
                     next(f)
 
         count_step = int(len(ax) / count)
-        count_step = count_step // 5
+        # count_step = count_step // 5
         trajectories = []
         for i in range(count):
             points = np.zeros(shape=(count_step, 3), dtype=np.float32)
@@ -122,7 +122,7 @@ class Trajectory:
             points[:, 1] = [ay[i + j * count] for j in range(count_step)]
             points[:, 2] = [az[i + j * count] for j in range(count_step)]
 
-            points = points[:(count_step // 3), :]
+            # points = points[:(count_step // 3), :]
 
             trajectories.append(Trajectory(points, np.array(time_steps), box))
 

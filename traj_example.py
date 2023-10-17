@@ -10,10 +10,12 @@ from processes.trajectory_extended_analizer import (
     TrajectoryExtendedAnalizer,
     ExtendedParams,
 )
-
+import pandas as pd
+import seaborn as sns
 from base.trajectory import Trajectory
 from processes.trajectory_analyzer import TrajectoryAnalizer, AnalizerParams
 from visualizer.visualizer import Visualizer
+from base.utils import get_params
 
 
 def visualize_dist_trajectory(traj: Trajectory) -> None:
@@ -44,21 +46,6 @@ def visualize_trajectories(
 
 def animate_trajectoryes(trajs: List[Trajectory]) -> None:
     Visualizer.animate_trajectoryes(trajs)
-
-
-def all_params():
-    # good params  [154, 162, 186]
-    params = {}
-    i = 0
-    for dp in [0, 10, 50]:  # 0 - bad
-        for pv in [0.01, 0.1, 0.9]:  # 0.9 - bad
-            for nu in [0.1, 0.5, 0.9]:
-                for tt in ['fBm', 'Bm']:  # fBm - best
-                    for ks in [0, 1, 2, 3]:
-                        for lm in [[0.5, 1, 1.5, 2, 2.5, 3]]:
-                            params[i] = (dp, pv, nu, tt, ks)
-                            i = i + 1
-    return params
 
 
 def analizy_visualize(trj, params, win_name: str):
@@ -101,18 +88,6 @@ def get_trap_time_distribution(trajectories: List[Trajectory]):
     return result
 
 
-def get_params(indexes: List[int]) -> List[AnalizerParams]:
-    list_mu = np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0])
-    atparams = all_params()
-
-    tparams = [atparams[i] for i in indexes]
-    aparams = [
-        AnalizerParams(tt, nu, dp, ks, list_mu, pv)
-        for dp, pv, nu, tt, ks in tparams
-    ]
-    return aparams
-
-
 def run_default_analizer(path: str, win_name: str) -> None:
     trajectories = Trajectory.read_trajectoryes(path)
     aparams = get_params([154, 162, 186])
@@ -144,32 +119,6 @@ def run_default_analizer(path: str, win_name: str) -> None:
     #     plt.show()
 
 
-def run_extended_analizer(
-    traj_path: str, throat_len_path: str, pil_path: str, win_name: str
-) -> None:
-    trajectories = Trajectory.read_trajectoryes(traj_path)
-    trj = trajectories[0]
-
-    aparams = get_params([154, 162, 186])
-    params = aparams[0]
-    ext_params = ExtendedParams(
-        params.traj_type,
-        params.nu,
-        params.diag_percentile,
-        params.kernel_size,
-        params.list_mu,
-        params.p_value,
-        1.2,
-    )
-
-    throat_lengthes = np.load(throat_len_path)
-    pi_l = np.load(pil_path)
-
-    analizer = TrajectoryExtendedAnalizer(ext_params, pi_l, throat_lengthes)
-    analizer.run(trj)
-    visualize_trajectory(trj, 'clusters', win_name=win_name)
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -190,11 +139,5 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
 
-    run_extended_analizer(
-        args.traj_path,
-        args.throat_len_path,
-        args.pil_path,
-        "Article algorithm + PSD",
-    )
-    run_default_analizer(args.traj_path, "Article algorithm")
-    Visualizer.show()
+    # run_default_analizer(args.traj_path, "Article algorithm")
+    # Visualizer.show()

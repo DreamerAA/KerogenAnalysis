@@ -30,6 +30,8 @@ class TrajectoryExtendedAnalizer:
 
     def run(self, trj: Trajectory) -> None:
         analizer = TrajectoryAnalizer(self.params)
+        print(" --- Matrix Algorithm finished")
+
         traps = analizer.run(trj)
 
         fd_lengthes = FittingData(self.throat_lengthes, np.array([]), None)
@@ -63,17 +65,19 @@ class TrajectoryExtendedAnalizer:
             np.abs(throat_probability - pore_probability)
             < self.params.critical_probability
         )
+        ex_p_mask = distances < x[np.argmax(yp)]
+        ex_t_mask = distances > x[np.argmax(yt)]
 
         result = np.zeros(shape=(distances.shape[0],), dtype=np.int32)
         result[btw_mask] = traps[1:][btw_mask]
         result[pore_mask] = 1
         result[throat_mask] = 0
-        result[distances < x[np.argmax(yp)]] = 1
-        result[distances > x[np.argmax(yt)]] = 0
+        result[ex_p_mask] = 1
+        result[ex_t_mask] = 0
         trj.traps = result
 
-        print(" --- Finish!")
-        return pore_mask, throat_mask, traps
+        print(" --- Probability Algorithm finished")
+        return pore_probability, throat_probability, ex_p_mask, ex_t_mask, traps
 
     @staticmethod
     def distances(points: npt.NDArray[np.float32]) -> npt.NDArray[np.float32]:
