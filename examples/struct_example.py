@@ -221,8 +221,8 @@ def main_part_struct():
     Visualizer.draw_img(img, True, bbox)
     # Visualizer.draw_img_trj(img, bbox, trajectories[num_traj], True)
 
-    # plt.imshow(img[100, :, :])
-    # plt.show()
+    plt.imshow(img[100, :, :])
+    plt.show()
 
     # plt.imshow(img[:,100,:])
     # plt.show()

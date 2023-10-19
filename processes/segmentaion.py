@@ -60,7 +60,9 @@ class Segmentator:
             # print(f" --- Finish commit kerogen box: {i}")
 
     @staticmethod
-    def cut_cell(size: Tuple[float, float, float], dev: float = 4.0) -> KerogenBox:
+    def cut_cell(
+        size: Tuple[float, float, float], dev: float = 4.0
+    ) -> KerogenBox:
         maxs = np.max(np.array(size))
         mins = np.min(np.array(size))
         ax_ns = min(maxs / dev, mins)
@@ -82,7 +84,7 @@ class Segmentator:
         l_cell_size = [s for s in cell_size]
         ref_cell_size = min(l_cell_size) if by_min else max(l_cell_size)
         return tuple(  # type: ignore
-            reference_size * cs // ref_cell_size for cs in l_cell_size
+            int(reference_size * (cs // ref_cell_size)) for cs in l_cell_size
         )
 
     def binarize(self) -> npt.NDArray[np.int8]:

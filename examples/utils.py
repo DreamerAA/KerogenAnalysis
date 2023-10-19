@@ -3,6 +3,14 @@ from typing import List
 from processes.trajectory_analyzer import AnalizerParams
 from visualizer.visualizer import Visualizer
 from base.trajectory import Trajectory
+import numpy.typing as npt
+
+
+def write_binary_file(array: npt.NDArray[np.int8], file_name: str) -> None:
+    with open(file_name, 'wb') as file:
+        for i in range(array.shape[2]):
+            for j in range(array.shape[1]):
+                file.write(bytes(bytearray(array[:, j, i])))
 
 
 def visualize_trajectory(
