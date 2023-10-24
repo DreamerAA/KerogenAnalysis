@@ -235,52 +235,6 @@ def main_part_struct():
     #     draw_kerogen_data(kerogen_data)
 
 
-def extract_weibull_psd(path_to_pnm: str, scale: float, border: float = 0.02):
-    radiuses, throat_lengths = Reader.read_pnm_data(
-        path_to_pnm, scale=scale, border=border
-    )
-    psd_params = exponweib.fit(radiuses)
-    tld_params = exponweib.fit(throat_lengths)
-    return psd_params, tld_params, radiuses, throat_lengths
-
-
-def main_pnm_psd_analizer() -> None:
-    psd_params, tld_params, radiuses, throat_lengths = extract_weibull_psd(
-        "../data/tmp/1_pbc_atom/result", 1e9, 0.02
-    )
-
-    params = exponweib.fit(radiuses)
-    nx_rad = np.linspace(radiuses[0], radiuses[-1], 1000)
-    fit_y_rad = exponweib.pdf(nx_rad, *psd_params)
-
-    params = exponweib.fit(throat_lengths)
-    nx_len = np.linspace(throat_lengths[0], throat_lengths[-1], 1000)
-    fit_y_len = exponweib.pdf(nx_len, *tld_params)
-
-    n = 50
-    fig, axs = plt.subplots(1, 2)
-
-    p, bb = np.histogram(radiuses, bins=n)
-    xdel = bb[1] - bb[0]
-    x = bb[:-1] + xdel * 0.5
-    pn = p / np.sum(p * xdel)
-    axs[0].plot(x, pn, label='Histogram data')
-    axs[0].plot(nx_rad, fit_y_rad, label='Fitting')
-    axs[0].set_title("PDF(Pore size distribution)")
-    axs[0].set_xlabel("Pore diameter (nm)")
-
-    p, bb = np.histogram(throat_lengths, bins=n)
-    xdel = bb[1] - bb[0]
-    x = bb[:-1] + xdel * 0.5
-    pn = p / np.sum(p * xdel)
-    axs[1].plot(x, pn, label='Histogram data')
-    axs[1].plot(nx_len, fit_y_len, label='Fitting')
-    axs[1].set_title("PDF(Throat length distribution)")
-    axs[1].set_xlabel("Throat length (nm)")
-
-    plt.legend()
-    plt.show()
-
 
 def generate_distribution() -> None:
     psd_params, tld_params, radiuses, throat_lengths = extract_weibull_psd(

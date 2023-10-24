@@ -1,5 +1,8 @@
 import sys
 import os
+from pathlib import Path
+from os import listdir
+from os.path import isfile, join, dirname, realpath
 import random
 import time
 from typing import IO, List, Tuple
@@ -17,17 +20,22 @@ from sklearn.metrics import pairwise_distances
 from matplotlib.collections import PolyCollection
 from matplotlib import cm
 from matplotlib.ticker import LinearLocator
+import argparse
+
+
+path = Path(realpath(__file__))
+parent_dir = str(path.parent.parent.absolute())
+print(parent_dir)
+sys.path.append(parent_dir)
+
 from base.boundingbox import BoundingBox
 from base.kerogendata import AtomData, KerogenData
 from base.periodizer import Periodizer
 from base.reader import Reader
 from base.trajectory import Trajectory
+from base.utils import create_box_mask
 from processes.segmentaion import Segmentator
 from visualizer.visualizer import Visualizer
-import argparse
-
-# from examples.utils import
-from base.utils import create_box_mask
 from examples.utils import write_binary_file
 
 
@@ -83,7 +91,7 @@ def read_structures(
 
 def dynamic_struct_extr(path_to_structure: str) -> None:
     start_time = time.time()
-    structures = read_structures(path_to_structure)
+    structures = read_structures(path_to_structure)[:1]
     print(f" -- Count structures: {len(structures)}")
 
     print(f" -- Reading finished! Elapsed time: {time.time() - start_time}s")
@@ -145,7 +153,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--structure_path',
         type=str,
-        # default="../data/methan_traj/meth_1.7_micros.1.gro"
+        # default="../data/Kerogen/methan_traj/meth_0.5_micros.gro"
         default="../data/Kerogen/traj.gro",
     )
     args = parser.parse_args()
