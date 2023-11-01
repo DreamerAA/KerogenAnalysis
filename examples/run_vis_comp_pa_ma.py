@@ -1,7 +1,7 @@
 
 import numpy as np
-import sys
 import argparse
+import sys
 import os
 from pathlib import Path
 from os.path import realpath
