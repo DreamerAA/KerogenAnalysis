@@ -42,7 +42,7 @@ def get_params(indexes: List[int]) -> List[AnalizerParams]:
 
     tparams = [atparams[i] for i in indexes]
     aparams = [
-        AnalizerParams(tt, nu, dp, ks, list_mu, pv)
+        AnalizerParams(tt, nu, dp, ks, list_mu, pv, 1)
         for dp, pv, nu, tt, ks in tparams
     ]
     return aparams

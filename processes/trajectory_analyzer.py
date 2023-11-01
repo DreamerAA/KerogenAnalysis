@@ -90,6 +90,8 @@ class AnalizerParams:
     """
     p_value: float = 0.01
 
+    num_jobs: int = 1
+
 
 class TrajectoryAnalizer:
     def __init__(self, params: AnalizerParams):
@@ -124,9 +126,11 @@ class TrajectoryAnalizer:
                 points, self.params.p_value, self.params.nu, mu, list_threshold
             )
 
-        results = Parallel(n_jobs=3)(
+        results = Parallel(n_jobs=self.params.num_jobs)(
             delayed(analyse)(mu) for mu in self.params.list_mu
         )
+        # result = [analyse(mu) for mu in self.params.list_mu]
+
         list_trapped = np.zeros((trj.count_points(),), dtype=np.bool_)
         for flag, result in results:
             if flag:

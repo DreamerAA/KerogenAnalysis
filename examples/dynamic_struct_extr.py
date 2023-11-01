@@ -25,7 +25,6 @@ import argparse
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
-print(parent_dir)
 sys.path.append(parent_dir)
 
 from base.boundingbox import BoundingBox

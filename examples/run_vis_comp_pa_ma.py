@@ -1,6 +1,16 @@
-from base.trajectory import Trajectory
+
 import numpy as np
+import sys
 import argparse
+import os
+from pathlib import Path
+from os.path import realpath
+
+path = Path(realpath(__file__))
+parent_dir = str(path.parent.parent.absolute())
+sys.path.append(parent_dir)
+
+from base.trajectory import Trajectory
 from examples.utils import get_params, visualize_trajectory
 from processes.trajectory_extended_analizer import (
     TrajectoryExtendedAnalizer,
@@ -8,21 +18,22 @@ from processes.trajectory_extended_analizer import (
 )
 from processes.trajectory_analyzer import TrajectoryAnalizer
 from visualizer.visualizer import Visualizer
-import os
 
 
 def run_vis_comp_pa_ma(
-    traj_path: str, throat_len_path: str, pil_path: str, win_name: str
+    traj_path: str, throat_len_path: str, pil_path: str, trj_t: str, trj_num:int
 ) -> None:
     trajectories = Trajectory.read_trajectoryes(traj_path)
-    trj = trajectories[3]
-    count_dp = 6
+    trj = trajectories[trj_num]
+    print(f" --- Count points in trajectory: {trj.count_points()}")
+    count_dp = 2
     ldp = np.linspace(0.5, 0.3, count_dp)
 
     aparams = get_params([154, 162, 186])
     params = aparams[0]
-
-    path_tmp_traps = "../data/Kerogen/h2_micros/matrix_traps.npy"
+    params.num_jobs = 3
+    
+    path_tmp_traps = f"../data/Kerogen/tmp/{trj_t}_{trj_num}_matrix_traps.npy"
     if os.path.exists(path_tmp_traps):
         trap_approx = np.load(path_tmp_traps)
     else:
@@ -58,7 +69,7 @@ def run_vis_comp_pa_ma(
 
         trj.traps = traps_result
         visualize_trajectory(
-            trj, 'clusters', f"Probabilistic algorithm with window {prob_win}"
+            trj, 'clusters', f"Probabilistic algorithm with window {prob_win} ({trj_t})"
         )
 
     Visualizer.show()
@@ -69,7 +80,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--traj_path',
         type=str,
-        # default="../data/methan_traj/meth_1.7_micros.1.gro"
+        # default="../data/Kerogen/methan_traj/meth_1.7_micros.1.gro"
         default="../data/Kerogen/h2_micros/h2_micros.1.gro",
     )
     parser.add_argument(
@@ -88,5 +99,7 @@ if __name__ == '__main__':
         args.traj_path,
         args.throat_len_path,
         args.pil_path,
-        "Article algorithm + PSD",
+        # "(meth) Article algorithm + PSD",
+        "(h2) Article algorithm + PSD",
+        3
     )

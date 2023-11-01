@@ -49,9 +49,9 @@ class KeyPressInteractorStyle(vtkInteractorStyleTrackballCamera):
 
     def key_press_event(self, obj, event):
         key = self.iren.GetKeySym().lower()
-        if key == 'e' or key == 'q':
+        if key == 'q':
             self.status = False
-        if key == 'r' or key == 'q':
+        if key == 'r':
             self.camera.SetPosition(self.camera_default_position)
         return
 
@@ -733,26 +733,28 @@ class Visualizer:
         renderer.ResetCamera()
         renderer.GetActiveCamera().Azimuth(90)
 
-        renWin = vtkRenderWindow()
-        renWin.AddRenderer(renderer)
-        renWin.SetSize(640, 512)
-        renWin.SetWindowName(window_name)
-        renWin.Render()
-
-        style = vtkInteractorStyleTrackballCamera()
+        ren_win = vtkRenderWindow()
+        ren_win.AddRenderer(renderer)
+        ren_win.Render()
+        ren_win.SetSize(640, 512)
+        ren_win.SetWindowName(window_name)
+        
+        # style = vtkInteractorStyleTrackballCamera()
 
         iren = vtkRenderWindowInteractor()
-        iren.SetRenderWindow(renWin)
-        iren.SetInteractorStyle(style)
-
-        collection.append(WinStructCollection(iren))
+        iren.SetRenderWindow(ren_win)
+        # iren.SetInteractorStyle(style)
+        win_col = WinStructCollection(iren)
+        collection.append(win_col)
 
     @staticmethod
     def show() -> None:
         if len(collection) == 0:
             return
-        collection[0].interactor.Initialize()
-        while all(x.running is True for x in collection):
+        for col in collection:
+            col.interactor.Initialize()
+        cont_flag = True
+        while cont_flag:
             to_rm = []
             for i, col in enumerate(collection):
                 col.running = col.kpis.status
@@ -768,6 +770,7 @@ class Visualizer:
                 print('Window', win_name, 'has stopped running.')
             if len(collection) == 0:
                 break
+            cont_flag = all(x.running is True for x in collection)
 
     @staticmethod
     def create_box_actor(box: BoundingBox) -> vtkActor:
