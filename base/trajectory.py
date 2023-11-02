@@ -17,7 +17,7 @@ class Trajectory:
     # non_periodic_points: Optional[npt.NDArray[np.float64]] = None
 
     def dists(self) -> npt.NDArray[np.float32]:
-        return Trajectory.extractDists(self.points_without_periodic())
+        return Trajectory.extractDists(self.points_without_periodic)
 
     def is_intersect_borders(self) -> np.bool_:
         ppoints = self.points_without_periodic()

@@ -31,7 +31,7 @@ def run_vis_comp_pa_ma(
 
     aparams = get_params([154, 162, 186])
     params = aparams[0]
-    params.num_jobs = 3
+    params.num_jobs = 1
     
     path_tmp_traps = f"../data/Kerogen/tmp/{trj_t}_{trj_num}_matrix_traps.npy"
     if os.path.exists(path_tmp_traps):
@@ -80,8 +80,8 @@ if __name__ == '__main__':
     parser.add_argument(
         '--traj_path',
         type=str,
-        # default="../data/Kerogen/methan_traj/meth_1.7_micros.1.gro"
-        default="../data/Kerogen/h2_micros/h2_micros.1.gro",
+        default="../data/Kerogen/methan_traj/meth_1.7_micros.1.gro"
+        # default="../data/Kerogen/h2_micros/h2_micros.1.gro",
     )
     parser.add_argument(
         '--throat_len_path',
@@ -99,7 +99,26 @@ if __name__ == '__main__':
         args.traj_path,
         args.throat_len_path,
         args.pil_path,
-        # "(meth) Article algorithm + PSD",
-        "(h2) Article algorithm + PSD",
-        3
+        "(meth) Article algorithm + PSD",
+        # "(h2) Article algorithm + PSD",
+        12
     )
+
+    # run_vis_comp_pa_ma(
+    #     args.traj_path,
+    #     args.throat_len_path,
+    #     args.pil_path,
+    #     "(meth) Article algorithm + PSD",
+    #     # "(h2) Article algorithm + PSD",
+    #     14
+    # )
+
+    # run_vis_comp_pa_ma(
+    #     args.traj_path,
+    #     args.throat_len_path,
+    #     args.pil_path,
+    #     "(meth) Article algorithm + PSD",
+    #     # "(h2) Article algorithm + PSD",
+    #     19
+    # )
+    Visualizer.show()

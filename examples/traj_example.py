@@ -6,12 +6,20 @@ from typing import List, Tuple
 from skimage import measure
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import seaborn as sns
+import os
+from pathlib import Path
+from os.path import realpath
+
+path = Path(realpath(__file__))
+parent_dir = str(path.parent.parent.absolute())
+sys.path.append(parent_dir)
+
 from processes.trajectory_extended_analizer import (
     TrajectoryExtendedAnalizer,
     ExtendedParams,
 )
-import pandas as pd
-import seaborn as sns
 from base.trajectory import Trajectory
 from processes.trajectory_analyzer import TrajectoryAnalizer, AnalizerParams
 from visualizer.visualizer import Visualizer
@@ -88,13 +96,13 @@ def run_default_analizer(path: str, win_name: str) -> None:
     # run_and_plot_trap_time_distribution(trajectories, list(zip(indexes, aparams)))
     # analize_script(4)
 
-    # for i in [12, 14, 19]:  #
-    #     visualize_trajectory(trajectories[i])
+    for i in [12, 14, 19]:  #
+        visualize_trajectory(trajectories[i])
 
     # params = AnalizerParams(traj_type='fBm', nu=0.9, diag_percentile=50 , kernel_size=1, list_mu=np.array([0.5, 1. , 1.5, 2. , 2.5, 3.]), p_value=0.01)
     # params.list_mu = np.array([1.5, 2])
     trj = trajectories[0]
-    analizy_visualize(trj, params, win_name)
+    # analizy_visualize(trj, params, win_name)
 
     # visualize_trajectories(trajectories)
     # animate_trajectoryes(trajectories)
@@ -109,6 +117,7 @@ def run_default_analizer(path: str, win_name: str) -> None:
     # for t in trajectories:
     #     visualize_dist_trajectory(t)
     #     plt.show()
+    Visualizer.show()
 
 
 if __name__ == '__main__':
@@ -131,5 +140,4 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
 
-    # run_default_analizer(args.traj_path, "Article algorithm")
-    # Visualizer.show()
+    run_default_analizer(args.traj_path, "Article algorithm")
