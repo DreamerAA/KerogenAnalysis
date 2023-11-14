@@ -1,4 +1,5 @@
 import time
+import math
 from dataclasses import dataclass
 from typing import Callable, List, Optional, Tuple
 
@@ -74,6 +75,16 @@ class Segmentator:
             Range(minb[1], maxb[1]),
             Range(minb[2], maxb[2]),
         )
+    
+    @staticmethod
+    def box_cell(
+        size: Tuple[float, float, float]
+    ) -> KerogenBox:
+        return KerogenBox(
+            Range(0., size[0]),
+            Range(0., size[1]),
+            Range(0., size[2]),
+        )
 
     @staticmethod
     def calc_image_size(
@@ -84,7 +95,7 @@ class Segmentator:
         l_cell_size = [s for s in cell_size]
         ref_cell_size = min(l_cell_size) if by_min else max(l_cell_size)
         return tuple(  # type: ignore
-            int(reference_size * (cs // ref_cell_size)) for cs in l_cell_size
+            int(math.ceil(reference_size * cs / ref_cell_size)) for cs in l_cell_size
         )
 
     def binarize(self) -> npt.NDArray[np.int8]:

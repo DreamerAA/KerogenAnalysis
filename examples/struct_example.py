@@ -1,8 +1,10 @@
 import sys
 import os
+from pathlib import Path
+from os.path import realpath
 import random
 import time
-from typing import IO, List, Tuple
+from typing import IO, List, Tuple, Any
 import seaborn as sns
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -17,6 +19,11 @@ from sklearn.metrics import pairwise_distances
 from matplotlib.collections import PolyCollection
 from matplotlib import cm
 from matplotlib.ticker import LinearLocator
+
+path = Path(realpath(__file__))
+parent_dir = str(path.parent.parent.absolute())
+sys.path.append(parent_dir)
+
 from base.boundingbox import BoundingBox
 from base.kerogendata import AtomData, KerogenData
 from base.periodizer import Periodizer
@@ -234,11 +241,17 @@ def main_part_struct():
     #     # draw_kerogen_data(kerogen_data,scale="")
     #     draw_kerogen_data(kerogen_data)
 
+def extract_weibull_psd(path_to_pnm: str, scale: float, border: float = 0.02)->Tuple[Any]:
+    radiuses, throat_lengths = Reader.read_pnm_data(
+        path_to_pnm, scale=scale, border=border
+    )
+    psd_params = exponweib.fit(radiuses)
+    tld_params = exponweib.fit(throat_lengths)
+    return psd_params, tld_params, radiuses, throat_lengths
 
-
-def generate_distribution() -> None:
+def generate_distribution(path_to_pnm:str, path_to_save:str) -> None:
     psd_params, tld_params, radiuses, throat_lengths = extract_weibull_psd(
-        "../data/Kerogen/tmp/1_pbc_atom/result", 1e9, 0.02
+        path_to_pnm, 1e10, 0.015
     )
 
     max_rad = radiuses[-1]
@@ -340,8 +353,9 @@ def generate_distribution() -> None:
     pi_l_save = np.zeros(shape=(pi_l.shape[0], 2), dtype=np.float32)
     pi_l_save[:, 1] = pi_l
     pi_l_save[:, 0] = new_l
-    np.save("../data/Kerogen/tmp/1_pbc_atom/pi_l.npy", pi_l_save)
-    np.save("../data/Kerogen/tmp/1_pbc_atom/throat_lengths.npy", throat_lengths)
+    path_to_save
+    np.save(path_to_save + "_pi_l.npy", pi_l_save)
+    np.save(path_to_save + "throat_lengths.npy", throat_lengths)
 
     plt.figure()
     plt.plot(new_l, pi_l, label="Pi(L)")
@@ -355,4 +369,13 @@ def generate_distribution() -> None:
 if __name__ == '__main__':
     # main_part_struct()
     # main_pnm_psd_analizer()
-    generate_distribution()
+    
+    generate_distribution("../data/Kerogen/tmp/500_500_500_start/num=0",
+                          "../data/Kerogen/tmp/500_500_500_start/part_cell_start")
+    
+    generate_distribution("../data/Kerogen/tmp/500_500_500_last/num=590",
+                          "../data/Kerogen/tmp/500_500_500_last/part_cell_last")
+
+    generate_distribution("../data/Kerogen/tmp/500_595_1045/500_595_1045",
+                          "../data/Kerogen/tmp/500_595_1045/full_cell")
+
