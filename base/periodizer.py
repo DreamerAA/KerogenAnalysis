@@ -5,7 +5,7 @@ from base.kerogendata import KerogenData
 
 class Periodizer:
     @staticmethod
-    def periodize(kerogen: KerogenData) -> None:
+    def periodize(kerogen: KerogenData, rm_long_edges:bool = True) -> None:
         def new_coord(old: float, s: float) -> float:
             if old < 0:
                 return s + old
@@ -17,14 +17,18 @@ class Periodizer:
         for a in kerogen.atoms:
             x, y, z = a.pos
             a.pos = np.array([new_coord(x, sx), new_coord(y, sy), new_coord(z, sz)])
-
-        Periodizer.rm_long_edges(kerogen)
+        if rm_long_edges:
+            Periodizer.rm_long_edges(kerogen)
 
     @staticmethod
     def rm_long_edges(kerogen: KerogenData) -> None:
+        if kerogen.graph is None:
+            return
+        
         sx_2, sy_2, sz_2 = np.array([s for s in kerogen.box.size()]) * 0.5
 
         def check_dist(n1: int, n2: int) -> bool:
+            
             a1, a2 = kerogen.atoms[n1], kerogen.atoms[n2]
             if (
                 abs(a1.pos[0] - a2.pos[0]) > sx_2

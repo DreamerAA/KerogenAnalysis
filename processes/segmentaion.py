@@ -77,7 +77,7 @@ class Segmentator:
         )
     
     @staticmethod
-    def box_cell(
+    def full_cell(
         size: Tuple[float, float, float]
     ) -> KerogenBox:
         return KerogenBox(

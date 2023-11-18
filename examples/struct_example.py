@@ -370,12 +370,14 @@ if __name__ == '__main__':
     # main_part_struct()
     # main_pnm_psd_analizer()
     
-    generate_distribution("../data/Kerogen/tmp/500_500_500_start/num=0",
-                          "../data/Kerogen/tmp/500_500_500_start/part_cell_start")
+    generate_distribution("../data/Kerogen/tmp/full_cell/pnms/num_0",
+                          "../data/Kerogen/tmp/full_cell/distributions/")
     
-    generate_distribution("../data/Kerogen/tmp/500_500_500_last/num=590",
-                          "../data/Kerogen/tmp/500_500_500_last/part_cell_last")
+    generate_distribution("../data/Kerogen/tmp/full_cell/pnms/num_525000000",
+                          "../data/Kerogen/tmp/full_cell/distributions/")
 
-    generate_distribution("../data/Kerogen/tmp/500_595_1045/500_595_1045",
-                          "../data/Kerogen/tmp/500_595_1045/full_cell")
+    generate_distribution("../data/Kerogen/tmp/full_cell/pnms/num_1075000000",
+                          "../data/Kerogen/tmp/full_cell/distributions")
 
+    generate_distribution("../data/Kerogen/tmp/full_cell/pnms/num_1597500000",
+                          "../data/Kerogen/tmp/full_cell/distributions/")

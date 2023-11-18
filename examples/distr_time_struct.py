@@ -3,7 +3,7 @@ import argparse
 import json
 import time
 from pathlib import Path
-from typing import Tuple, Any
+from typing import Tuple, Any, List
 from os import listdir
 from os.path import isfile, join, dirname, realpath
 import subprocess
@@ -157,9 +157,26 @@ def build_distributions_compare_bbb(path_to_pnms:str, path_to_bb_pnm:str)->None:
     plt.legend()
     plt.show()
 
+def build_distributions(paths:List[Tuple[str,str]])->None:
+    fig, axs = plt.subplots(1, 2)
+    for path_to_pnms,hist_prefix in paths:
+        onlyfiles = [f for f in listdir(path_to_pnms) if isfile(join(path_to_pnms, f))]    
+        onlyfiles = [file for file in onlyfiles if "_link1" in file]
+        steps = [int((file.split("_")[0]).split("=")[1]) for file in onlyfiles]
+        sorted_lfiles = list(zip(steps, onlyfiles))
+        sorted_lfiles = sorted(sorted_lfiles, key=lambda x: x[0])
+        for step, file in sorted_lfiles:
+            radiuses, throat_lengths = Reader.read_pnm_data(
+                join(path_to_pnms, file[:-10]), scale=1e10, border= 0.015
+            )
+            drawDistr(axs, radiuses, throat_lengths, hist_prefix + str(step))
+    plt.legend()
+    plt.show()
 
 if __name__ == '__main__':
     # extract_pnms()
     # build_distributions("/home/andrey/PHD/Kerogen/data/Kerogen/tmp/result_time_depend_struct/pnm/")
-    build_distributions_compare_bbb("/home/andrey/PHD/Kerogen/data/Kerogen/tmp/result_time_depend_struct/pnm/",
-                                    "/home/andrey/PHD/Kerogen/data/Kerogen/tmp/500_595_1045/500_595_1045")
+    # build_distributions_compare_bbb("/home/andrey/PHD/Kerogen/data/Kerogen/tmp/result_time_depend_struct/pnm/",
+    #                                 "/home/andrey/PHD/Kerogen/data/Kerogen/tmp/500_595_1045/500_595_1045")
+    build_distributions([("/home/andrey/PHD/Kerogen/data/Kerogen/tmp/full_cell/pnms", "Hist data for FULL cell num="),
+                         ("/home/andrey/PHD/Kerogen/data/Kerogen/tmp/part_cell/pnms", "Hist data for PART cell num=")])
