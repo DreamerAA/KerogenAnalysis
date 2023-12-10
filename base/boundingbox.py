@@ -111,6 +111,9 @@ class KerogenBox(BoundingBox):
         self.tmp_atom_sizes.clear()
 
     def is_intersect_atom(self, pos: npt.NDArray[np.float32]) -> bool:
-        p = pos.reshape(1, 3)
         dist = cdist(p, self.positions)
         return np.any(dist < self.atom_sizes)  # type: ignore
+
+    def dist_nearest(self,  pos: npt.NDArray[np.float32])->float:
+        dist = cdist(p, self.positions)
+        return dist.min()

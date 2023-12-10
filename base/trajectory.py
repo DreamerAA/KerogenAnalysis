@@ -73,9 +73,20 @@ class Trajectory:
             npoints[i + 1, :] = npoints[i, :] + shift
 
         return npoints
-
+    
+    @cached_property
     def count_points(self) -> int:
         return self.points.shape[0]
+
+    @cached_property
+    def delta_time(self)->float:
+        """time step
+
+        Returns:
+            float: picoseconds
+        """
+        assert(len(self.times) >= 2)
+        return self.times[1] - self.times[0]
 
     @staticmethod
     def read_trajectoryes(file_name: str) -> List['Trajectory']:

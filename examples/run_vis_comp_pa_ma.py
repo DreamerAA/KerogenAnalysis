@@ -25,7 +25,7 @@ def run_vis_comp_pa_ma(
 ) -> None:
     trajectories = Trajectory.read_trajectoryes(traj_path)
     trj = trajectories[trj_num]
-    print(f" --- Count points in trajectory: {trj.count_points()}")
+    print(f" --- Count points in trajectory: {trj.count_points}")
     count_dp = 2
     # ldp = np.linspace(0.5, 0.3, count_dp)
     # ldp = np.array([0.0, 0.3, 0.5])
@@ -82,11 +82,11 @@ def run_vis_comp_pa_ma(
 
 
 def run_comp_pa(
-    traj_path: str, throat_len_path: str, pil_path: str, trj_t: str, trj_num:int
+    traj_path: str, throat_len_path: str, pil_path: str, trj_t: str, trj_num:int, path_save:str
 ) -> None:
     trajectories = Trajectory.read_trajectoryes(traj_path)
     trj = trajectories[trj_num]
-    print(f" --- Count points in trajectory: {trj.count_points()}")
+    print(f" --- Count points in trajectory: {trj.count_points}")
     count_dp = 2
     # ldp = np.linspace(0.5, 0.3, count_dp)
     # ldp = np.array([0.0, 0.3, 0.5])
@@ -96,7 +96,7 @@ def run_comp_pa(
     params = aparams[0]
     params.num_jobs = 1
     
-    path_tmp_traps = f"../data/Kerogen/tmp/{trj_t}_{trj_num}_matrix_traps.npy"
+    path_tmp_traps = path_save + f"_{trj_t}_{trj_num}_matrix_traps.npy"
     if os.path.exists(path_tmp_traps):
         trap_approx = np.load(path_tmp_traps)
     else:
@@ -162,7 +162,17 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
 
-    run_comp_pa()
+
+    path_to_distr = "/home/andrey/PHD/Kerogen/data/Kerogen/tmp/result_time_depend_struct/distributions/"
+    for save_part in [path_to_distr + "num=0_fullcell", path_to_distr + "num=0_partcell",
+                      path_to_distr + "num=1597500000_fullcell", path_to_distr + "num=1597500000_partcell"]:
+        run_comp_pa(args.traj_path, 
+                    save_part + "_throat_lengths.npy", 
+                    save_part + "_pi_l.npy",
+                    "h2", 5,
+                    save_part)
+        # 5 12 2 17
+
 
     # run_vis_comp_pa_ma(
     #     args.traj_path,
@@ -190,4 +200,5 @@ if __name__ == '__main__':
     #     # "(h2) Article algorithm + PSD",
     #     19
     # )
+    
     Visualizer.show()

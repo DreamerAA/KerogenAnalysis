@@ -117,7 +117,7 @@ class Segmentator:
                             for i, vs, mm in zip(
                                 [ix, iy, iz], vox_sizes, self.kerogen.box.min()
                             )
-                        ]
+                        ], shape = (1,3)
                     )
                     for bb in self.bb:
                         if bb.is_inside(pos) and bb.is_intersect_atom(pos):
@@ -125,11 +125,49 @@ class Segmentator:
             print(f" --- Slice {ix}-x finished!")
             return s_img
 
-        num_proc = 16
+        num_proc = 14
         sim_results = Parallel(n_jobs=num_proc)(
             delayed(wrap)(ix) for ix in range(self.img_size[0])
         )
         img = np.ones(shape=self.img_size, dtype=np.int8)
+        for i, res in enumerate(sim_results):
+            img[i, :, :] = res
+
+        return img
+
+    def dist_map(self)-> npt.NDArray[np.float32]:
+        vox_sizes = [
+            ker_s / float(img_s)
+            for ker_s, img_s in zip(self.kerogen.box.size(), self.img_size)
+        ]
+
+        def wrap(ix):
+            s_img = np.ones(
+                shape=(self.img_size[1], self.img_size[2]), dtype=np.int8
+            )
+
+            for iy in range(self.img_size[1]):
+                for iz in range(self.img_size[2]):
+                    pos = np.array(
+                        [
+                            mm + (float(i) + 0.5) * vs
+                            for i, vs, mm in zip(
+                                [ix, iy, iz], vox_sizes, self.kerogen.box.min()
+                            )
+                        ], shape = (1,3)
+                    )
+                    for bb in self.bb:
+                        if bb.is_inside(pos):
+                            nd = self.bb.dist_nearest(pos)
+                            s_img[iy, iz] = min(s_img[iy, iz], nd)
+            print(f" --- Slice {ix}-x finished!")
+            return s_img
+
+        num_proc = 8
+        sim_results = Parallel(n_jobs=num_proc)(
+            delayed(wrap)(ix) for ix in range(self.img_size[0])
+        )
+        img = 1e6*np.ones(shape=self.img_size, dtype=np.float32)
         for i, res in enumerate(sim_results):
             img[i, :, :] = res
 

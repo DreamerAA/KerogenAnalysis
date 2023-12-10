@@ -1,25 +1,10 @@
 import sys
 import os
 from pathlib import Path
-from os import listdir
-from os.path import isfile, join, dirname, realpath
-import random
+from os.path import realpath
 import time
-from typing import IO, List, Tuple
-import seaborn as sns
-import matplotlib.pyplot as plt
-import networkx as nx
+from typing import List, Tuple
 import numpy as np
-import numpy.typing as npt
-import pandas as pd
-import scipy.stats as stats
-from scipy.interpolate import UnivariateSpline
-from scipy.stats import weibull_min, exponweib
-from joblib import Parallel, delayed
-from sklearn.metrics import pairwise_distances
-from matplotlib.collections import PolyCollection
-from matplotlib import cm
-from matplotlib.ticker import LinearLocator
 import argparse
 
 
@@ -160,6 +145,8 @@ def extanded_struct_extr(path_to_structure: str, path_to_save:str, mfilter, cut_
 
         bbox = Segmentator.cut_cell(size, 2) if cut_cell else Segmentator.full_cell(size)  # type: ignore
 
+        print(f" --- Current num: {num}")
+
         print(f" --- Box size: {bbox.size()}")
 
         kerogen_data = KerogenData(None, atoms, bbox)  # type: ignore
@@ -214,28 +201,20 @@ if __name__ == '__main__':
     parser.add_argument(
         '--structure_path',
         type=str,
-        # default="../data/Kerogen/methan_traj/meth_0.5_micros.gro"
-        default="../data/Kerogen/traj.gro",
+        default="../data/Kerogen/traj_ch4.gro",
     )
     parser.add_argument(
         '--save_path',
         type=str,
         # default="../data/Kerogen/methan_traj/meth_0.5_micros.gro"
-        default="../data/Kerogen/tmp/result_time_depend_struct/images/",
+        default="../data/Kerogen/time_trapping_results/ch4/",
     )
 
     args = parser.parse_args()
 
-    # dynamic_struct_extr(args.structure_path)
-
     def cfilter(s):
-        f = random.sample(s, 2)
-        f = sorted(f, key=lambda x: x[0]) 
-        return [s[0]] + f + [s[-1]]
+        return [s[-1]]
+
+    extanded_struct_extr(args.structure_path, args.save_path, cfilter, True, 500)
+
     
-    def ffilter(s):
-        return [s[0], s[len(s)//3], s[2*len(s)//3] , s[-1]]
-
-    extanded_struct_extr(args.structure_path, args.save_path, cfilter, True, 50)
-
-    extanded_struct_extr(args.structure_path, args.save_path, ffilter, False, 50)

@@ -9,7 +9,7 @@ from base.trajectory import Trajectory
 class Writer:
     @staticmethod
     def trajectory_to_mat(trjs: List[Trajectory]) -> None:
-        count_points = trjs[0].count_points()
+        count_points = trjs[0].count_points
         shape = (len(trjs), count_points)
         X, Y, Z = np.zeros(shape), np.zeros(shape), np.zeros(shape)
         for i, trj in enumerate(trjs):

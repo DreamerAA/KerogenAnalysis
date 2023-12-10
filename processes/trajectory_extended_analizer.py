@@ -29,14 +29,21 @@ class TrajectoryExtendedAnalizer:
         self.throat_lengthes = throat_lengthes
         self.pi_l = pi_l
 
+    @staticmethod
+    def isclose(a, b, rel_tol=1e-09, abs_tol=0.0):
+        return abs(a-b) <= max(rel_tol * max(abs(a), abs(b)), abs_tol)
+
     def run(
         self,
         trj: Trajectory,
-        trap_approx: Optional[npt.NDArray[np.int32]] = None,
+        trap_approx: Optional[npt.NDArray[np.int32]] = None
     ) -> None:
         if trap_approx is None:
-            analizer = TrajectoryAnalizer(self.params)
-            trap_approx = analizer.run(trj)
+            if not TrajectoryExtendedAnalizer.isclose(self.params.critical_probability, 0.):
+                analizer = TrajectoryAnalizer(self.params)
+                trap_approx = analizer.run(trj)
+            else:
+                trap_approx = (-1)*np.ones(shape=(trj.count_points,))
 
         print(" --- Matrix Algorithm finished")
 
@@ -83,14 +90,7 @@ class TrajectoryExtendedAnalizer:
         trj.traps = result
 
         print(" --- Probability Algorithm finished")
-        return (
-            result,
-            trap_approx,
-            pore_probability,
-            throat_probability,
-            ex_p_mask,
-            ex_t_mask,
-        )
+        return result
 
     @staticmethod
     def distances(points: npt.NDArray[np.float32]) -> npt.NDArray[np.float32]:

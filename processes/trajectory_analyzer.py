@@ -110,7 +110,7 @@ class TrajectoryAnalizer:
         ]
 
     def run(self, trj: Trajectory) -> npt.NDArray[np.int32]:
-        count_points = trj.count_points()
+        count_points = trj.count_points
 
         mat = mat73.loadmat(
             f"./list_threshold/nuc{int(self.params.nu*100)}diag_perc={self.params.diag_percentile}.mat"
@@ -125,13 +125,14 @@ class TrajectoryAnalizer:
             return self.analyse_by_mu(
                 points, self.params.p_value, self.params.nu, mu, list_threshold
             )
+        if self.params.num_jobs != 1:
+            results = Parallel(n_jobs=self.params.num_jobs)(
+                delayed(analyse)(mu) for mu in self.params.list_mu
+            )
+        else:
+            result = [analyse(mu) for mu in self.params.list_mu]
 
-        results = Parallel(n_jobs=self.params.num_jobs)(
-            delayed(analyse)(mu) for mu in self.params.list_mu
-        )
-        # result = [analyse(mu) for mu in self.params.list_mu]
-
-        list_trapped = np.zeros((trj.count_points(),), dtype=np.bool_)
+        list_trapped = np.zeros((trj.count_points,), dtype=np.bool_)
         for flag, result in results:
             if flag:
                 list_trapped = np.logical_or(list_trapped, result > 0)
