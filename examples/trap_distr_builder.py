@@ -83,14 +83,15 @@ def run(traj_path:str, distr_prefix:str, pts_trapping:str):
             traps_file = Path(join(cur_pts, f"traps_{i}.pickle"))
             if not seq_file.is_file():
                 seq = extractor.run(trj, lambda a, t: a.run(t))
-                with open(seq_file, 'wb') as handle:
-                    pickle.dump(seq, handle)
-                with open(traps_file, 'wb') as handle:
-                    pickle.dump(trj.traps, handle)
+                # with open(seq_file, 'wb') as handle:
+                #     pickle.dump(seq, handle)
+                # with open(traps_file, 'wb') as handle:
+                #     pickle.dump(trj.traps, handle)
             else:
                 with open(seq_file, 'rb') as fp:
                     seq = pickle.load(fp)
             trap_list.append(seq)
+            return 
 
         plot_trap_tim_distr(trap_list, prefix)
         

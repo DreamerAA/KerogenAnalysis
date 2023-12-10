@@ -1,6 +1,6 @@
 import random
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Any
 
 import matplotlib.pylab as plt
 import networkx as nx
@@ -439,7 +439,7 @@ class Visualizer:
 
     @staticmethod
     def create_img_data(
-        img: npt.NDArray[np.int8], bbox: Optional[BoundingBox]
+        img: npt.NDArray[Any], bbox: Optional[BoundingBox]
     ) -> vtk.vtkImageData:
         image_data = vtk.vtkImageData()
         size = img.shape
@@ -515,6 +515,7 @@ class Visualizer:
         img: npt.NDArray[np.int8],
         volume_mode: bool,
         bbox: Optional[BoundingBox],
+        **kwargs
     ) -> None:
         image_data = Visualizer.create_img_data(img, bbox)
 
@@ -540,6 +541,49 @@ class Visualizer:
         ren = vtkRenderer()
 
         Visualizer.add_img_actor(ren, img, volume_mode, bbox)
+
+        colors = vtkNamedColors()
+        ren.SetBackground(colors.GetColor3d("White"))
+
+        renWin = vtkRenderWindow()
+        renWin.AddRenderer(ren)
+
+        style = vtkInteractorStyleTrackballCamera()
+        iren = vtkRenderWindowInteractor()
+        iren.SetRenderWindow(renWin)
+        iren.SetInteractorStyle(style)
+
+        # Add the actors
+        center = bbox.center()
+        cm_pos = center + bbox.size()
+
+        camera = ren.GetActiveCamera()
+        # size = img.shape
+        camera.SetFocalPoint(*center)
+        camera.SetPosition(*cm_pos)
+        # renWin.SetSize(640, 640)
+
+        renWin.Render()
+        iren.Initialize()
+
+        if 'animation' in kwargs:
+            # Sign up to receive TimerEvent
+            cb = vtk.vtkTimerCallbackCamera(5000, [], [camera], iren)
+            iren.AddObserver('TimerEvent', cb.execute)
+            cb.timerId = iren.CreateRepeatingTimer(500)
+
+        renWin.Render()
+        # renWin.FullScreenOn()
+        renWin.SetSize(1900, 1080)
+        iren.Start()
+
+    def draw_float_img(img: npt.NDArray[np.float32],
+        isovalue: float,
+        bbox: BoundingBox
+    ) -> None:
+        ren = vtkRenderer()
+
+        Visualizer.add_img_actor(ren, img, False, bbox, isovalue=isovalue)
 
         colors = vtkNamedColors()
         ren.SetBackground(colors.GetColor3d("White"))

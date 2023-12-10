@@ -125,7 +125,7 @@ class Trajectory:
                     next(f)
 
         count_step = int(len(ax) / count)
-        # count_step = count_step // 5
+        count_step = count_step // 2
         trajectories = []
         for i in range(count):
             points = np.zeros(shape=(count_step, 3), dtype=np.float32)

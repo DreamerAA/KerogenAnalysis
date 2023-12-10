@@ -15,6 +15,8 @@ from base.trajectory import Trajectory
 from dataclasses import dataclass, field
 from joblib import Parallel, delayed
 import pickle
+from memory_profiler import profile
+
 
 list_vert_median = {
     (0, 'Bm'): [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -130,7 +132,7 @@ class TrajectoryAnalizer:
                 delayed(analyse)(mu) for mu in self.params.list_mu
             )
         else:
-            result = [analyse(mu) for mu in self.params.list_mu]
+            results = [analyse(mu) for mu in self.params.list_mu]
 
         list_trapped = np.zeros((trj.count_points,), dtype=np.bool_)
         for flag, result in results:
@@ -185,6 +187,7 @@ class TrajectoryAnalizer:
 
         return (True, list_trapped_m)
 
+    @profile
     def laplacian_matrix(
         self, points: npt.NDArray[np.float64], mu: float
     ) -> npt.NDArray[np.float64]:
@@ -199,16 +202,18 @@ class TrajectoryAnalizer:
         S = np.zeros(shape=(No, No), dtype=np.float32)
         for i in range(No):
             ts = (normal_inc - normal_inc[i, :]) ** 2
-            S[:, i] = np.sum(ts, 1, dtype=np.float32)
-            S[i, :] = S[:, i]
-
-        S2b = np.exp(-0.5 * S / mu**2)
-        S3: npt.NDArray[np.float32] = (
-            convolve2d(S2b, self.kernel, 'same')
+            ss = np.sum(ts, 1, dtype=np.float32)
+            S[:, i] = ss.copy()
+            S[i, :] = ss.copy()
+            
+        S *= (-0.5 / mu**2)
+        S = np.exp(S, dtype=np.float32)
+        S: npt.NDArray[np.float32] = (
+            convolve2d(S, self.kernel, 'same')
             if self.params.kernel_size > 0
-            else S2b
+            else S
         )
-        return S3
+        return S
 
     def RQA_block_measures(
         self, points: npt.NDArray[np.float64], mu: float, diagonal_max: int
