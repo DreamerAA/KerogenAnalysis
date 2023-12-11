@@ -15,7 +15,6 @@ from base.trajectory import Trajectory
 from dataclasses import dataclass, field
 from joblib import Parallel, delayed
 import pickle
-from memory_profiler import profile
 
 
 list_vert_median = {
@@ -127,6 +126,7 @@ class TrajectoryAnalizer:
             return self.analyse_by_mu(
                 points, self.params.p_value, self.params.nu, mu, list_threshold
             )
+
         if self.params.num_jobs != 1:
             results = Parallel(n_jobs=self.params.num_jobs)(
                 delayed(analyse)(mu) for mu in self.params.list_mu
@@ -187,7 +187,6 @@ class TrajectoryAnalizer:
 
         return (True, list_trapped_m)
 
-    @profile
     def laplacian_matrix(
         self, points: npt.NDArray[np.float64], mu: float
     ) -> npt.NDArray[np.float64]:
@@ -205,8 +204,8 @@ class TrajectoryAnalizer:
             ss = np.sum(ts, 1, dtype=np.float32)
             S[:, i] = ss.copy()
             S[i, :] = ss.copy()
-            
-        S *= (-0.5 / mu**2)
+
+        S *= -0.5 / mu**2
         S = np.exp(S, dtype=np.float32)
         S: npt.NDArray[np.float32] = (
             convolve2d(S, self.kernel, 'same')

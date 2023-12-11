@@ -73,19 +73,19 @@ class Trajectory:
             npoints[i + 1, :] = npoints[i, :] + shift
 
         return npoints
-    
+
     @cached_property
     def count_points(self) -> int:
         return self.points.shape[0]
 
     @cached_property
-    def delta_time(self)->float:
+    def delta_time(self) -> float:
         """time step
 
         Returns:
             float: picoseconds
         """
-        assert(len(self.times) >= 2)
+        assert len(self.times) >= 2
         return self.times[1] - self.times[0]
 
     @staticmethod
@@ -125,7 +125,7 @@ class Trajectory:
                     next(f)
 
         count_step = int(len(ax) / count)
-        count_step = count_step // 2
+        # count_step = count_step // 2
         trajectories = []
         for i in range(count):
             points = np.zeros(shape=(count_step, 3), dtype=np.float32)
