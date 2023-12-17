@@ -8,6 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 from typing import List
+from joblib import Parallel, delayed
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
@@ -76,19 +77,24 @@ def run(traj_path:str, distr_prefix:str, pts_trapping:str):
         extractor = TrapExtractor(analyzer)
 
         trap_list = []
-        for i, trj in enumerate(trajectories):
-            seq_file = Path(join(cur_pts, f"seq_{i}.pickle"))
-            traps_file = Path(join(cur_pts, f"traps_{i}.pickle"))
-            if not seq_file.is_file():
-                seq = extractor.run(trj, lambda a, t: a.run(t))
-                with open(seq_file, 'wb') as handle:
-                    pickle.dump(seq, handle)
-                with open(traps_file, 'wb') as handle:
-                    pickle.dump(trj.traps, handle)
-            else:
-                with open(seq_file, 'rb') as fp:
-                    seq = pickle.load(fp)
-            trap_list.append(seq)
+        def wrap(i, trj):
+            for i, trj in enumerate(trajectories):
+                seq_file = Path(join(cur_pts, f"seq_{i}.pickle"))
+                traps_file = Path(join(cur_pts, f"traps_{i}.pickle"))
+                if not seq_file.is_file():
+                    seq = extractor.run(trj, lambda a, t: a.run(t))
+                    with open(seq_file, 'wb') as handle:
+                        pickle.dump(seq, handle)
+                    with open(traps_file, 'wb') as handle:
+                        pickle.dump(trj.traps, handle)
+                else:
+                    with open(seq_file, 'rb') as fp:
+                        seq = pickle.load(fp)
+                trap_list.append(seq)
+
+        sim_results = Parallel(n_jobs=1)(
+            delayed(wrap)(i,trj) for i, trj in enumerate(trajectories)
+        )
 
         plot_trap_tim_distr(trap_list, prefix)
         
@@ -120,21 +126,22 @@ def run(traj_path:str, distr_prefix:str, pts_trapping:str):
 
 
 if __name__ == '__main__':
+    prefix = "../data/Kerogen/"
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--traj_folder',
         type=str,
-        default="../data/Kerogen/ch4_traj/",
+        default=prefix+"ch4_traj/",
     )
     parser.add_argument(
         '--distr_prefix',
         type=str,
-        default="../data/Kerogen/time_trapping_results/ch4/num=1597500000_500_500_500",
+        default=prefix+"time_trapping_results/ch4/num=1597500000_500_500_500",
     )
     parser.add_argument(
         '--pts_trapping',
         type=str,
-        default="../data/Kerogen/time_trapping_results/ch4/",
+        default=prefix+"time_trapping_results/ch4/",
     )
     args = parser.parse_args()
 
