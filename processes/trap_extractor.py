@@ -24,13 +24,16 @@ class TrapExtractor:
         data = []
         cur_time = 0.
         pos = points[0,:]
+        count_points = 0
         for i, trap in enumerate(edge_traps):
             if trap:
                 cur_time += dt
                 pos = pos + points[i,:]
+                count_points += 1
             else:
                 data.append((pos,cur_time))
-                pos = points[i,:]
+                pos = points[i,:]/count_points
+                count_points = 0
                 cur_time = 0
 
             

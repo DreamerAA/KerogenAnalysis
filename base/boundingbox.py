@@ -8,15 +8,13 @@ from scipy.spatial.distance import cdist
 class Range(object):
     def __init__(
         self,
-        mmin: float = float(np.finfo(np.float32).max),
-        mmax: float = float(np.finfo(np.float32).min),
+        mmin: float = None,
+        mmax: float = None,
     ):
-        if mmin != float(np.finfo(float).max) and mmax != float(
-            np.finfo(float).min
-        ):
-            assert mmin <= mmax
-        self.min_ = mmin
-        self.max_ = mmax
+        if mmin is not None and mmax is not None:
+            assert mmin <= mmax 
+        self.min_ = float(np.finfo(float).max) if mmin == None else mmin    
+        self.max_ = float(np.finfo(float).min) if mmax == None else mmax
 
     def update(self, v: float) -> None:
         self.min_ = min(v, self.min_)

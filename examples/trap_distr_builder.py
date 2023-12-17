@@ -89,12 +89,11 @@ def run(traj_path:str, distr_prefix:str, pts_trapping:str):
                 with open(seq_file, 'rb') as fp:
                     seq = pickle.load(fp)
             trap_list.append(seq)
-            return 
 
         plot_trap_tim_distr(trap_list, prefix)
         
 
-    ## mixed
+    # mixed
     ext_params = get_ext_params(0.5)
     mix_analizer = TrajectoryExtendedAnalizer(ext_params, pi_l, throat_lengthes)
     prefix = "mixed"

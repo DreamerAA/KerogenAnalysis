@@ -897,13 +897,13 @@ class Visualizer:
         renWin.SetWindowName('Trajectory')
         renWin.Render()
 
-        style = vtkInteractorStyleTrackballCamera()
+        # style = vtkInteractorStyleTrackballCamera()
 
         iren = vtkRenderWindowInteractor()
         iren.SetRenderWindow(renWin)
-        iren.SetInteractorStyle(style)
-        iren.Initialize()
-        iren.Start()
+        # iren.SetInteractorStyle(style)
+        win_col = WinStructCollection(iren)
+        collection.append(win_col)
 
     @staticmethod
     def draw_img_trj(
