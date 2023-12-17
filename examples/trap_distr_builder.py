@@ -68,8 +68,6 @@ def run(traj_path:str, distr_prefix:str, pts_trapping:str):
     matrix_analyzer = TrajectoryAnalizer(ext_params)
 
 
-
-
     plt.figure()
     for analyzer, prefix in [(matrix_analyzer, "matrix"), (prob_analizer, "prob")]:
         cur_pts = join(pts_trapping, prefix)
@@ -83,10 +81,10 @@ def run(traj_path:str, distr_prefix:str, pts_trapping:str):
             traps_file = Path(join(cur_pts, f"traps_{i}.pickle"))
             if not seq_file.is_file():
                 seq = extractor.run(trj, lambda a, t: a.run(t))
-                # with open(seq_file, 'wb') as handle:
-                #     pickle.dump(seq, handle)
-                # with open(traps_file, 'wb') as handle:
-                #     pickle.dump(trj.traps, handle)
+                with open(seq_file, 'wb') as handle:
+                    pickle.dump(seq, handle)
+                with open(traps_file, 'wb') as handle:
+                    pickle.dump(trj.traps, handle)
             else:
                 with open(seq_file, 'rb') as fp:
                     seq = pickle.load(fp)
@@ -127,7 +125,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--traj_folder',
         type=str,
-        default="../data/Kerogen/methan_traj/",
+        default="../data/Kerogen/ch4_traj/",
     )
     parser.add_argument(
         '--distr_prefix',
