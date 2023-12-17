@@ -52,11 +52,8 @@ class BoundingBox(object):
         self.zb_ = Range() if zb is None else zb
 
     def is_inside(self, pos: npt.NDArray[np.float32]) -> bool:
-        return (
-            self.xb_.is_inside(pos[0])
-            and self.yb_.is_inside(pos[1])
-            and self.zb_.is_inside(pos[2])
-        )
+        m = [b.is_inside(v) for b, v in zip([self.xb_,self.yb_,self.zb_], pos.flat)]
+        return np.all(m) 
 
     def size(self) -> Tuple[float, float, float]:
         return (self.xb_.diff(), self.yb_.diff(), self.zb_.diff())
@@ -71,9 +68,8 @@ class BoundingBox(object):
         return np.array([r.center() for r in [self.xb_, self.yb_, self.zb_]])
 
     def update(self, p: npt.NDArray[np.float32]) -> None:
-        self.xb_.update(p[0])
-        self.yb_.update(p[1])
-        self.zb_.update(p[2])
+        for b, v in zip([self.xb_,self.yb_,self.zb_], p.flat):
+            b.update(v)
 
 
 class KerogenBox(BoundingBox):
@@ -86,6 +82,7 @@ class KerogenBox(BoundingBox):
         self.xb_ = Range() if xb is None else xb
         self.yb_ = Range() if yb is None else yb
         self.zb_ = Range() if zb is None else zb
+        self.tmp_atom_type_ids: List[int] = []
         self.tmp_atom_ids: List[int] = []
         self.tmp_atom_sizes: List[float] = []
         self.tmp_positions: List[Tuple[float, float, float]] = []
@@ -106,14 +103,16 @@ class KerogenBox(BoundingBox):
         for i, p in enumerate(self.tmp_positions):
             self.positions[i] = p
 
-        self.tmp_atom_ids.clear()
+        self.tmp_atom_type_ids.clear()
         self.tmp_positions.clear()
+        self.tmp_atom_ids.clear()
         self.tmp_atom_sizes.clear()
 
     def is_intersect_atom(self, pos: npt.NDArray[np.float32]) -> bool:
-        dist = cdist(p, self.positions)
+        dist = cdist(pos, self.positions)
         return np.any(dist < self.atom_sizes)  # type: ignore
 
-    def dist_nearest(self,  pos: npt.NDArray[np.float32])->float:
-        dist = cdist(p, self.positions)
-        return dist.min()
+    def dist_nearest(self,  pos: npt.NDArray[np.float32])->Tuple[float,int]:
+        dist = cdist(pos, self.positions)
+        index = dist.argmin()
+        return dist.min(), self.atom_ids[index]

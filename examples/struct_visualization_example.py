@@ -6,7 +6,7 @@ import time
 from typing import List, Tuple
 import numpy as np
 import argparse
-
+import networkx as nx
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
@@ -73,9 +73,11 @@ def read_structures(
 
 
 
-def extanded_struct_extr(path_to_structure: str, path_to_save:str, mfilter, cut_cell: bool, ref_size: int) -> None:
+def extanded_struct_extr(path_to_structure: str, path_to_structure_links: str, path_to_save:str, mfilter, cut_cell: bool, ref_size: int) -> None:
     start_time = time.time()
+    # structures = Reader.read_struct_and_linked_list(path_to_structure,)
     structures = read_structures(path_to_structure)
+    linked_list = Reader.read_linked_list(path_to_structure_links)
     
     print(f" -- Count structures: {len(structures)}")
     structures = mfilter(structures)
@@ -91,11 +93,16 @@ def extanded_struct_extr(path_to_structure: str, path_to_save:str, mfilter, cut_
 
         print(f" --- Box size: {bbox.size()}")
 
-        kerogen_data = KerogenData(None, atoms, bbox)  # type: ignore
+        graph = nx.Graph()
+        graph.add_edges_from(linked_list)
+        kerogen_data = KerogenData(graph, atoms, bbox)  # type: ignore
         if not kerogen_data.checkPeriodization():
+            print("Periodization!")
             Periodizer.periodize(kerogen_data)
             # Periodizer.rm_long_edges(kerogen_data)
-            
+
+        print("Periodization is end!")
+
         resolution = np.array([s for s in size]).min()/ ref_size
         str_resolution = "{:.9f}".format(resolution)
 
@@ -105,7 +112,7 @@ def extanded_struct_extr(path_to_structure: str, path_to_save:str, mfilter, cut_
         prf_cell = "partcell" if cut_cell else "fullcell"
         binarized_file_name = (
             # f"../data/Kerogen/result_img_{file_name}_rs={ref_size}_mr={methan_radius}_div={div}.npy"
-            path_to_save + f"./result_img_num={num}_cell={prf_cell}_is={img_size}_ar={additional_radius}_resolution={str_resolution}.npy"
+            path_to_save + f"./float_img_num={num}_cell={prf_cell}_is={img_size}_ar={additional_radius}_resolution={str_resolution}.npy"
         )
 
 
@@ -122,9 +129,15 @@ def extanded_struct_extr(path_to_structure: str, path_to_save:str, mfilter, cut_
                 partitioning=1,
             )
             img = segmentator.dist_map()
-            np.save(binarized_file_name, img)  # type: ignore        
+            np.save(binarized_file_name, img)  # type: ignore     
 
-        Visualizer.draw_float_img(img, 20, kerogen_data.bbox)
+        import matplotlib.pyplot as plt
+        plt.imshow(img[250,:,:])
+        plt.show()
+           
+        img = np.pad(img, [(1,1),(1,1),(1,1)], 'maximum')
+        Visualizer.draw_float_img(img, 0.08, kerogen_data.box)
+    Visualizer.show()
 
 
 if __name__ == '__main__':
@@ -140,10 +153,17 @@ if __name__ == '__main__':
         # default="../data/Kerogen/methan_traj/meth_0.5_micros.gro"
         default="../data/Kerogen/time_trapping_results/ch4/",
     )
+    parser.add_argument(
+        '--linked_list',
+        type=str,
+        # default="../data/Kerogen/methan_traj/meth_0.5_micros.gro"
+        default="../data/Kerogen/ker.pdb",
+    )
+
 
     args = parser.parse_args()
 
     def cfilter(s):
         return [s[-1]]
 
-    extanded_struct_extr(args.structure_path, args.save_path, cfilter, True, 500)
+    extanded_struct_extr(args.structure_path, args.linked_list, args.save_path, cfilter, True, 500)

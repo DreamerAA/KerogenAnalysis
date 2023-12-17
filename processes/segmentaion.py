@@ -47,10 +47,10 @@ class Segmentator:
                         )
                     ]
                     self.bb.append(KerogenBox(*aranges))
-                    for a in kerogen.atoms:
+                    for ind, a in enumerate(kerogen.atoms):
                         if self.bb[-1].is_inside(a.pos):
                             self.bb[-1].add_atom(
-                                a.type_id,
+                                ind,
                                 size_data(a.type_id)
                                 + self.radius_extention(a.type_id),
                                 a.pos,  # type: ignore
@@ -140,34 +140,61 @@ class Segmentator:
             ker_s / float(img_s)
             for ker_s, img_s in zip(self.kerogen.box.size(), self.img_size)
         ]
+        
+        def dist_to_edge(a, b, p):
+            # normalized tangent vector
+            d = np.divide(b - a, np.linalg.norm(b - a))
+
+            # signed parallel distance components
+            s = np.dot(a - p, d)[0]
+            t = np.dot(p - b, d)[0]
+
+            # clamped parallel distance
+            h = np.maximum.reduce([s, t, 0])
+
+            # perpendicular distance component
+            c = np.cross(p - a, d)
+
+            return np.hypot(h, np.linalg.norm(c))
+
 
         def wrap(ix):
-            s_img = np.ones(
-                shape=(self.img_size[1], self.img_size[2]), dtype=np.int8
+            s_img = 1e6*np.ones(
+                shape=(self.img_size[1], self.img_size[2]), dtype=np.float32
             )
 
             for iy in range(self.img_size[1]):
                 for iz in range(self.img_size[2]):
-                    pos = np.array(
-                        [
+                    pos = np.zeros(shape = (1,3),dtype=np.float32)
+                    pos[:] = [
                             mm + (float(i) + 0.5) * vs
                             for i, vs, mm in zip(
                                 [ix, iy, iz], vox_sizes, self.kerogen.box.min()
                             )
-                        ], shape = (1,3)
-                    )
+                        ]
+                    
                     for bb in self.bb:
-                        if bb.is_inside(pos):
-                            nd = self.bb.dist_nearest(pos)
-                            s_img[iy, iz] = min(s_img[iy, iz], nd)
+                        if not bb.is_inside(pos):
+                            continue
+
+                        d, id = bb.dist_nearest(pos)
+                        de = -1
+                        for n1, n2 in self.kerogen.graph.edges(id):
+                            de = dist_to_edge(self.kerogen.atoms[n1].pos,self.kerogen.atoms[n2].pos, pos)
+                            s_img[iy, iz] = min(s_img[iy, iz], de)
+                        if de == -1:
+                            s_img[iy, iz] = min(s_img[iy, iz], d)
             print(f" --- Slice {ix}-x finished!")
             return s_img
+        
 
         num_proc = 8
         sim_results = Parallel(n_jobs=num_proc)(
             delayed(wrap)(ix) for ix in range(self.img_size[0])
         )
-        img = 1e6*np.ones(shape=self.img_size, dtype=np.float32)
+
+
+        img = np.ones(shape=self.img_size, dtype=np.float32)
         for i, res in enumerate(sim_results):
             img[i, :, :] = res
 

@@ -444,7 +444,11 @@ class Visualizer:
         image_data = vtk.vtkImageData()
         size = img.shape
         image_data.SetDimensions(size[0], size[1], size[2])
-        image_data.AllocateScalars(vtk.VTK_INT, 1)
+        if isinstance(img.dtype, np.uint8):
+            image_data.AllocateScalars(vtk.VTK_INT, 1)
+        else:
+            image_data.AllocateScalars(vtk.VTK_FLOAT, 1)
+
         if bbox is not None:
             bbs = bbox.size()
             t = [bs / iis for iis, bs in zip(size, bbs)]
@@ -484,13 +488,16 @@ class Visualizer:
         return volume
 
     @staticmethod
-    def create_actor_img(image_data) -> vtkActor:
-        marchingcube = vtk.vtkDiscreteFlyingEdges3D()
+    def create_actor_img(image_data, **kwargs) -> vtkActor:
+        if image_data.GetScalarType() == vtk.VTK_INT:
+            marchingcube = vtk.vtkDiscreteFlyingEdges3D()
+        else:
+            marchingcube = vtk.vtkFlyingEdges3D()
         marchingcube.SetInputData(image_data)
         marchingcube.ComputeNormalsOn()
         marchingcube.ComputeScalarsOn()
         marchingcube.SetNumberOfContours(1)
-        marchingcube.SetValue(0, 1)
+        marchingcube.SetValue(0, kwargs["isovalue"])
 
         lut = vtk.vtkLookupTable()
         lut.SetNumberOfColors(1)
@@ -512,7 +519,7 @@ class Visualizer:
     @staticmethod
     def add_img_actor(
         ren: vtkRenderer,
-        img: npt.NDArray[np.int8],
+        img: npt.NDArray[Any],
         volume_mode: bool,
         bbox: Optional[BoundingBox],
         **kwargs
@@ -524,7 +531,7 @@ class Visualizer:
             mactor = Visualizer.create_volume_img(image_data)
             ren.AddVolume(mactor)
         else:
-            mactor = Visualizer.create_actor_img(image_data)
+            mactor = Visualizer.create_actor_img(image_data, **kwargs)
             ren.AddActor(mactor)
 
         if bbox is not None:
@@ -579,7 +586,8 @@ class Visualizer:
 
     def draw_float_img(img: npt.NDArray[np.float32],
         isovalue: float,
-        bbox: BoundingBox
+        bbox: BoundingBox,
+        **kwargs
     ) -> None:
         ren = vtkRenderer()
 
