@@ -4,7 +4,6 @@ import scipy.io
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
-import scipy.io
 from numba import njit, jit
 from collections import defaultdict
 from scipy import ndimage
