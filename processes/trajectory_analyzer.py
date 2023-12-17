@@ -1,6 +1,5 @@
 from typing import Tuple
 
-import scipy.io
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
@@ -112,9 +111,9 @@ class TrajectoryAnalizer:
     def run(self, trj: Trajectory) -> npt.NDArray[np.int32]:
         count_points = trj.count_points
 
-        mat = scipy.io.loadmat(
-            f"./list_threshold/nuc{int(self.params.nu*100)}diag_perc={self.params.diag_percentile}.mat"
-        )
+        with open(f"./list_threshold/nuc{int(self.params.nu*100)}diag_perc={self.params.diag_percentile}.mat", 'rb') as handle:
+            mat = pickle.load(handle)
+            
         method = self.params.traj_type + "_3D"
         list_threshold = mat["list_threshold"][method]
         list_trapped = np.zeros(shape=(count_points,), dtype=np.bool_)
