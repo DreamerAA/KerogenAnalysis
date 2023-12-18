@@ -30,20 +30,27 @@ from processes.trajectory_extended_analizer import (
 from visualizer.visualizer import Visualizer
 
 
-
-
+def create_cdf(vals,n=30):
+    p, bb = np.histogram(vals, bins=n)
+    xdel = bb[1] - bb[0]
+    x = (bb[:-1] + xdel * 0.5).reshape(n,1)
+    pn = (np.cumsum(p) / np.sum(p)).reshape(n,1)
+    return np.hstack((x, pn))
 
 def run(path_to_pnm):
     radiuses, throat_lengths = Reader.read_pnm_data(
         path_to_pnm, scale=1e10, border=0.015
     )
 
-    steps = np.array([s for s in range(1,101)], dtype=np.int32)
-    prob = (steps.astype(np.float32))*0.01
-    ps = np.vstack((steps, prob))
+    steps = np.array([s for s in range(1,101)], dtype=np.int32).reshape(100,1)
+    prob = ((steps.astype(np.float32))*0.01).reshape(100,1)
+    ps = np.hstack((steps, prob))
+
+    ppl = create_cdf(radiuses)
+    ptl = create_cdf(throat_lengths)
 
     simulator = KerogenWalkSimulator(ppl, ps, ptl, 0.5, 0.5)
-    traj = simulator.run(5000)
+    traj = simulator.run(100)
     Visualizer.draw_trajectoryes([traj])
     Visualizer.show()
 

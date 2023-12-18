@@ -65,13 +65,14 @@ class KerogenWalkSimulator:
         self.k = k
 
     @staticmethod
-    def gen_shifts(cout_points, radius):
+    def gen_new_pos(cout_points, radius, pos):
         def gen():
             mr = radius*1.2
-            x = np.random.uniform(-mr, mr, size=4*cout_points)
-            y = np.random.uniform(-mr, mr, size=4*cout_points)
-            z = np.random.uniform(-mr, mr, size=4*cout_points)
-            points = np.vstack((x,y,z))
+            cp = 4*cout_points
+            x = np.random.uniform(-mr, mr, size=cp)
+            y = np.random.uniform(-mr, mr, size=cp)
+            z = np.random.uniform(-mr, mr, size=cp)
+            points = np.vstack((x + pos[0], y + pos[1], z + pos[2])).reshape(cp,3)
             dist = np.sqrt(x**2 + y**2 + z**2)
             indexes = dist < radius
             return points[indexes]
@@ -79,46 +80,55 @@ class KerogenWalkSimulator:
         points = gen()
 
         while points.shape[0] < cout_points:
-            points = np.hstack((points, gen()))
-        return points
+            points = np.vstack((points, gen()))
+        return points[:(cout_points),:]
 
 
     def run(self, count_points)->Trajectory:
-        points = np.zeros(shape=(count_points,3),dtype=np.float32)
+        points = (-1)*np.ones(shape=(count_points,3),dtype=np.float32)
+        points[0,:] = [0,0,0]
         pores = []
 
-        cur_ind = 0
+        cur_ind = 0 # index of current position
         will_steps = True
 
-        def steps_inside():
+        def steps_inside(cur_ind):
             cur_pore_pos = points[cur_ind,:]
             d = self.ppl.get()
-            s = self.ps.get()
-            shifts = KerogenWalkSimulator.gen_shifts(s,d)
-            points[(cur_ind+1):(cur_ind+s)] = cur_pore_pos + shifts
-            pores.append((cur_pore_pos,d,s)) 
-            will_steps = True
+            s = int(self.ps.get())
+            new_pos = KerogenWalkSimulator.gen_new_pos(s,d, cur_pore_pos)
+            cur_ind += 1
+
+            size = min(count_points - cur_ind, s)
+            points[cur_ind:(cur_ind+size)] = new_pos[:(size+1)]
+            pores.append((cur_pore_pos,s,d)) 
+            cur_ind += s
+            return cur_ind, True
+
+        cur_ind, will_steps = steps_inside(cur_ind)
 
         while cur_ind + 1 < count_points:
-            if np.uniform(0,1,size=1)[0] < self.p and len(pores) < 2:
+            if np.random.uniform(0,1,size=1)[0] < self.p and len(pores) >= 2:
                 # return previous pore
-                _, s, d = pores[-1]
-                shifts = KerogenWalkSimulator.gen_shifts(s,d)
-                points[cur_ind + 1,:] = shifts + pores[-1][0]
+                cp, _, d = pores[-1]
+                new_pos = KerogenWalkSimulator.gen_new_pos(1,d,cp)
+                points[cur_ind + 1,:] = new_pos
                 cur_ind += 1
 
-            if not will_steps and np.uniform(0,1,size=1)[0] < 1 - self.k:
+            if not will_steps and np.random.uniform(0,1,size=1)[0] < 1 - self.k:
                 # inside pore
-                steps_inside()
+                cur_ind, will_steps = steps_inside(cur_ind)
 
             # got ot another pore
             lenght = self.ptl.get()
-            dxyz = np.uniform(-1,1,size=3)
-            dxyz /= np.sqrt(dxyz**2)
+            dxyz = np.random.uniform(-1,1,size=3)
+            dxyz /= np.sqrt(np.sum(dxyz**2))
             new_shift = dxyz*lenght
             points[cur_ind + 1,:] = points[cur_ind,:] + new_shift
             cur_ind += 1
             will_steps = False
+
+        return Trajectory(points, )
 
 
         
