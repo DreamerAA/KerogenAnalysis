@@ -522,7 +522,7 @@ class Visualizer:
         img: npt.NDArray[Any],
         volume_mode: bool,
         bbox: Optional[BoundingBox],
-        **kwargs
+        **kwargs,
     ) -> None:
         image_data = Visualizer.create_img_data(img, bbox)
 
@@ -584,10 +584,11 @@ class Visualizer:
         renWin.SetSize(1900, 1080)
         iren.Start()
 
-    def draw_float_img(img: npt.NDArray[np.float32],
+    def draw_float_img(
+        img: npt.NDArray[np.float32],
         isovalue: float,
         bbox: BoundingBox,
-        **kwargs
+        **kwargs,
     ) -> None:
         ren = vtkRenderer()
 
@@ -656,6 +657,7 @@ class Visualizer:
         color_type='dist',
         periodic: bool = False,
         plot_box: bool = True,
+        with_points: bool = False,
         window_name: str = 'Trajectory',
     ) -> None:
         renderer = vtkRenderer()
@@ -664,6 +666,9 @@ class Visualizer:
                 trj, periodic, color_type
             )
             renderer.AddActor(actor)
+            if with_points:
+                actor = Visualizer.create_trj_points_actor(trj, periodic)
+                renderer.AddActor(actor)
 
         if plot_box:
             outfit_actor = Visualizer.create_box_actor(trjs[0].box)
@@ -680,7 +685,7 @@ class Visualizer:
         ren_win.Render()
         ren_win.SetSize(640, 512)
         ren_win.SetWindowName(window_name)
-        
+
         # style = vtkInteractorStyleTrackballCamera()
 
         iren = vtkRenderWindowInteractor()
@@ -823,8 +828,9 @@ class Visualizer:
         return actor, poly_data, tube_filter
 
     @staticmethod
-    def draw_trajectory_points(trj: Trajectory) -> None:
-        tp = trj.points_without_periodic
+    def create_trj_points_actor(trj: Trajectory, periodic: bool = True) -> None:
+        tp = trj.points_without_periodic if periodic else trj.points
+
         pcount = tp.shape[0]
 
         points = vtkPoints()
@@ -834,9 +840,6 @@ class Visualizer:
         pdata = vtkDoubleArray()
         pdata.SetName("clusters")
         pdata.SetNumberOfValues(pcount)
-
-        if trj.traps is not None:
-            count_clusters = trj.traps.max() + 1
 
         for i in range(pcount):
             points.SetPoint(i, tp[i, 0], tp[i, 1], tp[i, 2])
@@ -878,6 +881,11 @@ class Visualizer:
 
         actor = vtkActor()
         actor.SetMapper(mapper)
+        return actor
+
+    @staticmethod
+    def draw_trajectory_points(trj: Trajectory) -> None:
+        actor = Visualizer.create_trj_points_actor(trj)
 
         renderer = vtkRenderer()
         renderer.AddActor(actor)

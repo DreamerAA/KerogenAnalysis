@@ -8,5 +8,5 @@ from dataclasses import dataclass
 @dataclass
 class TrapSequence:
     points: npt.NDArray[np.float32]
+    traps: npt.NDArray[np.int32]
     times: npt.NDArray[np.float32]
-        

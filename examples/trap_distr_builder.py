@@ -72,7 +72,6 @@ def run(traj_path: str, distr_prefix: str, pts_trapping: str):
     matrix_analyzer = TrajectoryAnalizer(ext_params)
 
     plt.figure()
-    # for analyzer, prefix in [(matrix_analyzer, "matrix"), (prob_analizer, "prob")]:
     for analyzer, prefix in [
         # (matrix_analyzer, "matrix"),
         (prob_analizer, "prob"),
@@ -84,44 +83,39 @@ def run(traj_path: str, distr_prefix: str, pts_trapping: str):
 
         trap_list = []
 
-        def wrap(i, trj):
-            for i, trj in enumerate(trajectories):
-                seq_file = Path(join(cur_pts, f"seq_{i}.pickle"))
-                traps_file = Path(join(cur_pts, f"traps_{i}.pickle"))
-                if not seq_file.is_file():
-                    seq = extractor.run(trj, lambda a, t: a.run(t))
-                    with open(seq_file, 'wb') as handle:
-                        pickle.dump(seq, handle)
-                    with open(traps_file, 'wb') as handle:
-                        pickle.dump(trj.traps, handle)
-                else:
-                    with open(seq_file, 'rb') as fp:
-                        seq = pickle.load(fp)
-                trap_list.append(seq)
-
-        sim_results = Parallel(n_jobs=1)(
-            delayed(wrap)(i, trj) for i, trj in enumerate(trajectories)
-        )
+        for i, trj in enumerate(trajectories):
+            seq_file = Path(join(cur_pts, f"seq_{i}.pickle"))
+            traps_file = Path(join(cur_pts, f"traps_{i}.pickle"))
+            if not seq_file.is_file():
+                seq = extractor.run(trj, lambda a, t: a.run(t))
+                with open(seq_file, 'wb') as handle:
+                    pickle.dump(seq, handle)
+                with open(traps_file, 'wb') as handle:
+                    pickle.dump(trj.traps, handle)
+            else:
+                with open(seq_file, 'rb') as fp:
+                    seq = pickle.load(fp)
+            trap_list.append(seq)
 
         plot_trap_tim_distr(trap_list, prefix)
 
     # mixed
-    ext_params = get_ext_params(0.5)
-    mix_analizer = TrajectoryExtendedAnalizer(ext_params, pi_l, throat_lengthes)
-    prefix = "mixed"
-    matrix_pts = join(pts_trapping, "matrix")
-    cur_pts = join(pts_trapping, prefix)
-    os.makedirs(cur_pts, exist_ok=True)
+    # ext_params = get_ext_params(0.5)
+    # mix_analizer = TrajectoryExtendedAnalizer(ext_params, pi_l, throat_lengthes)
+    # prefix = "mixed"
+    # matrix_pts = join(pts_trapping, "matrix")
+    # cur_pts = join(pts_trapping, prefix)
+    # os.makedirs(cur_pts, exist_ok=True)
 
-    extractor = TrapExtractor(mix_analizer)
-    trap_list = []
-    for i, trj in enumerate(trajectories):
-        seq_file = Path(join(matrix_pts, f"traps_{i}.pickle"))
-        with open(seq_file, 'rb') as fp:
-            trap_approx = pickle.load(fp)
-        seq = extractor.run(trj, lambda a, t: a.run(t, trap_approx))
-        trap_list.append(seq)
-    plot_trap_tim_distr(trap_list, prefix)
+    # extractor = TrapExtractor(mix_analizer)
+    # trap_list = []
+    # for i, trj in enumerate(trajectories):
+    #     seq_file = Path(join(matrix_pts, f"traps_{i}.pickle"))
+    #     with open(seq_file, 'rb') as fp:
+    #         trap_approx = pickle.load(fp)
+    #     seq = extractor.run(trj, lambda a, t: a.run(t, trap_approx))
+    #     trap_list.append(seq)
+    # plot_trap_tim_distr(trap_list, prefix)
 
     plt.xscale('log')
     plt.yscale('log')
