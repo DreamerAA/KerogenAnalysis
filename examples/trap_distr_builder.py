@@ -22,61 +22,68 @@ from processes.trajectory_extended_analizer import (
     TrajectoryExtendedAnalizer,
     ExtendedParams,
 )
-from processes.trajectory_extended_analizer import (
-    TrajectoryAnalizer
-)
+from processes.trajectory_extended_analizer import TrajectoryAnalizer
 
 
-def pltdistr(times, prefix: str, n:int = 50):
+def pltdistr(times, prefix: str, n: int = 50):
     p, bb = np.histogram(times, bins=n, density=True)
-    plt.scatter((bb[:-1]+bb[1:])/2, p, s=20, marker='o',label=prefix)
+    plt.scatter((bb[:-1] + bb[1:]) / 2, p, s=20, marker='o', label=prefix)
+
 
 def plot_trap_tim_distr(trap_list, prefix):
     time_tuple = tuple(trap.times for trap in trap_list)
     time_trapings = np.concatenate(time_tuple)
-    non_zero_tt = time_trapings[time_trapings != 0] 
+    non_zero_tt = time_trapings[time_trapings != 0]
     print(f"All count trapping steps: {len(time_trapings)}")
     print(f"Count zero time trapping: {np.sum(time_trapings == 0)}")
     print(f"Count non zero time trapping: {np.sum(time_trapings != 0)}")
 
     pltdistr(non_zero_tt, prefix)
 
-def run(traj_path:str, distr_prefix:str, pts_trapping:str):
+
+def run(traj_path: str, distr_prefix: str, pts_trapping: str):
     params = get_params([154])[0]
 
-    def get_ext_params(prob_win:float)->ExtendedParams:
+    def get_ext_params(prob_win: float) -> ExtendedParams:
         return ExtendedParams(
-                params.traj_type,
-                params.nu,
-                params.diag_percentile,
-                params.kernel_size,
-                params.list_mu,
-                params.p_value,
-                1,
-                prob_win
-            )
+            params.traj_type,
+            params.nu,
+            params.diag_percentile,
+            params.kernel_size,
+            params.list_mu,
+            params.p_value,
+            1,
+            prob_win,
+        )
+
     trajectories: List[Trajectory] = []
     onlyfiles = [f for f in listdir(traj_path) if isfile(join(traj_path, f))]
     for path in onlyfiles:
-        trajectories += Trajectory.read_trajectoryes(join(traj_path,path))
+        trajectories += Trajectory.read_trajectoryes(join(traj_path, path))
 
     print("read_ready")
     throat_lengthes = np.load(distr_prefix + "_throat_lengths.npy")
     pi_l = np.load(distr_prefix + "_pi_l.npy")
 
-    ext_params = get_ext_params(0.)
-    prob_analizer = TrajectoryExtendedAnalizer(ext_params, pi_l, throat_lengthes)
+    ext_params = get_ext_params(0.0)
+    prob_analizer = TrajectoryExtendedAnalizer(
+        ext_params, pi_l, throat_lengthes
+    )
     matrix_analyzer = TrajectoryAnalizer(ext_params)
 
-
     plt.figure()
-    for analyzer, prefix in [(matrix_analyzer, "matrix"), (prob_analizer, "prob")]:
+    # for analyzer, prefix in [(matrix_analyzer, "matrix"), (prob_analizer, "prob")]:
+    for analyzer, prefix in [
+        # (matrix_analyzer, "matrix"),
+        (prob_analizer, "prob"),
+    ]:
         cur_pts = join(pts_trapping, prefix)
         os.makedirs(cur_pts, exist_ok=True)
-        
+
         extractor = TrapExtractor(analyzer)
 
         trap_list = []
+
         def wrap(i, trj):
             for i, trj in enumerate(trajectories):
                 seq_file = Path(join(cur_pts, f"seq_{i}.pickle"))
@@ -93,11 +100,10 @@ def run(traj_path:str, distr_prefix:str, pts_trapping:str):
                 trap_list.append(seq)
 
         sim_results = Parallel(n_jobs=1)(
-            delayed(wrap)(i,trj) for i, trj in enumerate(trajectories)
+            delayed(wrap)(i, trj) for i, trj in enumerate(trajectories)
         )
 
         plot_trap_tim_distr(trap_list, prefix)
-        
 
     # mixed
     ext_params = get_ext_params(0.5)
@@ -131,18 +137,18 @@ if __name__ == '__main__':
     parser.add_argument(
         '--traj_folder',
         type=str,
-        default=prefix+"ch4_traj/",
+        default=prefix + "ch4_traj/",
     )
     parser.add_argument(
         '--distr_prefix',
         type=str,
-        default=prefix+"time_trapping_results/ch4/num=1597500000_500_500_500",
+        default=prefix + "time_trapping_results/ch4/num=1597500000_500_500_500",
     )
     parser.add_argument(
         '--pts_trapping',
         type=str,
-        default=prefix+"time_trapping_results/ch4/",
+        default=prefix + "time_trapping_results/ch4/",
     )
     args = parser.parse_args()
 
-    run(args.traj_folder, args.distr_prefix, args.pts_trapping )
+    run(args.traj_folder, args.distr_prefix, args.pts_trapping)
