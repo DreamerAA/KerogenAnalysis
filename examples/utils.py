@@ -1,9 +1,18 @@
+from typing import Optional
 import numpy as np
 from typing import List
 from processes.trajectory_analyzer import AnalizerParams
 from visualizer.visualizer import Visualizer
 from base.trajectory import Trajectory
 import numpy.typing as npt
+
+
+def create_cdf(vals, n=30):
+    p, bb = np.histogram(vals, bins=n)
+    xdel = bb[1] - bb[0]
+    x = (bb[:-1] + xdel * 0.5).reshape(n, 1)
+    pn = (np.cumsum(p) / np.sum(p)).reshape(n, 1)
+    return np.hstack((x, pn))
 
 
 def write_binary_file(array: npt.NDArray[np.int8], file_name: str) -> None:
@@ -36,13 +45,20 @@ def all_params():
     return params
 
 
-def get_params(indexes: List[int]) -> List[AnalizerParams]:
-    list_mu = np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0])
+def get_params(
+    indexes: Optional[List[int]] = None,
+    lmu: Optional[List[int]] = None,
+    num_jobs: int = 1,
+) -> List[AnalizerParams]:
+    list_mu = np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0]) if lmu is None else lmu
     atparams = all_params()
+    if indexes is not None:
+        tparams = [atparams[i] for i in indexes]
+    else:
+        tparams = [v for _, v in atparams.items()]
 
-    tparams = [atparams[i] for i in indexes]
     aparams = [
-        AnalizerParams(tt, nu, dp, ks, list_mu, pv, 1)
+        AnalizerParams(tt, nu, dp, ks, list_mu, pv, num_jobs)
         for dp, pv, nu, tt, ks in tparams
     ]
     return aparams
