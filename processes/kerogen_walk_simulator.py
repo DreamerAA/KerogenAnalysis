@@ -61,6 +61,8 @@ class DirGenerator:
 
 class ProbDensFuncWrap:
     def __init__(self, pdf, size=100000):
+        assert pdf[0, 1] == 0
+        assert pdf[-1, 1] == 1
         self.pdf = pdf
         self.cur_index = 0
         self.size = size
