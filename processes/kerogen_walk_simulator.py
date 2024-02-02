@@ -60,13 +60,17 @@ class DirGenerator:
 
 
 class ProbDensFuncWrap:
-    def __init__(self, pdf, size=100000):
+    def __init__(self, pdf, name, size=100000):
         assert pdf[0, 1] == 0
         assert pdf[-1, 1] == 1
         self.pdf = pdf
+        self.name = name
         self.cur_index = 0
         self.size = size
         self.cur_arr = ProbDensFuncWrap.generate(pdf, size)
+        print(
+            f"Generated {self.name}: min={self.cur_arr.min()}, max={self.cur_arr.max()}"
+        )
 
     @staticmethod
     def generate(pdf, size):
@@ -79,6 +83,9 @@ class ProbDensFuncWrap:
         if self.cur_index >= self.size:
             self.cur_arr = ProbDensFuncWrap.generate(self.pdf, self.size)
             self.cur_index = 0
+            print(
+                f"Generated {self.name}: min={self.cur_arr.min()}, max={self.cur_arr.max()}"
+            )
         v = self.cur_arr[self.cur_index]
         self.cur_index += 1
         return v
@@ -99,9 +106,9 @@ class KerogenWalkSimulator:
         :return: Nothing
         :doc-author: Trelent
         """
-        self.ppl = ProbDensFuncWrap(ppl)
-        self.ps = ProbDensFuncWrap(ps)
-        self.ptl = ProbDensFuncWrap(ptl)
+        self.ppl = ProbDensFuncWrap(ppl, 'ppl')
+        self.ps = ProbDensFuncWrap(ps, 'ps')
+        self.ptl = ProbDensFuncWrap(ptl, 'ptl')
         self.p = p
         self.k = k
         self.dir_gen = DirGenerator()

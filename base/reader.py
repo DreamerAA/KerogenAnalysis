@@ -81,23 +81,22 @@ class Reader:
         return atoms, size
 
     @staticmethod
-    def read_head_struct(f)->int:
+    def read_head_struct(f) -> int:
         try:
             simul_num = int(str(next(f)).split("=")[-1])
         except StopIteration:
             simul_num = -1
         return simul_num
-        
 
     @staticmethod
     def read_raw_struct_ff(
         f: TextIOWrapper,
     ) -> Tuple[List[AtomData], Tuple[float, float, float]]:
         atoms = []
-        
+
         simul_num = Reader.read_head_struct(f)
         if simul_num == -1:
-            return None,None, simul_num       
+            return None, None, simul_num
 
         count_atoms = int(next(f))
         print(f" --- Count atoms: {count_atoms}")
@@ -176,3 +175,7 @@ class Reader:
         throat_lengths *= scale
         throat_lengths.sort()
         return radiuses, throat_lengths
+
+    @staticmethod
+    def read_np_img(path: str) -> npt.NDArray[np.int32]:
+        return np.load(path)

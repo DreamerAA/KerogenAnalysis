@@ -10,6 +10,7 @@ import pickle
 from typing import List
 from joblib import Parallel, delayed
 import time
+from scipy.stats import poisson
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
@@ -20,7 +21,7 @@ from base.trap_sequence import TrapSequence
 from base.reader import Reader
 from base.trajectory import Trajectory
 from base.boundingbox import BoundingBox
-from processes.KerogenWalkSimulator import KerogenWalkSimulator
+from processes.kerogen_walk_simulator import KerogenWalkSimulator
 from processes.trap_extractor import TrapExtractor
 from processes.trajectory_extended_analizer import (
     TrajectoryExtendedAnalizer,
@@ -31,24 +32,22 @@ from processes.trajectory_extended_analizer import (
     AnalizerParams,
 )
 from visualizer.visualizer import Visualizer
-from examples.utils import create_cdf, get_params
+from examples.utils import create_cdf, get_params, ps_generate
 
 
 def run(prefix):
     radiuses, throat_lengths = Reader.read_pnm_data(
         prefix, scale=1e10, border=0.015
     )
-    radiuses = radiuses * 3
 
-    steps = np.array([s for s in range(1, 101)], dtype=np.int32).reshape(100, 1)
-    prob = ((steps.astype(np.float32)) * 0.01).reshape(100, 1)
-    ps = np.hstack((steps, prob))
+    ps_type = 'poisson'  # poisson uniform
+    ps = ps_generate(ps_type)
 
     ppl = create_cdf(radiuses)
     ptl = create_cdf(throat_lengths)
 
-    simulator = KerogenWalkSimulator(ppl, ps, ptl, 0.5, 0.0)
-    trjs = [simulator.run(2000) for i in range(5)]
+    simulator = KerogenWalkSimulator(ppl, ps, ptl, 0.5, 0.5)
+    trjs = [simulator.run(2000) for i in range(6)]
     l_real_traps = [trj.traps.copy() for trj in trjs]
 
     llmu = [
@@ -69,7 +68,7 @@ def run(prefix):
     errors = []
     start_time = time.time()
     for j, lmu in enumerate(llmu):
-        params = get_params(lmu=lmu, num_jobs=5)
+        params = get_params(lmu=lmu, num_jobs=6)
 
         def wrap(i, param):
             matrix_analyzer = TrajectoryAnalizer(param)
@@ -79,7 +78,7 @@ def run(prefix):
                 matrix_traps_result = matrix_analyzer.run(trj).astype(np.int32)
                 me += np.sum(np.abs(real_traps - matrix_traps_result))
             print(
-                f"Ready {(i + 1) * (j+1)} from {len(params) * len(llmu)} time = {time.time() - start_time}s "
+                f"Ready {len(params) * j + (i + 1)} from {len(params) * len(llmu)} time = {time.time() - start_time}s "
             )
             return (me, param)
 
@@ -98,7 +97,7 @@ def run(prefix):
         #     errors.append((me, param))
 
         ind += 1
-        print(f"Checked {ind} from {len(params) * len(llmu)}")
+        print(f"Checked {ind} from {len(llmu)}")
 
         min_ind = np.array([e for e, _ in errors], dtype=np.float32).argmin()
         print(errors[min_ind][1])

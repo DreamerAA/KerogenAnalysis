@@ -18,7 +18,7 @@ from base.trap_sequence import TrapSequence
 from base.reader import Reader
 from base.trajectory import Trajectory
 from base.boundingbox import BoundingBox
-from processes.KerogenWalkSimulator import KerogenWalkSimulator
+from processes.kerogen_walk_simulator import KerogenWalkSimulator
 from processes.trap_extractor import TrapExtractor
 from processes.trajectory_extended_analizer import (
     TrajectoryExtendedAnalizer,

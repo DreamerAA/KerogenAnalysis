@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 import os
+from scipy.stats import poisson
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
@@ -14,81 +15,131 @@ sys.path.append(parent_dir)
 from examples.utils import get_params
 from base.reader import Reader
 from processes.pil_distr_generator import PiLDistrGenerator
-from processes.KerogenWalkSimulator import KerogenWalkSimulator
+from processes.kerogen_walk_simulator import KerogenWalkSimulator
 from processes.trajectory_extended_analizer import (
     TrajectoryExtendedAnalizer,
     ExtendedParams,
 )
 from processes.trajectory_extended_analizer import TrajectoryAnalizer
-from examples.utils import create_cdf, get_params
+from examples.utils import create_cdf, get_params, ps_generate
+
+
+# pset = np.array(
+#         [
+#             (
+#                 ExtendedParams(
+#                     traj_type='fBm',
+#                     nu=0.5,
+#                     diag_percentile=50,
+#                     kernel_size=2,
+#                     list_mu=[0.5, 1.0, 1.5, 2.0, 2.5, 3.0],
+#                     p_value=0.01,
+#                     num_jobs=6,
+#                     critical_probability=0.0,
+#                 ),
+#                 'matrix optimal for p = 1.0',
+#             ),
+#             (
+#                 ExtendedParams(
+#                     traj_type='fBm',
+#                     nu=0.1,
+#                     diag_percentile=10,
+#                     kernel_size=1,
+#                     list_mu=[0.5, 1.0],
+#                     p_value=0.9,
+#                     num_jobs=3,
+#                     critical_probability=0.0,
+#                 ),
+#                 'matrix optimal for p = 0.5',
+#             ),
+#             (
+#                 ExtendedParams(
+#                     traj_type='fBm',
+#                     nu=0.1,
+#                     diag_percentile=0,
+#                     kernel_size=0,
+#                     list_mu=[1.5, 2.0, 2.5],
+#                     p_value=0.9,
+#                     num_jobs=3,
+#                     critical_probability=0.0,
+#                 ),
+#                 'matrix optimal for p = 0.0',
+#             ),
+#         ]
+#     )
 
 
 def run(prefix, count_trj=10, count_steps=3000):
-    rradiuses, throat_lengths = Reader.read_pnm_data(
+    radiuses, throat_lengths = Reader.read_pnm_data(
         prefix, scale=1e10, border=0.015
     )
 
-    pset = [
-        (
-            ExtendedParams(
-                traj_type='fBm',
-                nu=0.5,
-                diag_percentile=50,
-                kernel_size=2,
-                list_mu=[0.5, 1.0, 1.5, 2.0, 2.5, 3.0],
-                p_value=0.01,
-                num_jobs=6,
-                critical_probability=0.0,
+    pset = np.array(
+        [
+            (
+                ExtendedParams(
+                    traj_type='fBm',
+                    nu=0.1,
+                    diag_percentile=10,
+                    kernel_size=1,
+                    list_mu=[0.5, 1.0],
+                    p_value=0.9,
+                    num_jobs=3,
+                    critical_probability=0.0,
+                ),
+                'matrix optimal for p = 0.5',
             ),
-            'matrix optimal for p = 1.0',
-        ),
-        (
-            ExtendedParams(
-                traj_type='fBm',
-                nu=0.1,
-                diag_percentile=0,
-                kernel_size=0,
-                list_mu=[1.5, 2.0, 2.5],
-                p_value=0.9,
-                num_jobs=5,
-                critical_probability=0.0,
+            (
+                ExtendedParams(
+                    traj_type='fBm',
+                    nu=0.1,
+                    diag_percentile=0,
+                    kernel_size=0,
+                    list_mu=[1.5, 2.0, 2.5],
+                    p_value=0.9,
+                    num_jobs=3,
+                    critical_probability=0.0,
+                ),
+                'matrix optimal for p = 0.0',
             ),
-            'matrix optimal for p = 0.0',
-        ),
-    ]
+        ]
+    )
+
+    ps_type = 'uniform'  # poisson uniform
+    ps = ps_generate(ps_type)
+
     ind = 0
-    for rad_scale in [1, 2, 4]:
-        radiuses = rradiuses * rad_scale
-        steps = np.array([s for s in range(1, 101)], dtype=np.int32).reshape(
-            100, 1
-        )
-        prob = ((steps.astype(np.float32)) * 0.01).reshape(100, 1)
-        ps = np.hstack((steps, prob))
+    ppl = create_cdf(radiuses)
+    ptl = create_cdf(throat_lengths)
 
-        ppl = create_cdf(radiuses)
-        ptl = create_cdf(throat_lengths)
+    pi_l_file_name = prefix + f"_pi_l.npy"
+    if os.path.isfile(pi_l_file_name):
+        pi_l = np.load(pi_l_file_name)
+    else:
+        generator = PiLDistrGenerator()
+        pi_l = generator.run(radiuses)
+        np.save(pi_l_file_name, pi_l)
 
-        pi_l_file_name = prefix + f"_scale={rad_scale}_pi_l.npy"
-        if os.path.isfile(pi_l_file_name):
-            pi_l = np.load(pi_l_file_name)
-        else:
-            generator = PiLDistrGenerator()
-            pi_l = generator.run(radiuses)
-            np.save(pi_l_file_name, pi_l)
+    for params, msuffix in pset:
+        plt.figure()
 
-        for params, msuffix in pset:
-            plt.figure()
+        prob_analizer = TrajectoryExtendedAnalizer(params, pi_l, throat_lengths)
+        matrix_analyzer = TrajectoryAnalizer(params)
 
-            prob_analizer = TrajectoryExtendedAnalizer(
-                params, pi_l, throat_lengths
+        prob = np.arange(1.1, step=0.1)
+        r_matrix_error = np.zeros(shape=(len(prob),))
+        r_prob_error = np.zeros(shape=(len(prob),))
+
+        for style, k in zip(['solid', 'dotted', 'dashed'], [0.1, 0.5, 0.9]):
+            path_to_save = (
+                '/'.join(prefix.split('/')[:-1]) + "/errors/" + ps_type
             )
-            matrix_analyzer = TrajectoryAnalizer(params)
-
-            prob = np.arange(1.1, step=0.1)
-            r_matrix_error = np.zeros(shape=(len(prob),))
-            r_prob_error = np.zeros(shape=(len(prob),))
-
-            for style, k in zip(['solid', 'dotted', 'dashed'], [0.1, 0.5, 0.9]):
+            matrix_er_fn = path_to_save + f"/matrix_k={k}_{msuffix}.npy"
+            prob_er_fn = path_to_save + f"/prob_k={k}_{msuffix}.npy"
+            if (
+                not Path(prob_er_fn).is_file()
+                or not Path(matrix_er_fn).is_file()
+            ):
                 for j, p in enumerate(prob):
                     simulator = KerogenWalkSimulator(ppl, ps, ptl, k, p)
 
@@ -118,27 +169,31 @@ def run(prefix, count_trj=10, count_steps=3000):
 
                         ind += 1
                         print(
-                            f"Ready {ind} from {count_trj*len(prob)*3*3*2} time = {time.time() - start_time}s "
+                            f"Ready {ind} from {count_trj*len(prob)*3*2}, trajectory num={i+1}, prob={p}, time = {time.time() - start_time}s "
                         )
-                        print(f"Trajectory num={i+1}, prob={p}")
 
                 delim = count_trj * count_steps
                 r_prob_error /= delim
                 r_matrix_error /= delim
+                np.save(matrix_er_fn, r_matrix_error)
+                np.save(prob_er_fn, r_prob_error)
 
-                plt.plot(
-                    prob, r_prob_error, label=f"prob k={k}", linestyle=style
-                )
-                plt.plot(
-                    prob, r_matrix_error, label=f"matrix k={k}", linestyle=style
-                )
+            r_matrix_error = np.load(matrix_er_fn)
+            r_prob_error = np.load(prob_er_fn)
 
-            plt.xlabel("Probability return to previous trap")
-            plt.ylabel("Avarage error as (Count Error)/(Count Points)")
-            plt.title(
-                f"Trajectory count steps {count_steps}, count trajectories {count_trj}, {msuffix}, radiuses *= {rad_scale}"
+            plt.plot(prob, r_prob_error, label=f"prob k={k}", linestyle=style)
+            plt.plot(
+                prob, r_matrix_error, label=f"matrix k={k}", linestyle=style
             )
-            plt.legend()
+
+            np.save(f"", r_prob_error)
+
+        plt.xlabel("Probability return to previous trap")
+        plt.ylabel("Avarage error as (Count Error)/(Count Points)")
+        plt.title(
+            f"Trajectory count steps {count_steps}, count trajectories {count_trj}, {msuffix}"
+        )
+        plt.legend()
 
     plt.show()
 

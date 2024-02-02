@@ -5,6 +5,24 @@ from processes.trajectory_analyzer import AnalizerParams
 from visualizer.visualizer import Visualizer
 from base.trajectory import Trajectory
 import numpy.typing as npt
+from scipy.stats import poisson
+
+
+def ps_generate(type):
+    steps = np.arange(0, 150)
+    if type == 'poisson':
+        prob = poisson.cdf(steps, 100, loc=-50)
+        prob[0] = 0
+
+        ps = np.zeros(shape=(len(steps) + 1, 2), dtype=np.float32)
+        ps[1:, 0] = steps
+        ps[1:, 1] = prob
+    else:
+        prob = (steps.astype(np.float32)) * 0.01
+        ps = np.zeros(shape=(len(steps) + 1, 2))
+        ps[1:, 0] = steps
+        ps[1:, 1] = prob / prob[-1]
+    return ps
 
 
 def create_cdf(vals, n=30):
@@ -12,6 +30,7 @@ def create_cdf(vals, n=30):
     xdel = bb[1] - bb[0]
     x = (bb[:-1] + xdel * 0.5).reshape(n, 1)
     pn = (np.cumsum(p) / np.sum(p)).reshape(n, 1)
+    pn[0] = 0
     return np.hstack((x, pn))
 
 
