@@ -1,5 +1,8 @@
 import time
 import math
+from pathlib import Path
+from os.path import realpath
+import sys
 from dataclasses import dataclass
 from typing import Callable, List, Optional, Tuple
 
@@ -7,6 +10,10 @@ import networkx as nx
 import numpy as np
 import numpy.typing as npt
 from joblib import Parallel, delayed
+
+path = Path(realpath(__file__))
+parent_dir = str(path.parent.parent.absolute())
+sys.path.append(parent_dir)
 
 from base.boundingbox import KerogenBox, Range
 from base.kerogendata import AtomData, KerogenData
@@ -75,15 +82,13 @@ class Segmentator:
             Range(minb[1], maxb[1]),
             Range(minb[2], maxb[2]),
         )
-    
+
     @staticmethod
-    def full_cell(
-        size: Tuple[float, float, float]
-    ) -> KerogenBox:
+    def full_cell(size: Tuple[float, float, float]) -> KerogenBox:
         return KerogenBox(
-            Range(0., size[0]),
-            Range(0., size[1]),
-            Range(0., size[2]),
+            Range(0.0, size[0]),
+            Range(0.0, size[1]),
+            Range(0.0, size[2]),
         )
 
     @staticmethod
@@ -95,7 +100,8 @@ class Segmentator:
         l_cell_size = [s for s in cell_size]
         ref_cell_size = min(l_cell_size) if by_min else max(l_cell_size)
         return tuple(  # type: ignore
-            int(math.ceil(reference_size * cs / ref_cell_size)) for cs in l_cell_size
+            int(math.ceil(reference_size * cs / ref_cell_size))
+            for cs in l_cell_size
         )
 
     def binarize(self) -> npt.NDArray[np.int8]:
@@ -117,30 +123,32 @@ class Segmentator:
                             for i, vs, mm in zip(
                                 [ix, iy, iz], vox_sizes, self.kerogen.box.min()
                             )
-                        ], shape = (1,3)
-                    )
+                        ]
+                    ).reshape(1, 3)
                     for bb in self.bb:
                         if bb.is_inside(pos) and bb.is_intersect_atom(pos):
                             s_img[iy, iz] = 0
             print(f" --- Slice {ix}-x finished!")
             return s_img
 
-        num_proc = 14
+        num_proc = 15
         sim_results = Parallel(n_jobs=num_proc)(
             delayed(wrap)(ix) for ix in range(self.img_size[0])
         )
+        # sim_results = [wrap(ix) for ix in range(self.img_size[0])]
+
         img = np.ones(shape=self.img_size, dtype=np.int8)
         for i, res in enumerate(sim_results):
             img[i, :, :] = res
 
         return img
 
-    def dist_map(self)-> npt.NDArray[np.float32]:
+    def dist_map(self) -> npt.NDArray[np.float32]:
         vox_sizes = [
             ker_s / float(img_s)
             for ker_s, img_s in zip(self.kerogen.box.size(), self.img_size)
         ]
-        
+
         def dist_to_edge(a, b, p):
             # normalized tangent vector
             d = np.divide(b - a, np.linalg.norm(b - a))
@@ -157,22 +165,21 @@ class Segmentator:
 
             return np.hypot(h, np.linalg.norm(c))
 
-
         def wrap(ix):
-            s_img = 1e6*np.ones(
+            s_img = 1e6 * np.ones(
                 shape=(self.img_size[1], self.img_size[2]), dtype=np.float32
             )
 
             for iy in range(self.img_size[1]):
                 for iz in range(self.img_size[2]):
-                    pos = np.zeros(shape = (1,3),dtype=np.float32)
+                    pos = np.zeros(shape=(1, 3), dtype=np.float32)
                     pos[:] = [
-                            mm + (float(i) + 0.5) * vs
-                            for i, vs, mm in zip(
-                                [ix, iy, iz], vox_sizes, self.kerogen.box.min()
-                            )
-                        ]
-                    
+                        mm + (float(i) + 0.5) * vs
+                        for i, vs, mm in zip(
+                            [ix, iy, iz], vox_sizes, self.kerogen.box.min()
+                        )
+                    ]
+
                     for bb in self.bb:
                         if not bb.is_inside(pos):
                             continue
@@ -180,19 +187,21 @@ class Segmentator:
                         d, id = bb.dist_nearest(pos)
                         de = -1
                         for n1, n2 in self.kerogen.graph.edges(id):
-                            de = dist_to_edge(self.kerogen.atoms[n1].pos,self.kerogen.atoms[n2].pos, pos)
+                            de = dist_to_edge(
+                                self.kerogen.atoms[n1].pos,
+                                self.kerogen.atoms[n2].pos,
+                                pos,
+                            )
                             s_img[iy, iz] = min(s_img[iy, iz], de)
                         if de == -1:
                             s_img[iy, iz] = min(s_img[iy, iz], d)
             print(f" --- Slice {ix}-x finished!")
             return s_img
-        
 
         num_proc = 8
         sim_results = Parallel(n_jobs=num_proc)(
             delayed(wrap)(ix) for ix in range(self.img_size[0])
         )
-
 
         img = np.ones(shape=self.img_size, dtype=np.float32)
         for i, res in enumerate(sim_results):

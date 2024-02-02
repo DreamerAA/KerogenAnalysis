@@ -55,8 +55,8 @@ def read_structures(
     path_to_structure: str,
 ) -> List[Tuple[List[AtomData], Tuple[float, float, float]]]:
     structures = []
-    
-    count_to_skip = 10
+
+    count_to_skip = 65
     with open(path_to_structure) as f:
         atoms, size, n = Reader.read_raw_struct_ff(f)
         is_end = False
@@ -68,6 +68,31 @@ def read_structures(
                 is_end = Reader.skip_struct(f)
                 if is_end:
                     break
+
+    return structures
+
+
+def read_structures_by_num(
+    path_to_structure: str, indexes: List[int]
+) -> List[Tuple[List[AtomData], Tuple[float, float, float]]]:
+    structures = []
+
+    with open(path_to_structure) as f:
+        is_end = False
+        while not is_end:
+            num = Reader.read_head_struct(f)
+            if num == -1:
+                is_end = True
+                continue
+
+            if num not in indexes:
+                is_end = Reader.skip_struct_main_part(f)
+                if is_end:
+                    break
+            else:
+                atoms, size = Reader.read_raw_struct_ff_main(f)
+                structures.append((num, np.array(atoms), size))
+                print(" -- Reading struct is ended!")
 
     return structures
 
@@ -131,12 +156,17 @@ def dynamic_struct_extr(path_to_structure: str) -> None:
         )
 
 
-def extanded_struct_extr(path_to_structure: str, path_to_save:str, mfilter, cut_cell: bool, ref_size: int) -> None:
+def extanded_struct_extr(
+    path_to_structure: str,
+    path_to_save: str,
+    indexes: List[int],
+    cut_cell: bool,
+    ref_size: int,
+) -> None:
     start_time = time.time()
-    structures = read_structures(path_to_structure)
-    
+    structures = read_structures_by_num(path_to_structure, indexes)
+
     print(f" -- Count structures: {len(structures)}")
-    structures = mfilter(structures)
     print(f" -- Count structures after filter: {len(structures)}")
 
     print(f" -- Reading finished! Elapsed time: {time.time() - start_time}s")
@@ -153,8 +183,8 @@ def extanded_struct_extr(path_to_structure: str, path_to_save:str, mfilter, cut_
         if not kerogen_data.checkPeriodization():
             Periodizer.periodize(kerogen_data)
             # Periodizer.rm_long_edges(kerogen_data)
-            
-        resolution = np.array([s for s in size]).min()/ ref_size
+
+        resolution = np.array([s for s in size]).min() / ref_size
         str_resolution = "{:.9f}".format(resolution)
 
         img_size = Segmentator.calc_image_size(
@@ -163,7 +193,8 @@ def extanded_struct_extr(path_to_structure: str, path_to_save:str, mfilter, cut_
         prf_cell = "partcell" if cut_cell else "fullcell"
         binarized_file_name = (
             # f"../data/Kerogen/result_img_{file_name}_rs={ref_size}_mr={methan_radius}_div={div}.npy"
-            path_to_save + f"./result_img_num={num}_cell={prf_cell}_is={img_size}_ar={additional_radius}_resolution={str_resolution}.npy"
+            path_to_save
+            + f"./result_img_num={num}_cell={prf_cell}_is={img_size}_ar={additional_radius}_resolution={str_resolution}.npy"
         )
 
         if os.path.isfile(binarized_file_name):
@@ -185,7 +216,8 @@ def extanded_struct_extr(path_to_structure: str, path_to_save:str, mfilter, cut_
         str_resolution = "{:.9f}".format(resolution)
         raw_file_name = (
             # f"../data/Kerogen/result_raw_img_{file_name}_is={img.shape}_mr={methan_radius}_div={div}.raw"
-            path_to_save + f"./result_raw_img_num={num}_cell={prf_cell}_is={img.shape}_mr={additional_radius}_resolution={str_resolution}a.raw"
+            path_to_save
+            + f"./result_raw_img_num={num}_cell={prf_cell}_is={img.shape}_mr={additional_radius}_resolution={str_resolution}a.raw"
         )
 
         img = 1 - img
@@ -201,20 +233,19 @@ if __name__ == '__main__':
     parser.add_argument(
         '--structure_path',
         type=str,
-        default="../data/Kerogen/traj_ch4.gro",
+        default="../data/ch4/type1.ch4.1.gro",
     )
     parser.add_argument(
         '--save_path',
         type=str,
         # default="../data/Kerogen/methan_traj/meth_0.5_micros.gro"
-        default="../data/Kerogen/time_trapping_results/ch4/",
+        default="../data/ch4/images/",
     )
 
     args = parser.parse_args()
 
-    def cfilter(s):
-        return [s[-1]]
+    indexes = [25000 + 250000 * i * 65 for i in range(100)] + [1640025000]
 
-    extanded_struct_extr(args.structure_path, args.save_path, cfilter, True, 500)
-
-    
+    extanded_struct_extr(
+        args.structure_path, args.save_path, indexes, True, 500
+    )

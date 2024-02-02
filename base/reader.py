@@ -92,11 +92,17 @@ class Reader:
     def read_raw_struct_ff(
         f: TextIOWrapper,
     ) -> Tuple[List[AtomData], Tuple[float, float, float]]:
-        atoms = []
-
         simul_num = Reader.read_head_struct(f)
         if simul_num == -1:
             return None, None, simul_num
+        atoms, size = Reader.read_raw_struct_ff_main(f)
+        return atoms, size, simul_num
+
+    @staticmethod
+    def read_raw_struct_ff_main(
+        f: TextIOWrapper,
+    ) -> Tuple[List[AtomData], Tuple[float, float, float]]:
+        atoms = []
 
         count_atoms = int(next(f))
         print(f" --- Count atoms: {count_atoms}")
@@ -135,13 +141,18 @@ class Reader:
         str_size = list(filter(lambda x: x != '', cell_sizes.split(' ')))
         size = tuple([float(e) for e in str_size])
         atoms = np.array(atoms)
-        return atoms, size, simul_num
+        return atoms, size
 
     @staticmethod
     def skip_struct(f: TextIOWrapper) -> bool:
         is_end = skip_line(f, 1)
         if is_end:
             return is_end
+        count_atoms = int(next(f))
+        is_end = skip_line(f, count_atoms + 1)
+        return is_end
+
+    def skip_struct_main_part(f: TextIOWrapper) -> bool:
         count_atoms = int(next(f))
         is_end = skip_line(f, count_atoms + 1)
         return is_end
