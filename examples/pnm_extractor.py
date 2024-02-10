@@ -38,36 +38,48 @@ if __name__ == '__main__':
 
     # Opening JSON file
     with open(path_to_config) as f:
-        # returns JSON object as 
+        # returns JSON object as
         # a dictionary
         jconfig = json.load(f)
-        
-    onlyfiles = [f for f in listdir(path_to_images) if isfile(join(path_to_images, f))]
+
+    onlyfiles = [
+        f
+        for f in listdir(path_to_images)
+        if isfile(join(path_to_images, f)) and '.raw' in f
+    ]
 
     for i, file in enumerate(onlyfiles):
         lfile = file.split('_')
-        parts = [l.split('=')[1] for l  in lfile if "num" in l or "resolution" in l or "is=" in l]
+        parts = [
+            l.split('=')[1]
+            for l in lfile
+            if "num" in l or "resolution" in l or "is=" in l
+        ]
         print(parts)
         num = int(parts[0])
         xs, ys, zs = [int(e) for e in parts[1][1:-1].split(',')]
         resolution = float(parts[2][:-5])
 
         pnm_pref = join(path_to_pnm, f"num={num}_{xs}_{ys}_{zs}")
-        jconfig["input_data"]["filename"] = join(path_to_images,file)
+        jconfig["input_data"]["filename"] = join(path_to_images, file)
         jconfig["input_data"]["size"]["x"] = xs
         jconfig["input_data"]["size"]["y"] = ys
         jconfig["input_data"]["size"]["z"] = zs
         jconfig["output_data"]["statoil_prefix"] = pnm_pref
         jconfig["output_data"]["filename"] = pnm_pref
-        jconfig["extraction_parameters"]["resolution"] = resolution*0.1
+        jconfig["extraction_parameters"]["resolution"] = resolution * 0.1
 
         with open(path_to_config, "w") as outfile:
             json.dump(jconfig, outfile)
 
-        process = subprocess.Popen(["/home/andrey/DigitalCore/PNE/pore-network-extraction/build/bin/extractor_example", path_to_config], 
-                                    
-                                    stdout=subprocess.PIPE, 
-                                    stderr=subprocess.PIPE)
+        process = subprocess.Popen(
+            [
+                "/home/andrey/DigitalCore/PNE/pore-network-extraction/build/bin/extractor_example",
+                path_to_config,
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
         # wait for the process to terminate
         out, err = process.communicate()
         errcode = process.returncode
@@ -76,4 +88,3 @@ if __name__ == '__main__':
             break
         else:
             print(f"go next to {i+1} from {len(onlyfiles)}")
-        

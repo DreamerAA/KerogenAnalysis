@@ -5,6 +5,7 @@ import os
 from os import listdir
 from os.path import isfile, join, dirname, realpath
 import numpy as np
+import numpy.typing as npt
 import matplotlib.pyplot as plt
 import pickle
 from typing import List
@@ -19,10 +20,6 @@ parent_dir = str(path.parent.parent.absolute())
 sys.path.append(parent_dir)
 
 from base.reader import Reader
-
-
-def filesPath(path: str):
-    return [join(path, f) for f in listdir(path) if isfile(join(path, f))]
 
 
 def data_by_img():
@@ -292,37 +289,91 @@ def data_by_pnm():
     ]
 
 
-def calculateEulerImage(path_to_img: str, path_to_config: str) -> None:
+def calculateEulerImage(
+    path_to_img: str, path_to_config: str
+) -> npt.NDArray[np.int64]:
     path_to_exe = "/home/andrey/DigitalCore/PNE/pore-network-extraction/build/bin/extractor_example"
 
-    onlyfiles = filesPath(path_to_img)
-    for i, img_file in enumerate(onlyfiles):
-        if "(500, 500, 500)" not in img_file:
-            continue
-        # Opening JSON file
-        with open(path_to_config, 'r') as f:
-            data = json.load(f)
-            f.close()
+    # Opening JSON file
+    with open(path_to_config) as f:
+        # returns JSON object as
+        # a dictionary
+        jconfig = json.load(f)
 
-        data["input_data"]["filename"] = img_file
-        data["output_data"]["filename"] = "./tmp"
+    path_to_pnm = ''
+
+    onlyfiles = [
+        join(path_to_img, f)
+        for f in listdir(path_to_img)
+        if isfile(join(path_to_img, f)) and '.raw' in f
+    ]
+
+    eulers = np.zeros(shape=(len(onlyfiles)), dtype=np.int64)
+
+    for i, file in enumerate(onlyfiles):
+        lfile = file.split('_')
+        parts = [
+            l.split('=')[1]
+            for l in lfile
+            if "num" in l or "resolution" in l or "is=" in l
+        ]
+        # print(parts)
+        num = int(parts[0])
+        xs, ys, zs = [int(e) for e in parts[1][1:-1].split(',')]
+        resolution = float(parts[2][:-5])
+
+        pnm_pref = join(path_to_pnm, f"num={num}_{xs}_{ys}_{zs}")
+        jconfig["input_data"]["filename"] = file
+        jconfig["input_data"]["size"]["x"] = xs
+        jconfig["input_data"]["size"]["y"] = ys
+        jconfig["input_data"]["size"]["z"] = zs
+        jconfig["output_data"]["statoil_prefix"] = pnm_pref
+        jconfig["output_data"]["filename"] = pnm_pref
+        jconfig["extraction_parameters"]["resolution"] = resolution * 0.1
 
         with open(path_to_config, 'w') as f:
-            json.dump(data, f)
+            json.dump(jconfig, f)
             f.close()
 
-        subprocess.run([path_to_exe, path_to_config])
+        process = subprocess.Popen(
+            [
+                path_to_exe,
+                path_to_config,
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        # wait for the process to terminate
+        out, err = process.communicate()
+        errcode = process.returncode
+        if errcode != 0:
+            print("Error!!!")
+        s = str(out)
+        s = s[2:-1]
+        str_e = (s.split('\n')[-1]).split(':')[1]
+        e = int(str_e[:-2])
+        # print(e, str(out))
+        eulers[i] = e
+
         print(f"Ready {i+1} from {len(onlyfiles)}")
+    return eulers
 
 
 def calculateEulerPNM(path_to_pnm: str):
-    onlyfiles = filesPath(path_to_pnm)
+    onlyfiles = [
+        join(path_to_pnm, f)
+        for f in listdir(path_to_pnm)
+        if isfile(join(path_to_pnm, f))
+        if "_link1.dat" in f
+    ]
+
     nums = []
-    eulers = []
     for i, img_file in enumerate(onlyfiles):
-        num = int((img_file.split('_')[3]).split('=')[1])
+        num = int(((img_file.split('/')[-1]).split('_')[0]).split('=')[1])
         nums.append(num)
-    for n in nums:
+
+    eulers = np.zeros(shape=(len(onlyfiles)), dtype=np.int64)
+    for j, n in enumerate(nums):
         fn = path_to_pnm + f"num={n}_500_500_500"
         radiuses, throat_lengths = Reader.read_pnm_data(fn, 1, 0)
         ll, _ = Reader.read_pnm_linklist(fn + "_link1.dat")
@@ -358,17 +409,15 @@ def calculateEulerPNM(path_to_pnm: str):
         V = len(radiuses)
         E = len(throat_lengths)
         ne = V - E + F
-        eulers.append(ne)
-        print(ne)
-    print(eulers)
+        eulers[j] = ne
+    return eulers
 
 
-def plotEulerDistributions(path_to_pnm: str):
-    onlyfiles = filesPath(path_to_pnm)
-    pnm = [
-        Reader.read_pnm_data(path[:-10], scale=1e10, border=-1)
-        for path in onlyfiles
-    ]
+def plotEulerDistributions(leulers: List[npt.NDArray[np.int64]]):
+    for name, eulers in leulers:
+        plt.hist(eulers, bins=10, label=name)
+    plt.legend()
+    plt.show()
 
 
 if __name__ == '__main__':
@@ -376,27 +425,45 @@ if __name__ == '__main__':
     parser.add_argument(
         '--path_to_img',
         type=str,
-        default="../data/Kerogen/tmp/result_time_depend_struct/images",
+        # default="/media/andrey/Samsung_T5/PHD/Kerogen/ch4/images/",
+        default="/media/andrey/Samsung_T5/PHD/Kerogen/h2/images/",
     )
     parser.add_argument(
         '--path_to_pnm',
         type=str,
-        default="../data/Kerogen/tmp/result_time_depend_struct/pnm/part/",
+        # default="/media/andrey/Samsung_T5/PHD/Kerogen/ch4/pnm/",
+        default="/media/andrey/Samsung_T5/PHD/Kerogen/h2/pnm/",
+    )
+    parser.add_argument(
+        '--path_to_euler',
+        type=str,
+        # default="/media/andrey/Samsung_T5/PHD/Kerogen/ch4/",
+        default="/media/andrey/Samsung_T5/PHD/Kerogen/h2/",
     )
     parser.add_argument(
         '--path_to_conf',
         type=str,
-        default="../data/Kerogen/tmp/result_time_depend_struct/extract_config.json",
+        default="/media/andrey/Samsung_T5/PHD/Kerogen/ExtractorExampleConfig.json",
     )
 
     args = parser.parse_args()
 
-    # calculateEulerImage(args.path_to_img, args.path_to_conf)
-    # result of calculateEulerImage saved to data_by_img()
+    img_eulers_file = args.path_to_euler + "img_euler.pkl"
+    if isfile(img_eulers_file):
+        with open(img_eulers_file, 'rb') as f:
+            img_eulers = pickle.load(f)
+    else:
+        img_eulers = calculateEulerImage(args.path_to_img, args.path_to_conf)
+        with open(img_eulers_file, 'wb') as f:
+            pickle.dump(img_eulers, f)
 
-    calculateEulerPNM(args.path_to_pnm)
-    # result of calculateEulerPNM saved to data_by_pnm()
+    pnm_eulers_file = args.path_to_euler + "pnm_euler.pkl"
+    if isfile(pnm_eulers_file):
+        with open(pnm_eulers_file, 'rb') as f:
+            pnm_eulers = pickle.load(f)
+    else:
+        pnm_eulers = calculateEulerPNM(args.path_to_pnm)
+        with open(pnm_eulers_file, 'wb') as f:
+            pickle.dump(pnm_eulers, f)
 
-    # data_by_img()
-
-    # plotEulerDistributions(args.path_to_pnm)
+    plotEulerDistributions([("PNM", pnm_eulers), ("Image", img_eulers)])

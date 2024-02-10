@@ -233,7 +233,8 @@ if __name__ == '__main__':
     parser.add_argument(
         '--structure_path',
         type=str,
-        default="../data/ch4/type1.ch4.1.gro",
+        # default="../data/ch4/type1.ch4.1.gro",
+        default="../data/h2/type1.h2.1.gro",
     )
     parser.add_argument(
         '--save_path',
