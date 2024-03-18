@@ -24,51 +24,6 @@ from processes.trajectory_extended_analizer import TrajectoryAnalizer
 from examples.utils import create_cdf, get_params, ps_generate
 
 
-# pset = np.array(
-#         [
-#             (
-#                 ExtendedParams(
-#                     traj_type='fBm',
-#                     nu=0.5,
-#                     diag_percentile=50,
-#                     kernel_size=2,
-#                     list_mu=[0.5, 1.0, 1.5, 2.0, 2.5, 3.0],
-#                     p_value=0.01,
-#                     num_jobs=6,
-#                     critical_probability=0.0,
-#                 ),
-#                 'matrix optimal for p = 1.0',
-#             ),
-#             (
-#                 ExtendedParams(
-#                     traj_type='fBm',
-#                     nu=0.1,
-#                     diag_percentile=10,
-#                     kernel_size=1,
-#                     list_mu=[0.5, 1.0],
-#                     p_value=0.9,
-#                     num_jobs=3,
-#                     critical_probability=0.0,
-#                 ),
-#                 'matrix optimal for p = 0.5',
-#             ),
-#             (
-#                 ExtendedParams(
-#                     traj_type='fBm',
-#                     nu=0.1,
-#                     diag_percentile=0,
-#                     kernel_size=0,
-#                     list_mu=[1.5, 2.0, 2.5],
-#                     p_value=0.9,
-#                     num_jobs=3,
-#                     critical_probability=0.0,
-#                 ),
-#                 'matrix optimal for p = 0.0',
-#             ),
-#         ]
-#     )
-
-
 def run(prefix, count_trj=10, count_steps=3000):
     radiuses, throat_lengths = Reader.read_pnm_data(
         prefix, scale=1e10, border=0.015

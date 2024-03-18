@@ -45,7 +45,7 @@ class PiLDistrGenerator:
         def sim(num: int, m: int, radius: float) -> npt.NDArray[np.float32]:
             len_distr = np.zeros(shape=(cl - 1,), dtype=np.int32)
             xyz_scaled = xyz * radius
-            distances = pairwise_distances(xyz_scaled, xyz_scaled, n_jobs=4)
+            distances = pairwise_distances(xyz_scaled, xyz_scaled, n_jobs=2)
             distances = PiLDistrGenerator.upper_tri_masking(distances)
 
             for i in range(1, cl):
@@ -56,10 +56,11 @@ class PiLDistrGenerator:
             print(f" --- Result of {num+1} from {m}")
             return len_distr / np.sum(len_distr * dl)
 
+        np.sort(pore_radiuses)
         sample_rad = pore_radiuses[::30]
         pi_l_d = np.zeros(shape=(sample_rad.shape[0], cl - 1))
 
-        pres = Parallel(n_jobs=10)(
+        pres = Parallel(n_jobs=8)(
             delayed(sim)(i, len(sample_rad), rad)
             for i, rad in enumerate(sample_rad)
         )

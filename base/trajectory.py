@@ -32,8 +32,8 @@ class Trajectory:
         )
         return np.any(xmask) or np.any(ymask) or np.any(zmask)
 
-    def trjbox(self) -> BoundingBox:
-        ppoints = self.points_without_periodic()
+    def trjbox(self, periodic: bool) -> BoundingBox:
+        ppoints = self.points_without_periodic if not periodic else self.points
         mmin = ppoints.min(axis=0)
         mmax = ppoints.max(axis=0)
         tmp = [Range(i, j) for i, j in zip(mmin, mmax)]
@@ -51,6 +51,28 @@ class Trajectory:
 
     @cached_property
     def points_without_periodic(self) -> npt.NDArray[np.float64]:
+        borders = self.box.max()
+
+        npoints = np.zeros(shape=self.points.shape, dtype=np.float32)
+        npoints[0, :] = self.points[0, :]
+
+        shift = np.zeros(shape=(3,), dtype=np.float32)
+        for i in range(1, self.points.shape[0]):
+            prev_pos = self.points[i - 1, :]
+            next_pos = self.points[i, :]
+
+            for a in range(3):
+                delta = next_pos[a] - prev_pos[a]
+                b = np.array([0, borders[a]])
+                s = delta - b * (-1 if delta < 0 else 1)
+                shift[a] = s[np.argmin(np.abs(s))]
+
+            npoints[i, :] = npoints[i - 1, :] + shift
+
+        return npoints
+
+    @cached_property
+    def points_without_periodic_old(self) -> npt.NDArray[np.float64]:
         borders = self.box.max()
         s_2 = borders.min() / 2
         diff = self.points[1:] - self.points[:-1]
@@ -138,3 +160,19 @@ class Trajectory:
             trajectories.append(Trajectory(points, np.array(time_steps), box))
 
         return trajectories
+
+    def msd(self):
+        Trajectory.msd_by_points(self.points_without_periodic), self.times
+
+    def msd_average_time(self):
+        cp = self.points_without_periodic.shape[0]
+        points = self.points_without_periodic
+        amsd = np.zeros(shape=(cp, cp), dtype=np.float32)
+        for i in range(cp):
+            amsd[i, : (cp - i)] = Trajectory.msd_by_points(points[i:, :])
+        return np.sum(amsd, axis=0) / np.arange(cp, 0, -1)
+
+    @staticmethod
+    def msd_by_points(points):
+        p = points - points[0, :]
+        return p[:, 0] ** 2 + p[:, 1] ** 2 + p[:, 2] ** 2

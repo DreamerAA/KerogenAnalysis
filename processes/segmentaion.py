@@ -184,24 +184,18 @@ class Segmentator:
                         if not bb.is_inside(pos):
                             continue
 
-                        d, id = bb.dist_nearest(pos)
-                        de = -1
-                        for n1, n2 in self.kerogen.graph.edges(id):
-                            de = dist_to_edge(
-                                self.kerogen.atoms[n1].pos,
-                                self.kerogen.atoms[n2].pos,
-                                pos,
-                            )
-                            s_img[iy, iz] = min(s_img[iy, iz], de)
-                        if de == -1:
-                            s_img[iy, iz] = min(s_img[iy, iz], d)
+                        d, _ = bb.dist_nearest(pos)
+                        s_img[iy, iz] = min(s_img[iy, iz], d)
             print(f" --- Slice {ix}-x finished!")
             return s_img
 
-        num_proc = 8
+        num_proc = 12
         sim_results = Parallel(n_jobs=num_proc)(
             delayed(wrap)(ix) for ix in range(self.img_size[0])
         )
+        # sim_results = []
+        # for ix in range(self.img_size[0]):
+        #     sim_results.append(wrap(ix))
 
         img = np.ones(shape=self.img_size, dtype=np.float32)
         for i, res in enumerate(sim_results):

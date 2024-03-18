@@ -1,37 +1,22 @@
 import argparse
 from pathlib import Path
 import sys
-import os
-from os import listdir
-from os.path import isfile, join, dirname, realpath
+from os.path import realpath
 import numpy as np
-import matplotlib.pyplot as plt
-import pickle
-from typing import List
 from joblib import Parallel, delayed
 import time
-from scipy.stats import poisson
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
 sys.path.append(parent_dir)
 
-from examples.utils import get_params, visualize_trajectory
-from base.trap_sequence import TrapSequence
+from examples.utils import get_params
 from base.reader import Reader
-from base.trajectory import Trajectory
-from base.boundingbox import BoundingBox
 from processes.kerogen_walk_simulator import KerogenWalkSimulator
-from processes.trap_extractor import TrapExtractor
-from processes.trajectory_extended_analizer import (
-    TrajectoryExtendedAnalizer,
-    ExtendedParams,
-)
+
 from processes.trajectory_extended_analizer import (
     TrajectoryAnalizer,
-    AnalizerParams,
 )
-from visualizer.visualizer import Visualizer
 from examples.utils import create_cdf, get_params, ps_generate
 
 

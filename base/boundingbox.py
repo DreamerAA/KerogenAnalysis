@@ -12,8 +12,8 @@ class Range(object):
         mmax: float = None,
     ):
         if mmin is not None and mmax is not None:
-            assert mmin <= mmax 
-        self.min_ = float(np.finfo(float).max) if mmin == None else mmin    
+            assert mmin <= mmax
+        self.min_ = float(np.finfo(float).max) if mmin == None else mmin
         self.max_ = float(np.finfo(float).min) if mmax == None else mmax
 
     def update(self, v: float) -> None:
@@ -50,8 +50,11 @@ class BoundingBox(object):
         self.zb_ = Range() if zb is None else zb
 
     def is_inside(self, pos: npt.NDArray[np.float32]) -> bool:
-        m = [b.is_inside(v) for b, v in zip([self.xb_,self.yb_,self.zb_], pos.flat)]
-        return np.all(m) 
+        m = [
+            b.is_inside(v)
+            for b, v in zip([self.xb_, self.yb_, self.zb_], pos.flat)
+        ]
+        return np.all(m)
 
     def size(self) -> Tuple[float, float, float]:
         return (self.xb_.diff(), self.yb_.diff(), self.zb_.diff())
@@ -66,8 +69,22 @@ class BoundingBox(object):
         return np.array([r.center() for r in [self.xb_, self.yb_, self.zb_]])
 
     def update(self, p: npt.NDArray[np.float32]) -> None:
-        for b, v in zip([self.xb_,self.yb_,self.zb_], p.flat):
+        for b, v in zip([self.xb_, self.yb_, self.zb_], p.flat):
             b.update(v)
+
+    def update_by_box(self, bbox: 'BoundingBox') -> None:
+        for nb, b in [
+            (self.xb_, bbox.xb_),
+            (self.yb_, bbox.yb_),
+            (self.zb_, bbox.zb_),
+        ]:
+            nb.update_by_range(b)
+
+    def aminmax(self):
+        res = []
+        for a in [self.xb_, self.yb_, self.zb_]:
+            res += [a.min_, a.max_]
+        return res
 
 
 class KerogenBox(BoundingBox):
@@ -110,7 +127,7 @@ class KerogenBox(BoundingBox):
         dist = cdist(pos, self.positions)
         return np.any(dist < self.atom_sizes)  # type: ignore
 
-    def dist_nearest(self,  pos: npt.NDArray[np.float32])->Tuple[float,int]:
+    def dist_nearest(self, pos: npt.NDArray[np.float32]) -> Tuple[float, int]:
         dist = cdist(pos, self.positions)
         index = dist.argmin()
         return dist.min(), self.atom_ids[index]

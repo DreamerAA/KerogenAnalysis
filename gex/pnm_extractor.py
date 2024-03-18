@@ -3,30 +3,40 @@ from os import listdir
 from os.path import isfile, join, dirname, realpath
 import argparse
 import json
+from pathlib import Path
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--path_to_extractor',
         type=str,
-        default="../data/Kerogen/traj.gro",
+        default="/home/andrey/DigitalCore/PNE/pore-network-extraction/build/bin/extractor_example",
     )
     parser.add_argument(
         '--path_to_pnm_folder',
         type=str,
-        default="/home/andrey/PHD/Kerogen/data/Kerogen/tmp/result_time_depend_struct/pnm/",
+        # default="/media/andrey/Samsung_T5/PHD/Kerogen/400K/h2/pnm/",
+        default="/media/andrey/Samsung_T5/PHD/Kerogen/400K/ch4/pnm/",
     )
 
     parser.add_argument(
         '--path_to_img_folder',
         type=str,
-        default="/home/andrey/PHD/Kerogen/data/Kerogen/tmp/result_time_depend_struct/img_to_pnm/",
+        # default="/media/andrey/Samsung_T5/PHD/Kerogen/400K/h2/images/",
+        default="/media/andrey/Samsung_T5/PHD/Kerogen/400K/ch4/images/",
     )
 
     parser.add_argument(
         '--path_to_config',
         type=str,
-        default="/home/andrey/PHD/Kerogen/data/Kerogen/tmp/result_time_depend_struct/extract_config.json",
+        default="/home/andrey/DigitalCore/PNE/pore-network-extraction/example/config/ExtractorExampleConfig.json",
+    )
+    parser.add_argument(
+        '--path_to_save_euler',
+        type=str,
+        # default='/media/andrey/Samsung_T5/PHD/Kerogen/400K/h2/euler.json',
+        default='/media/andrey/Samsung_T5/PHD/Kerogen/400K/ch4/euler.json',
     )
 
     args = parser.parse_args()
@@ -35,6 +45,9 @@ if __name__ == '__main__':
     path_to_pnm = args.path_to_pnm_folder
     path_to_extractor = args.path_to_extractor
     path_to_config = args.path_to_config
+    path_to_save_euler = args.path_to_save_euler
+
+    Path(path_to_pnm).mkdir(parents=True, exist_ok=True)
 
     # Opening JSON file
     with open(path_to_config) as f:
@@ -47,6 +60,11 @@ if __name__ == '__main__':
         for f in listdir(path_to_images)
         if isfile(join(path_to_images, f)) and '.raw' in f
     ]
+
+    output_save = {}
+    if isfile(path_to_save_euler):
+        with open(path_to_save_euler, "r") as f:
+            output_save = json.load(f)
 
     for i, file in enumerate(onlyfiles):
         lfile = file.split('_')
@@ -67,14 +85,24 @@ if __name__ == '__main__':
         jconfig["input_data"]["size"]["z"] = zs
         jconfig["output_data"]["statoil_prefix"] = pnm_pref
         jconfig["output_data"]["filename"] = pnm_pref
-        jconfig["extraction_parameters"]["resolution"] = resolution * 0.1
+        jconfig["extraction_parameters"]["resolution"] = resolution * 0.0001
+        jconfig["extraction_parameters"]["length_unit_type"] = "UM"
+
+        if isfile(pnm_pref + "_node1.dat") and parts[0] in output_save:
+            print(f"Skip {num}")
+            continue
+
+        print(f"--- File name:{join(path_to_images,file)}")
+        print(f"--- Size: {xs}, {ys}, {zs}")
+        print(f"--- Output name: {pnm_pref}")
+        print(f"--- Resolution: {resolution*0.1} nm")
 
         with open(path_to_config, "w") as outfile:
             json.dump(jconfig, outfile)
 
         process = subprocess.Popen(
             [
-                "/home/andrey/DigitalCore/PNE/pore-network-extraction/build/bin/extractor_example",
+                path_to_extractor,
                 path_to_config,
             ],
             stdout=subprocess.PIPE,
@@ -82,9 +110,15 @@ if __name__ == '__main__':
         )
         # wait for the process to terminate
         out, err = process.communicate()
+        euler = int(out.decode("utf-8").splitlines()[0].split(':')[1])
+        output_save[num] = euler
         errcode = process.returncode
         if errcode != 0:
             print("Error!!!")
             break
         else:
+            print(f"Sucssess: {output_save[num]}")
             print(f"go next to {i+1} from {len(onlyfiles)}")
+
+        with open(path_to_save_euler, 'w') as f:
+            json.dump(output_save, f)

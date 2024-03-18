@@ -15,6 +15,7 @@ from vtkmodules.vtkFiltersCore import vtkGlyph3D, vtkTubeFilter
 from vtkmodules.vtkFiltersModeling import vtkOutlineFilter
 from vtkmodules.vtkFiltersSources import vtkLineSource, vtkSphereSource
 from vtkmodules.vtkInteractionStyle import vtkInteractorStyleTrackballCamera
+from vtkmodules.vtkRenderingAnnotation import vtkCubeAxesActor
 from vtkmodules.vtkRenderingCore import (
     vtkActor,
     vtkColorTransferFunction,
@@ -22,11 +23,14 @@ from vtkmodules.vtkRenderingCore import (
     vtkRenderer,
     vtkRenderWindow,
     vtkRenderWindowInteractor,
+    vtkCamera,
 )
+from vtkmodules.vtkRenderingOpenGL2 import vtkOpenGLRenderer, vtkOpenGLSkybox
 
 import sys
 from pathlib import Path
 from os.path import realpath
+from enum import Enum
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
@@ -35,6 +39,12 @@ sys.path.append(parent_dir)
 from visualizer.win_struct_collection import WinStructCollection
 from base.boundingbox import BoundingBox
 from base.trajectory import Trajectory
+
+
+class WrapMode(Enum):
+    EMPTY = 0
+    BOX = 1
+    AXES = 2
 
 
 collection: List[WinStructCollection] = []
@@ -631,7 +641,10 @@ class Visualizer:
 
     @staticmethod
     def create_trajectory_actor(
-        trj: Trajectory, periodic: bool, color_type: str = 'dist'
+        trj: Trajectory,
+        periodic: bool,
+        color_type: str = 'dist',
+        line_width: int = 1,
     ) -> vtkActor:
         points = trj.points_without_periodic if not periodic else trj.points
         if color_type == 'dist':
@@ -648,7 +661,9 @@ class Visualizer:
             colors /= colors.max()
 
         return Visualizer.create_polyline_actor(
-            points, colors, trj.atom_size * 0.5
+            points,
+            colors,
+            trj.atom_size * line_width,
         )[0]
 
     @staticmethod
@@ -656,41 +671,62 @@ class Visualizer:
         trjs: List[Trajectory],
         color_type='dist',
         periodic: bool = False,
-        plot_box: bool = True,
+        wrap_mode: WrapMode = WrapMode.EMPTY,
         with_points: bool = False,
         window_name: str = 'Trajectory',
+        radius: int = 1,
     ) -> None:
-        renderer = vtkRenderer()
+        # renderer = vtkRenderer()
+        renderer = vtkOpenGLRenderer()
+
+        bbox = BoundingBox()
         for trj in trjs:
             actor = Visualizer.create_trajectory_actor(
-                trj, periodic, color_type
+                trj, periodic, color_type, radius
             )
+            trjbox: BoundingBox = trj.trjbox(periodic)
+            bbox.update_by_box(trjbox)
             renderer.AddActor(actor)
             if with_points:
-                actor = Visualizer.create_trj_points_actor(trj, periodic)
+                actor = Visualizer.create_trj_points_actor(
+                    trj, periodic, radius * 0.25
+                )
                 renderer.AddActor(actor)
-
-        if plot_box:
-            outfit_actor = Visualizer.create_box_actor(trjs[0].box)
-            renderer.AddActor(outfit_actor)
 
         colors = vtkNamedColors()
 
+        if wrap_mode == WrapMode.BOX:
+            outfit_actor = Visualizer.create_box_actor(trjs[0].box)
+            renderer.AddActor(outfit_actor)
+        elif wrap_mode == WrapMode.AXES:
+            actor = Visualizer.create_axes_actor(
+                bbox, renderer.GetActiveCamera()
+            )
+            renderer.AddActor(actor)
+        else:
+            assert wrap_mode == WrapMode.EMPTY
+
         renderer.SetBackground(colors.GetColor3d("White"))
         renderer.ResetCamera()
-        renderer.GetActiveCamera().Azimuth(90)
+        renderer.GetActiveCamera().Azimuth(135)
 
         ren_win = vtkRenderWindow()
         ren_win.AddRenderer(renderer)
-        ren_win.Render()
+
         ren_win.SetSize(640, 512)
         ren_win.SetWindowName(window_name)
 
-        # style = vtkInteractorStyleTrackballCamera()
+        style = vtkInteractorStyleTrackballCamera()
 
         iren = vtkRenderWindowInteractor()
         iren.SetRenderWindow(ren_win)
-        # iren.SetInteractorStyle(style)
+        iren.SetInteractorStyle(style)
+
+        irradiance = renderer.GetEnvMapIrradiance()
+        irradiance.SetIrradianceStep(0.3)
+        renderer.UseImageBasedLightingOn()
+        renderer.UseSphericalHarmonicsOn()
+
         win_col = WinStructCollection(iren)
         collection.append(win_col)
 
@@ -733,6 +769,50 @@ class Visualizer:
         outlineActor.SetMapper(outlineMapper)
         outlineActor.GetProperty().SetColor(colors.GetColor3d('Brown'))
         return outlineActor
+
+    @staticmethod
+    def create_axes_actor(bbox: BoundingBox, camera: vtkCamera) -> vtkActor:
+        colors = vtkNamedColors()
+        data = colors.GetColor3d("Black")
+
+        axes = vtkCubeAxesActor()
+        axes.SetUseTextActor3D(2)
+        axes.SetBounds(bbox.aminmax())
+        axes.SetCamera(camera)
+        axes.GetXAxesLinesProperty().SetColor(data)
+        axes.GetYAxesLinesProperty().SetColor(data)
+        axes.GetZAxesLinesProperty().SetColor(data)
+        axes.GetXAxesGridlinesProperty().SetColor(data)
+        axes.GetYAxesGridlinesProperty().SetColor(data)
+        axes.GetZAxesGridlinesProperty().SetColor(data)
+
+        # axes.XAxisLabelVisibilityOff()
+        # axes.YAxisLabelVisibilityOff()
+        # axes.ZAxisLabelVisibilityOff()
+
+        axes.SetXTitle("")
+        axes.SetYTitle("")
+        axes.SetZTitle("")
+
+        axes.GetTitleTextProperty(0).SetColor(data)
+        axes.GetTitleTextProperty(1).SetColor(data)
+        axes.GetTitleTextProperty(2).SetColor(data)
+        axes.GetLabelTextProperty(0).SetColor(data)
+        axes.GetLabelTextProperty(1).SetColor(data)
+        axes.GetLabelTextProperty(2).SetColor(data)
+        # axes.SetXUnits("A")
+        # axes.SetYUnits("A")
+        # axes.SetZUnits("A")
+        # axes.DrawXGridlinesOn()
+        # axes.DrawYGridlinesOn()
+        # axes.DrawZGridlinesOn()
+        axes.SetGridLineLocation(axes.VTK_GRID_LINES_FURTHEST)
+        axes.XAxisMinorTickVisibilityOff()
+        axes.YAxisMinorTickVisibilityOff()
+        axes.ZAxisMinorTickVisibilityOff()
+        # axes.SetFlyModeToOuterEdges()
+        axes.SetFlyMode(axes.VTK_FLY_FURTHEST_TRIAD)
+        return axes
 
     @staticmethod
     def create_sphere_actor(
@@ -806,7 +886,7 @@ class Visualizer:
         tube_filter = vtkTubeFilter()
         tube_filter.SetNumberOfSides(16)
         tube_filter.SetInputData(poly_data)
-        tube_filter.SetRadius(radius * 0.01)
+        tube_filter.SetRadius(radius)
 
         mapper = vtkPolyDataMapper()
         mapper.SetInputConnection(tube_filter.GetOutputPort())
@@ -815,21 +895,26 @@ class Visualizer:
         mapper.SetLookupTable(ctf)
         mapper.Update()
 
+        colors = vtkNamedColors()
+        color = colors.GetColor3d("hotpink")
+
         actor = vtkActor()
         actor.SetMapper(mapper)
-        # actor.GetProperty().SetDiffuse(0.7)
-        # actor.GetProperty().SetSpecular(0.4)
-        # actor.GetProperty().SetSpecularPower(1)
-        actor.GetProperty().SetDiffuse(0)
-        actor.GetProperty().SetSpecular(0)
-        actor.GetProperty().SetAmbient(1)
-        # actor.GetProperty().SetSpecularPower(0)
-        actor.GetProperty().BackfaceCullingOn()
+
+        actor.GetProperty().SetOpacity(1.0)  # 0.1
+        actor.GetProperty().SetSpecular(0.1)
+        actor.GetProperty().SetSpecularPower(80)
+        actor.GetProperty().SetDiffuse(0.9)
+        actor.GetProperty().SetAmbient(0.1)
+        actor.GetProperty().SetDiffuseColor(color)
+
         return actor, poly_data, tube_filter
 
     @staticmethod
-    def create_trj_points_actor(trj: Trajectory, periodic: bool = True) -> None:
-        tp = trj.points_without_periodic if periodic else trj.points
+    def create_trj_points_actor(
+        trj: Trajectory, periodic: bool = True, radius: int = 1
+    ) -> None:
+        tp = trj.points_without_periodic if not periodic else trj.points
 
         pcount = tp.shape[0]
 
@@ -843,21 +928,21 @@ class Visualizer:
 
         for i in range(pcount):
             points.SetPoint(i, tp[i, 0], tp[i, 1], tp[i, 2])
-            if trj.traps is not None:
-                pdata.SetValue(i, float(trj.traps[i]) / trj.traps.max())
-            else:
-                pdata.SetValue(i, 1.0)
+            pdata.SetValue(i, 1.0)
         polydata = vtkPolyData()
         polydata.SetPoints(points)
         polydata.GetPointData().AddArray(pdata)
 
         # const double pore_scale = vis_set->poreScaleRadius();
         sphere_source = vtkSphereSource()
-        sphere_source.SetRadius(trj.atom_size * 0.1)
+        sphere_source.SetRadius(radius)
         glyph = vtkGlyph3D()
         # pore_glyph.SetScaleFactor(pore_scale)
         glyph.SetSourceConnection(sphere_source.GetOutputPort())
         glyph.SetInputData(polydata)
+
+        colors = vtkNamedColors()
+        color = colors.GetColor3d("gray")
 
         ctf = vtkColorTransferFunction()
         if trj.traps is not None:
@@ -870,7 +955,7 @@ class Visualizer:
                     random.uniform(0, 1),
                 )
         else:
-            ctf.AddRGBPoint(0, 0, 0, 1.0)
+            ctf.AddRGBPoint(0, *color)
 
         mapper = vtkPolyDataMapper()
         mapper.SetInputConnection(glyph.GetOutputPort())

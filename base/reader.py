@@ -45,12 +45,22 @@ class Reader:
         with open(filename) as f:
             if count == -1:
                 count = int(next(f))
-            splited_lines = [line.split("    ") for line in f]
-            n1 = [int(line[1]) for line in splited_lines]
-            n2 = [int(line[2]) for line in splited_lines]
-            rad = [float(line[3]) for line in splited_lines]
-            shape_factor = [float(line[4]) for line in splited_lines]
-            length = [float(line[5]) for line in splited_lines]
+            splited_lines = f.readlines()
+
+            def extract_num(line: str, ind: int):
+                splited_line = line.split(' ')
+                splited_line = [
+                    x for x in splited_line if len(x) > 0 and x != ''
+                ]
+                return splited_line[ind]
+
+            n1 = [int(extract_num(line, 1)) for line in splited_lines]
+            n2 = [int(extract_num(line, 2)) for line in splited_lines]
+            rad = [float(extract_num(line, 3)) for line in splited_lines]
+            shape_factor = [
+                float(extract_num(line, 4)) for line in splited_lines
+            ]
+            length = [float(extract_num(line, 5)) for line in splited_lines]
             res = np.zeros(shape=(len(n1), 2), dtype=np.int32)
             res[:, 0] = n1
             res[:, 1] = n2
@@ -168,8 +178,8 @@ class Reader:
         radiuses *= scale
 
         linked_list, t_throat_lengths = Reader.read_pnm_linklist(path_to_link_1)
-        mask0 = linked_list[:, 0] < 0
-        mask1 = linked_list[:, 1] < 0
+        mask0 = linked_list[:, 0] <= 0
+        mask1 = linked_list[:, 1] <= 0
         nn1 = linked_list[mask0, 1] - 1
         nn0 = linked_list[mask1, 0] - 1
 
