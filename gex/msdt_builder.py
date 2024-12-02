@@ -138,7 +138,7 @@ def runAll(traj_path: str, element: str, temp: str, step: int = 1) -> None:
 
 def runTimeAvarage(
     traj_path: str,
-    msd_path,
+    msd_path: str,
     prefix: str,
     step: int = 1,
     force_save: bool = False,
@@ -167,20 +167,46 @@ def runTimeAvarage(
 
 
 if __name__ == '__main__':
-    prefix = "/media/andrey/Samsung_T5/PHD/Kerogen/"
-    for temp in ["300K", "400K"]:
-        for el, step in [("ch4", 1), ("h2", 2)]:
-            traj_path = prefix + f"{temp}/{el}/trj.gro"
+    input_data = [
+        (
+            "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/",
+            "type1-300K-CH4", 1
+        ),
+        (
+            "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/h2/",
+            "type1-300K-H2", 2
+        ),
+        (
+            "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/400K/ch4/",
+            "type1-400K-CH4", 1
+        ),
+        (
+            "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/400K/h2/",
+            "type1-400K-H2", 2
+        ),
+        (
+            "/media/andrey/Samsung_T5/PHD/Kerogen/type2matrix/300K/ch4/",
+            "type2-300K-CH4", 1
+        ),
+        (
+            "/media/andrey/Samsung_T5/PHD/Kerogen/type2matrix/300K/h2/",
+            "type2-300K-H2", 2
+        ),
+    ]
+    
+    for path, prefix, step in input_data:
+        print("Run " + prefix)
+        traj_path = path + "trj.gro"
             # runClear(
             # traj_path, prefix + f"{temp}/{el}/msd.csv", f"{el}-{temp}", step
             # )
-            runTimeAvarage(
-                traj_path,
-                prefix + f"{temp}/{el}/msd_time_avarage.csv",
-                f"{el}-{temp}",
-                step,
-                False,
-            )
+        runTimeAvarage(
+            traj_path,
+            path + "msd_time_avarage.csv",
+            prefix,
+            step,
+            False,
+        )
 
     # runSmooth(traj_path, el)
 
@@ -189,8 +215,8 @@ if __name__ == '__main__':
     # traj_path = prefix + f"{temp}/{el}/trj.gro"
     # runAll(traj_path, temp, el, step)
 
-    # plt.xscale('log')
-    # plt.yscale('log')
+    plt.xscale('log')
+    plt.yscale('log')
     plt.xlabel("Time (ps)")
     plt.ylabel("MSD (A^2)")
     plt.legend()

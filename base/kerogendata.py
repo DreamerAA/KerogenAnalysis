@@ -29,5 +29,5 @@ class KerogenData:
     def positionsAsDict(self) -> Dict[int, Tuple[float, float, float]]:
         return {i: a.tuple_pos() for i, a in enumerate(self.atoms)}
 
-    def checkPeriodization(self) ->bool:
+    def checkPeriodization(self) -> bool:
         return np.all([self.box.is_inside(a.pos) for a in self.atoms])

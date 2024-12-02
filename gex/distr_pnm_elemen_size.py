@@ -52,7 +52,7 @@ def drawDistr(axs, radiuses, throat_lengths, label):
     )
 
 
-def build_distributions(paths: List[Tuple[str, str]], pnm_step=10) -> None:
+def build_distributions(paths: List[Tuple[str, str]], pnm_step=10, avarage=False) -> None:
     fig, axs = plt.subplots(1, 2)
     for path_to_pnms, hist_prefix in paths:
         onlyfiles = [
@@ -62,11 +62,29 @@ def build_distributions(paths: List[Tuple[str, str]], pnm_step=10) -> None:
         steps = [int((file.split("=")[1]).split("_")[0]) for file in onlyfiles]
         sorted_lfiles = list(zip(steps, onlyfiles))
         sorted_lfiles = sorted(sorted_lfiles, key=lambda x: x[0])
-        for step, file in sorted_lfiles[::pnm_step]:
-            radiuses, throat_lengths = Reader.read_pnm_data(
-                join(path_to_pnms, file[:-10]), scale=1e10, border=0.015
-            )
-            drawDistr(axs, radiuses, throat_lengths, hist_prefix + str(step))
+        if avarage:
+            ar_radiuses = None
+            ar_throat_lengths = None
+            for step, file in sorted_lfiles[::pnm_step]:
+                radiuses, throat_lengths = Reader.read_pnm_data(
+                    join(path_to_pnms, file[:-10]), scale=1e10, border=0.015
+                )
+                if ar_radiuses is None:
+                    ar_radiuses = radiuses
+                else:
+                    ar_radiuses = np.concatenate((ar_radiuses, radiuses))
+                if ar_throat_lengths is None:
+                    ar_throat_lengths = throat_lengths
+                else:
+                    ar_throat_lengths = np.concatenate((ar_throat_lengths, throat_lengths))
+            drawDistr(axs, ar_radiuses, ar_throat_lengths, hist_prefix)
+        else:
+            for step, file in sorted_lfiles[::pnm_step]:
+                radiuses, throat_lengths = Reader.read_pnm_data(
+                    join(path_to_pnms, file[:-10]), scale=1e10, border=0.015
+                )
+                drawDistr(axs, radiuses, throat_lengths, hist_prefix + str(step))
+        
     plt.legend()
     plt.show()
 
@@ -75,12 +93,28 @@ if __name__ == '__main__':
     build_distributions(
         [
             (
-                "/media/andrey/Samsung_T5/PHD/Kerogen/ch4/pnm/",
-                "CH4, num=",
+                "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/pnm/",
+                "type1-300K-CH4",
             ),
             (
-                "/media/andrey/Samsung_T5/PHD/Kerogen/h2/pnm/",
-                "H2, num=",
+                "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/h2/pnm/",
+                "type1-300K-H2",
             ),
-        ]
+            (
+                "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/400K/ch4/pnm/",
+                "type1-400K-CH4",
+            ),
+            (
+                "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/400K/h2/pnm/",
+                "type1-400K-H2",
+            ),
+            (
+                "/media/andrey/Samsung_T5/PHD/Kerogen/type2matrix/300K/ch4/pnm/",
+                "type2-300K-CH4",
+            ),
+            (
+                "/media/andrey/Samsung_T5/PHD/Kerogen/type2matrix/300K/h2/pnm/",
+                "type2-300K-H2",
+            ),
+        ], pnm_step=1, avarage=True
     )

@@ -87,7 +87,7 @@ def build_distributions(paths: List[Tuple[str, str]]) -> None:
         columns=['Count throats', 'Prefix'],
     )
     plt.figure()
-    sns.histplot(data=dct, x="Count throats", hue="Prefix")
+    sns.histplot(data=dct, x="Count throats", hue="Prefix").set(title="Count throat distribution in the porenetwork")
     # plt.legend()
     plt.show()
 
@@ -96,12 +96,28 @@ if __name__ == '__main__':
     build_distributions(
         [
             (
-                "/media/andrey/Samsung_T5/PHD/Kerogen/ch4/pnm/",
-                "CH4",
+                "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/pnm/",
+                "type1-300K-CH4",
             ),
             (
-                "/media/andrey/Samsung_T5/PHD/Kerogen/h2/pnm/",
-                "H2",
+                "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/h2/pnm/",
+                "type1-300K-H2",
+            ),
+            (
+                "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/400K/ch4/pnm/",
+                "type1-400K-CH4",
+            ),
+            (
+                "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/400K/h2/pnm/",
+                "type1-400K-H2",
+            ),
+            (
+                "/media/andrey/Samsung_T5/PHD/Kerogen/type2matrix/300K/ch4/pnm/",
+                "type2-300K-CH4",
+            ),
+            (
+                "/media/andrey/Samsung_T5/PHD/Kerogen/type2matrix/300K/h2/pnm/",
+                "type2-300K-H2",
             ),
         ]
     )

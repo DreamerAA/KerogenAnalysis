@@ -15,7 +15,7 @@ sys.path.append(parent_dir)
 from base.boundingbox import BoundingBox
 from base.kerogendata import AtomData, KerogenData
 from base.periodizer import Periodizer
-from base.reader import Reader
+from base.reader import Reader, StepsInfo
 from base.trajectory import Trajectory
 from base.utils import create_box_mask
 from processes.segmentaion import Segmentator
@@ -76,11 +76,11 @@ def read_structures_by_num(
     path_to_structure: str, indexes: List[int]
 ) -> List[Tuple[List[AtomData], Tuple[float, float, float]]]:
     structures = []
-
+    info = StepsInfo()
     with open(path_to_structure) as f:
         is_end = False
         while not is_end:
-            num = Reader.read_head_struct(f)
+            num = Reader.read_head_struct(f, info)
             if num == -1:
                 is_end = True
                 continue
@@ -230,23 +230,30 @@ def extanded_struct_extr(
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        '--def_path',
+        type=str,
+        default="/media/andrey/Samsung_T5/PHD/Kerogen/type2matrix/300K/h2/",
+    )
+
     parser.add_argument(
         '--structure_path',
         type=str,
-        # default="../data/ch4/type1.ch4.1.gro",
-        default="../data/h2/type1.h2.1.gro",
+        default="./type2.h2.300.gro",
     )
     parser.add_argument(
         '--save_path',
         type=str,
-        # default="../data/Kerogen/methan_traj/meth_0.5_micros.gro"
-        default="../data/ch4/images/",
+        default="./images/",
     )
 
     args = parser.parse_args()
 
-    indexes = [25000 + 250000 * i * 65 for i in range(100)] + [1640025000]
+    indexes = [2500 + 25000 * i * 200 for i in range(50)] + [249977500]
 
     extanded_struct_extr(
-        args.structure_path, args.save_path, indexes, True, 500
+        args.def_path + args.structure_path,
+        args.def_path + args.save_path,
+        indexes, True, 250
     )

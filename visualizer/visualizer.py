@@ -901,7 +901,7 @@ class Visualizer:
         actor = vtkActor()
         actor.SetMapper(mapper)
 
-        actor.GetProperty().SetOpacity(1.0)  # 0.1
+        actor.GetProperty().SetOpacity(0.1)  # 0.1
         actor.GetProperty().SetSpecular(0.1)
         actor.GetProperty().SetSpecularPower(80)
         actor.GetProperty().SetDiffuse(0.9)

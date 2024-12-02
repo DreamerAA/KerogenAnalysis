@@ -11,20 +11,23 @@ if __name__ == '__main__':
     parser.add_argument(
         '--path_to_extractor',
         type=str,
-        default="/home/andrey/DigitalCore/PNE/pore-network-extraction/build/bin/extractor_example",
+        default="/home/andrey/DigitalCore/PNE/pore-network-extraction/build/clang-15-release-cpu/bin/extractor_example",
     )
+
+    default_path = "/media/andrey/Samsung_T5/PHD/Kerogen/type2matrix/300K/h2/"
+
     parser.add_argument(
         '--path_to_pnm_folder',
         type=str,
         # default="/media/andrey/Samsung_T5/PHD/Kerogen/400K/h2/pnm/",
-        default="/media/andrey/Samsung_T5/PHD/Kerogen/400K/ch4/pnm/",
+        default=default_path + "/pnm/",
     )
 
     parser.add_argument(
         '--path_to_img_folder',
         type=str,
         # default="/media/andrey/Samsung_T5/PHD/Kerogen/400K/h2/images/",
-        default="/media/andrey/Samsung_T5/PHD/Kerogen/400K/ch4/images/",
+        default=default_path + "/images/",
     )
 
     parser.add_argument(
@@ -36,7 +39,7 @@ if __name__ == '__main__':
         '--path_to_save_euler',
         type=str,
         # default='/media/andrey/Samsung_T5/PHD/Kerogen/400K/h2/euler.json',
-        default='/media/andrey/Samsung_T5/PHD/Kerogen/400K/ch4/euler.json',
+        default=default_path + "/euler.json",
     )
 
     args = parser.parse_args()

@@ -96,8 +96,10 @@ def run_default_analizer(path: str, win_name: str) -> None:
     # run_and_plot_trap_time_distribution(trajectories, list(zip(indexes, aparams)))
     # analize_script(4)
 
-    for i in [12, 14, 19]:  #
-        visualize_trajectory(trajectories[i])
+    
+    visualize_trajectory(trajectories[12],plot_box=True)
+    visualize_trajectory(trajectories[14])
+    visualize_trajectory(trajectories[19])
 
     # params = AnalizerParams(traj_type='fBm', nu=0.9, diag_percentile=50 , kernel_size=1, list_mu=np.array([0.5, 1. , 1.5, 2. , 2.5, 3.]), p_value=0.01)
     # params.list_mu = np.array([1.5, 2])
@@ -122,11 +124,12 @@ def run_default_analizer(path: str, win_name: str) -> None:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    def_path = "/media/andrey/Samsung_T5/PHD/Kerogen/400K/h2/"
     parser.add_argument(
         '--traj_path',
         type=str,
         # default="../data/methan_traj/meth_1.7_micros.1.gro"
-        default="../data/Kerogen/h2_micros/h2_micros.1.gro",
+        default=def_path+"trj.gro"
     )
     parser.add_argument(
         '--throat_len_path',

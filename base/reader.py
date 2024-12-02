@@ -14,6 +14,25 @@ def skip_line(file: IO, count: int = 1) -> bool:  # type: ignore
         return True
 
 
+class StepsInfo:
+    def __init__(self):
+        self.steps = []
+        self.delta = -1
+
+    def getStep(self, line: str) -> None:
+        els = (line[:-2]).split('=')
+        res = int(els[2])
+        if res < 0:
+            res = self.steps[-1] + self.delta
+
+        self.steps.append(res)
+
+        if len(self.steps) == 2:
+            self.delta = self.steps[-1] - self.steps[-2]
+        elif len(self.steps) > 2:
+            assert self.delta == (self.steps[-1] - self.steps[-2])
+
+
 class Reader:
     @staticmethod
     def read_struct_and_linked_list(
@@ -71,15 +90,15 @@ class Reader:
 
     @staticmethod
     def type_to_type_id(type: str) -> int:
-        if type[0] == 'c':
+        if type[0].lower() == 'c':
             return 0
-        elif type[0] == 'o':
+        elif type[0].lower() == 'o':
             return 1
-        elif type[0] == 'n':
+        elif type[0].lower() == 'n':
             return 2
-        elif type[0] == 'h':
+        elif type[0].lower() == 'h':
             return 3
-        elif type[0] == 's':
+        elif type[0].lower() == 's':
             return 4
         return -1
 
@@ -91,12 +110,14 @@ class Reader:
         return atoms, size
 
     @staticmethod
-    def read_head_struct(f) -> int:
+    def read_head_struct(f, info: StepsInfo) -> int:
         try:
-            simul_num = int(str(next(f)).split("=")[-1])
+            simul_num = str(next(f))
+            info.getStep(simul_num)
         except StopIteration:
-            simul_num = -1
-        return simul_num
+            return -1
+        return info.steps[-1]
+        
 
     @staticmethod
     def read_raw_struct_ff(
@@ -125,7 +146,10 @@ class Reader:
                 atom_id: str = str(line[8:15])
                 atom_id = atom_id.replace(" ", "")
                 type_id = Reader.type_to_type_id(atom_id)
-
+                if type_id == -1:
+                    print(f"Error in line {i}: {line}, error: {e}")
+                    raise RuntimeError()
+                
                 x = float(line[20:28])
                 y = float(line[28:36])
                 z = float(line[36:44])
@@ -138,11 +162,9 @@ class Reader:
                     np.array([x, y, z]),
                 )
 
-                if "CH4" in struct_type:
-                    # methane.append(data)
-                    pass
-                else:
+                if "KRG" in struct_type:
                     atoms.append(data)
+                    
             except Exception as e:
                 print(i, line)
                 print(f"Error in line {i}: {line}, error: {e}")

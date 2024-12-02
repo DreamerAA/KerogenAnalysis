@@ -40,5 +40,5 @@ if __name__ == '__main__':
     temp = "300K"
     el, step = "h2", 1
     traj_path = prefix + f"{temp}/{el}/trj.gro"
-    num = 1
+    num = 12
     visualize_dist_trajectory(traj_path, num)

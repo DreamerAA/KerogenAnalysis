@@ -97,13 +97,39 @@ def run(
 
 
 if __name__ == '__main__':
-    prefix = "/media/andrey/Samsung_T5/PHD/Kerogen/"
-    for el in ["ch4", "h2"]:
-        traj_path = prefix + el + "/trj.gro"
-        tl_path = prefix + el + "/throat_lengths.npy"
-        pil_path = prefix + el + "/pi_l.npy"
-        pts_trapping = prefix + el + "/traps/"
-        run(traj_path, tl_path, pil_path, pts_trapping, el)
+    path_to_data = "/media/andrey/Samsung_T5/PHD/Kerogen/"
+    input_data = [
+        (
+            path_to_data + "type1matrix/300K/ch4/",
+            "type1-300K-CH4", 1
+        ),
+        (
+            path_to_data + "type1matrix/300K/h2/",
+            "type1-300K-H2", 2
+        ),
+        (
+            path_to_data + "type1matrix/400K/ch4/",
+            "type1-400K-CH4", 1
+        ),
+        (
+            path_to_data + "type1matrix/400K/h2/",
+            "type1-400K-H2", 2
+        ),
+        (
+            path_to_data + "type2matrix/300K/ch4/",
+            "type2-300K-CH4", 1
+        ),
+        (
+            path_to_data + "type2matrix/300K/h2/",
+            "type2-300K-H2", 2
+        ),
+    ]
+    for path, prefix, step  in input_data:
+        traj_path = path + "/trj.gro"
+        tl_path = path + "/throat_lengths.npy"
+        pil_path = path + "/pi_l.npy"
+        pts_trapping = path + "/traps/"
+        run(traj_path, tl_path, pil_path, pts_trapping, prefix)
 
     plt.xscale('log')
     plt.yscale('log')

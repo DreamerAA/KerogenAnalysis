@@ -48,8 +48,10 @@ def generate_distribution(path_to_pnms: str, path_to_save: str) -> None:
 
 
 if __name__ == '__main__':
-    mpath = "/media/andrey/Samsung_T5/PHD/Kerogen/"
-    for tem in ["300K", "400K"]:
+    mpath = "/media/andrey/Samsung_T5/PHD/Kerogen/type2matrix/"
+    
+    # for tem in ["300K", "400K"]:
+    for tem in ["300K"]:
         for el in ["h2", "ch4"]:
             path_to_save = mpath + f"{tem}/{el}/"
             path_to_pnm = path_to_save + "/pnm/"
