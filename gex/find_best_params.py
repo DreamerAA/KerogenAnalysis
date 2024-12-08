@@ -1,23 +1,20 @@
 import argparse
-from pathlib import Path
 import sys
+import time
 from os.path import realpath
+from pathlib import Path
+
 import numpy as np
 from joblib import Parallel, delayed
-import time
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
 sys.path.append(parent_dir)
 
-from examples.utils import get_params
 from base.reader import Reader
-from processes.kerogen_walk_simulator import KerogenWalkSimulator
-
-from processes.trajectory_extended_analizer import (
-    TrajectoryAnalizer,
-)
 from examples.utils import create_cdf, get_params, ps_generate
+from processes.kerogen_walk_simulator import KerogenWalkSimulator
+from processes.trajectory_extended_analizer import TrajectoryAnalizer
 
 
 def run(prefix):

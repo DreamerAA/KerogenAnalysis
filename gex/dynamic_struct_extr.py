@@ -1,12 +1,12 @@
-import sys
-import os
-from pathlib import Path
-from os.path import realpath
-import time
-from typing import List, Tuple
-import numpy as np
 import argparse
+import os
+import sys
+import time
+from os.path import realpath
+from pathlib import Path
+from typing import List, Tuple
 
+import numpy as np
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
@@ -18,10 +18,9 @@ from base.periodizer import Periodizer
 from base.reader import Reader, StepsInfo
 from base.trajectory import Trajectory
 from base.utils import create_box_mask
+from examples.utils import write_binary_file
 from processes.segmentaion import Segmentator
 from visualizer.visualizer import Visualizer
-from examples.utils import write_binary_file
-
 
 additional_radius = 0.0
 
@@ -255,5 +254,7 @@ if __name__ == '__main__':
     extanded_struct_extr(
         args.def_path + args.structure_path,
         args.def_path + args.save_path,
-        indexes, True, 250
+        indexes,
+        True,
+        250,
     )

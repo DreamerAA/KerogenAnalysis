@@ -1,30 +1,31 @@
 import argparse
-from pathlib import Path
-import sys
 import os
-from os import listdir
-from os.path import isfile, join, dirname, realpath
-import numpy as np
-import matplotlib.pyplot as plt
 import pickle
+import sys
+from os import listdir
+from os.path import dirname, isfile, join, realpath
+from pathlib import Path
 from typing import List
-from joblib import Parallel, delayed
-import seaborn as sns
+
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
+import seaborn as sns
+from joblib import Parallel, delayed
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
 sys.path.append(parent_dir)
 
-from examples.utils import get_params, visualize_trajectory
-from base.trap_sequence import TrapSequence
 from base.trajectory import Trajectory
-from processes.trap_extractor import TrapExtractor
+from base.trap_sequence import TrapSequence
+from examples.utils import get_params, visualize_trajectory
 from processes.trajectory_extended_analizer import (
-    TrajectoryExtendedAnalizer,
     ExtendedParams,
+    TrajectoryAnalizer,
+    TrajectoryExtendedAnalizer,
 )
-from processes.trajectory_extended_analizer import TrajectoryAnalizer
+from processes.trap_extractor import TrapExtractor
 
 
 def smooth(x, window_len=11, window='hanning'):
@@ -170,36 +171,42 @@ if __name__ == '__main__':
     input_data = [
         (
             "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/",
-            "type1-300K-CH4", 1
+            "type1-300K-CH4",
+            1,
         ),
         (
             "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/h2/",
-            "type1-300K-H2", 2
+            "type1-300K-H2",
+            2,
         ),
         (
             "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/400K/ch4/",
-            "type1-400K-CH4", 1
+            "type1-400K-CH4",
+            1,
         ),
         (
             "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/400K/h2/",
-            "type1-400K-H2", 2
+            "type1-400K-H2",
+            2,
         ),
         (
             "/media/andrey/Samsung_T5/PHD/Kerogen/type2matrix/300K/ch4/",
-            "type2-300K-CH4", 1
+            "type2-300K-CH4",
+            1,
         ),
         (
             "/media/andrey/Samsung_T5/PHD/Kerogen/type2matrix/300K/h2/",
-            "type2-300K-H2", 2
+            "type2-300K-H2",
+            2,
         ),
     ]
-    
+
     for path, prefix, step in input_data:
         print("Run " + prefix)
         traj_path = path + "trj.gro"
-            # runClear(
-            # traj_path, prefix + f"{temp}/{el}/msd.csv", f"{el}-{temp}", step
-            # )
+        # runClear(
+        # traj_path, prefix + f"{temp}/{el}/msd.csv", f"{el}-{temp}", step
+        # )
         runTimeAvarage(
             traj_path,
             path + "msd_time_avarage.csv",

@@ -1,16 +1,16 @@
-import sys
-from pathlib import Path
 import argparse
+import os
+import sys
 import time
+from os.path import realpath
+from pathlib import Path
 from typing import List, Tuple
-from skimage import measure
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import os
-from pathlib import Path
-from os.path import realpath
+from skimage import measure
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())

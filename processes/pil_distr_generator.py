@@ -1,14 +1,15 @@
-from typing import Tuple, Any
+import sys
+from os.path import realpath
+from pathlib import Path
+from typing import Any, Tuple
+
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
-from scipy.stats import exponweib
 from joblib import Parallel, delayed
-from sklearn.metrics import pairwise_distances
 from matplotlib import cm
-import sys
-from pathlib import Path
-from os.path import realpath
+from scipy.stats import exponweib
+from sklearn.metrics import pairwise_distances
 
 
 class PiLDistrGenerator:

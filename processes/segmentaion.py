@@ -1,9 +1,9 @@
-import time
 import math
-from pathlib import Path
-from os.path import realpath
 import sys
+import time
 from dataclasses import dataclass
+from os.path import realpath
+from pathlib import Path
 from typing import Callable, List, Optional, Tuple
 
 import networkx as nx

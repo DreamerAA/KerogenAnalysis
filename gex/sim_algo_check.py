@@ -1,27 +1,27 @@
 import argparse
-from pathlib import Path
-import sys
-from os.path import realpath
-import numpy as np
-import matplotlib.pyplot as plt
-import time
 import os
+import sys
+import time
+from os.path import realpath
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
 from scipy.stats import poisson
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
 sys.path.append(parent_dir)
 
-from examples.utils import get_params
 from base.reader import Reader
-from processes.pil_distr_generator import PiLDistrGenerator
-from processes.kerogen_walk_simulator import KerogenWalkSimulator
-from processes.trajectory_extended_analizer import (
-    TrajectoryExtendedAnalizer,
-    ExtendedParams,
-)
-from processes.trajectory_extended_analizer import TrajectoryAnalizer
 from examples.utils import create_cdf, get_params, ps_generate
+from processes.kerogen_walk_simulator import KerogenWalkSimulator
+from processes.pil_distr_generator import PiLDistrGenerator
+from processes.trajectory_extended_analizer import (
+    ExtendedParams,
+    TrajectoryAnalizer,
+    TrajectoryExtendedAnalizer,
+)
 
 
 def run(prefix, count_trj=10, count_steps=3000):

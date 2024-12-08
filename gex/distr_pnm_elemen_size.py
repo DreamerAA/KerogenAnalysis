@@ -1,15 +1,16 @@
-import sys
 import argparse
 import json
-import time
-from pathlib import Path
-from typing import Tuple, Any, List
-from os import listdir
-from os.path import isfile, join, dirname, realpath
 import subprocess
-from scipy.stats import weibull_min, exponweib
-import numpy as np
+import sys
+import time
+from os import listdir
+from os.path import dirname, isfile, join, realpath
+from pathlib import Path
+from typing import Any, List, Tuple
+
 import matplotlib.pyplot as plt
+import numpy as np
+from scipy.stats import exponweib, weibull_min
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
@@ -52,7 +53,9 @@ def drawDistr(axs, radiuses, throat_lengths, label):
     )
 
 
-def build_distributions(paths: List[Tuple[str, str]], pnm_step=10, avarage=False) -> None:
+def build_distributions(
+    paths: List[Tuple[str, str]], pnm_step=10, avarage=False
+) -> None:
     fig, axs = plt.subplots(1, 2)
     for path_to_pnms, hist_prefix in paths:
         onlyfiles = [
@@ -76,15 +79,19 @@ def build_distributions(paths: List[Tuple[str, str]], pnm_step=10, avarage=False
                 if ar_throat_lengths is None:
                     ar_throat_lengths = throat_lengths
                 else:
-                    ar_throat_lengths = np.concatenate((ar_throat_lengths, throat_lengths))
+                    ar_throat_lengths = np.concatenate(
+                        (ar_throat_lengths, throat_lengths)
+                    )
             drawDistr(axs, ar_radiuses, ar_throat_lengths, hist_prefix)
         else:
             for step, file in sorted_lfiles[::pnm_step]:
                 radiuses, throat_lengths = Reader.read_pnm_data(
                     join(path_to_pnms, file[:-10]), scale=1e10, border=0.015
                 )
-                drawDistr(axs, radiuses, throat_lengths, hist_prefix + str(step))
-        
+                drawDistr(
+                    axs, radiuses, throat_lengths, hist_prefix + str(step)
+                )
+
     plt.legend()
     plt.show()
 
@@ -116,5 +123,7 @@ if __name__ == '__main__':
                 "/media/andrey/Samsung_T5/PHD/Kerogen/type2matrix/300K/h2/pnm/",
                 "type2-300K-H2",
             ),
-        ], pnm_step=1, avarage=True
+        ],
+        pnm_step=1,
+        avarage=True,
     )

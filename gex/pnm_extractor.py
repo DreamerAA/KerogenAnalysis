@@ -1,10 +1,9 @@
-import subprocess
-from os import listdir
-from os.path import isfile, join, dirname, realpath
 import argparse
 import json
+import subprocess
+from os import listdir
+from os.path import dirname, isfile, join, realpath
 from pathlib import Path
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

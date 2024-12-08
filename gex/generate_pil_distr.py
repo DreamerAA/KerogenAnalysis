@@ -1,23 +1,23 @@
-from typing import Tuple, Any
+import sys
+from os import listdir
+from os.path import dirname, isfile, join, realpath
+from pathlib import Path
+from typing import Any, Tuple
+
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
-from scipy.stats import exponweib
 from joblib import Parallel, delayed
-from sklearn.metrics import pairwise_distances
 from matplotlib import cm
-import sys
-from pathlib import Path
-from os import listdir
-from os.path import isfile, join, dirname, realpath
-
+from scipy.stats import exponweib
+from sklearn.metrics import pairwise_distances
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
 sys.path.append(parent_dir)
 
-from processes.pil_distr_generator import PiLDistrGenerator
 from base.reader import Reader
+from processes.pil_distr_generator import PiLDistrGenerator
 
 
 def generate_distribution(path_to_pnms: str, path_to_save: str) -> None:
@@ -49,7 +49,7 @@ def generate_distribution(path_to_pnms: str, path_to_save: str) -> None:
 
 if __name__ == '__main__':
     mpath = "/media/andrey/Samsung_T5/PHD/Kerogen/type2matrix/"
-    
+
     # for tem in ["300K", "400K"]:
     for tem in ["300K"]:
         for el in ["h2", "ch4"]:

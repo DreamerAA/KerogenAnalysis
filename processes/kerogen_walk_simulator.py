@@ -1,22 +1,23 @@
 import argparse
-from pathlib import Path
-import sys
 import os
-from os import listdir
-from os.path import isfile, join, dirname, realpath
-import numpy as np
-import matplotlib.pyplot as plt
 import pickle
-from typing import List
-import numpy.typing as npt
-import networkx as nx
 import random
+import sys
+from os import listdir
+from os.path import dirname, isfile, join, realpath
+from pathlib import Path
+from typing import List, Tuple
+
+import matplotlib.pyplot as plt
+import networkx as nx
+import numpy as np
+import numpy.typing as npt
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
 sys.path.append(parent_dir)
 
-from base.boundingbox import Range, BoundingBox
+from base.boundingbox import BoundingBox, Range
 from base.trajectory import Trajectory
 
 
@@ -131,7 +132,7 @@ class KerogenWalkSimulator:
                 assert (points[0, :]).shape == pos.shape
             for i in range(3):
                 points[:, i] = points[:, i] + pos[i]
-    
+
             return points
 
         points = gen()
@@ -149,7 +150,7 @@ class KerogenWalkSimulator:
 
         graph = nx.Graph()
         graph.add_node(cur_trap_ind, pos=[0, 0, 0], size=self.psd.get())
-        
+
         def move_next(cur_pos_ind, cur_trap_ind):
             lenght = self.ptl.get()
             dir = self.dir_gen.get()
@@ -157,25 +158,33 @@ class KerogenWalkSimulator:
             pos = points[cur_pos_ind, :] + dir * lenght
             points[cur_pos_ind + 1, :] = pos
 
-            graph.add_node(graph.number_of_nodes(), pos=pos, size=self.psd.get())
-            graph.add_edge(cur_trap_ind, graph.number_of_nodes() - 1) 
+            graph.add_node(
+                graph.number_of_nodes(), pos=pos, size=self.psd.get()
+            )
+            graph.add_edge(cur_trap_ind, graph.number_of_nodes() - 1)
             traps[cur_pos_ind] = False
             return cur_pos_ind + 1, graph.number_of_nodes() - 1
-        
-        def move_to_adjacent(cur_pos_ind, cur_trap_ind):
+
+        def move_to_adjacent(
+            cur_pos_ind: int, cur_trap_ind: int
+        ) -> Tuple[int, int]:
             neighbors = list(graph.neighbors(cur_trap_ind))
             node_num = random.choice(neighbors)
             node = graph.nodes[node_num]
             trap_pos = np.array(node['pos'])
             size = node['size']
-            print(trap_pos, node['size'])
             new_pos = KerogenWalkSimulator.gen_new_pos(1, size, trap_pos)
-            assert np.sqrt(np.sum((trap_pos - new_pos)**2)) <= size
+            assert np.sqrt(np.sum((trap_pos - new_pos) ** 2)) <= size
             points[cur_pos_ind + 1, :] = new_pos
             traps[cur_pos_ind] = False
             return cur_pos_ind + 1, node_num
 
-        def steps_inside(cur_pos_ind: int, cur_trap_ind: int, ps: ProbDensFuncWrap, max_count_steps: int):
+        def steps_inside(
+            cur_pos_ind: int,
+            cur_trap_ind: int,
+            ps: ProbDensFuncWrap,
+            max_count_steps: int,
+        ):
             node = graph.nodes[cur_trap_ind]
             count_steps = int(ps.get())
             if count_steps == 0:
@@ -184,23 +193,33 @@ class KerogenWalkSimulator:
             trap_pos = np.array(node['pos'])
             size = node['size']
 
-            points[(cur_pos_ind + 1): (cur_pos_ind + count_steps + 1)] = KerogenWalkSimulator.gen_new_pos(count_steps, size, trap_pos)
+            points[
+                (cur_pos_ind + 1) : (cur_pos_ind + count_steps + 1)
+            ] = KerogenWalkSimulator.gen_new_pos(count_steps, size, trap_pos)
             traps[cur_pos_ind : (cur_pos_ind + count_steps)] = True
             return cur_pos_ind + count_steps, cur_trap_ind
 
-        cur_pos_ind, cur_trap_ind = steps_inside(cur_pos_ind, cur_trap_ind, self.ps, count_points)
+        cur_pos_ind, cur_trap_ind = steps_inside(
+            cur_pos_ind, cur_trap_ind, self.ps, count_points
+        )
         cur_pos_ind, cur_trap_ind = move_next(cur_pos_ind, cur_trap_ind)
-        cur_pos_ind, cur_trap_ind = steps_inside(cur_pos_ind, cur_trap_ind, self.ps, count_points)
+        cur_pos_ind, cur_trap_ind = steps_inside(
+            cur_pos_ind, cur_trap_ind, self.ps, count_points
+        )
 
         point_start_ind = cur_pos_ind
-        
+
         tmp_points = points
-        points = np.zeros(shape=(cur_pos_ind + count_points, 3), dtype=np.float32)
-        points[:count_points, :] = tmp_points    
+        points = np.zeros(
+            shape=(cur_pos_ind + count_points, 3), dtype=np.float32
+        )
+        points[:count_points, :] = tmp_points
 
         tmp_traps = traps
-        traps = np.zeros(shape=(cur_pos_ind + count_points - 1,), dtype=np.bool_)
-        traps[:(count_points-1)] = tmp_traps    
+        traps = np.zeros(
+            shape=(cur_pos_ind + count_points - 1,), dtype=np.bool_
+        )
+        traps[: (count_points - 1)] = tmp_traps
 
         links_start_ind = cur_pos_ind
         max_count_points = count_points + point_start_ind
@@ -210,24 +229,26 @@ class KerogenWalkSimulator:
         count_iter_inside = 0
         while cur_pos_ind + 1 < max_count_points:
             if self.el_gen.get() < self.p:
-                print("move_next")
                 count_move_next += 1
                 cur_pos_ind, cur_trap_ind = move_next(cur_pos_ind, cur_trap_ind)
             else:
-                print("move_adjacent")
                 count_move_adj += 1
-                cur_pos_ind, cur_trap_ind = move_to_adjacent(cur_pos_ind, cur_trap_ind)
+                cur_pos_ind, cur_trap_ind = move_to_adjacent(
+                    cur_pos_ind, cur_trap_ind
+                )
 
             if cur_pos_ind >= max_count_points:
                 break
 
             if self.el_gen.get() <= 1 - self.k:
-                print("steps_inside")
                 count_iter_inside += 1
-                cur_pos_ind, cur_trap_ind = steps_inside(cur_pos_ind, cur_trap_ind, self.ps, max_count_points)
-            
-            
-        assert (points[-1, 0] != 0. or points[-1, 1] != 0. or points[-1, 2] != 0.)
+                cur_pos_ind, cur_trap_ind = steps_inside(
+                    cur_pos_ind, cur_trap_ind, self.ps, max_count_points
+                )
+
+        assert (
+            points[-1, 0] != 0.0 or points[-1, 1] != 0.0 or points[-1, 2] != 0.0
+        )
         points = points[point_start_ind:, :]
         traps = traps[links_start_ind:]
         mmin = points.min(axis=0) - 1e6
@@ -236,14 +257,6 @@ class KerogenWalkSimulator:
         bbox = BoundingBox(
             *tuple(Range(k - f, l + f) for k, l, f in zip(mmin, mmax, df))
         )
-
-        print("Nodes:")
-        for num in graph.nodes:
-            node = graph.nodes[num]
-            print(f"Position: {node['pos']}, size: {node['size']}")
-        
-
-        # print(f"Last point: {points[-1, :]}")
 
         print(f"Count move next: {count_move_next}")
         print(f"Count move adjacent: {count_move_adj}")

@@ -1,19 +1,19 @@
+import asyncio
+import pickle
+from collections import defaultdict
+from dataclasses import dataclass, field
 from typing import Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
-from numba import njit, jit
-from collections import defaultdict
+from joblib import Parallel, delayed
+from numba import jit, njit
 from scipy import ndimage
 from scipy.signal import convolve2d
 from skimage import measure
-import asyncio
-from base.trajectory import Trajectory
-from dataclasses import dataclass, field
-from joblib import Parallel, delayed
-import pickle
 
+from base.trajectory import Trajectory
 
 list_vert_median = {
     (0, 'Bm'): [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -111,7 +111,10 @@ class TrajectoryAnalizer:
     def run(self, trj: Trajectory) -> npt.NDArray[np.int32]:
         count_points = trj.count_points
 
-        with open(f"./list_threshold/nuc{int(self.params.nu*100)}diag_perc={self.params.diag_percentile}.pkl", 'rb') as handle:
+        with open(
+            f"./list_threshold/nuc{int(self.params.nu*100)}diag_perc={self.params.diag_percentile}.pkl",
+            'rb',
+        ) as handle:
             mat = pickle.load(handle)
 
         method = self.params.traj_type + "_3D"

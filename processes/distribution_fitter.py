@@ -1,8 +1,9 @@
 from dataclasses import dataclass
-import numpy.typing as npt
-import numpy as np
 from enum import Enum
-from scipy.stats import weibull_min, exponweib, gamma
+
+import numpy as np
+import numpy.typing as npt
+from scipy.stats import exponweib, gamma, weibull_min
 
 
 class DistributionType(Enum):

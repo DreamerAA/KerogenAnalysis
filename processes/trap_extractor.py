@@ -1,9 +1,12 @@
-from typing import List, Tuple, Any
+from typing import Any, List, Tuple
+
 import numpy as np
 import numpy.typing as npt
+
 from base.trajectory import Trajectory
-from .trajectory_analyzer import TrajectoryAnalizer
 from base.trap_sequence import TrapSequence
+
+from .trajectory_analyzer import TrajectoryAnalizer
 
 
 class TrapExtractor:

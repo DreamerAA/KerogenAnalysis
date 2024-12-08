@@ -1,6 +1,6 @@
 import sys
+from os.path import isfile, realpath
 from pathlib import Path
-from os.path import realpath, isfile
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
@@ -28,13 +28,12 @@ def run(data_path: str, save_path: str) -> StepsInfo:
     return info
 
 
-if __name__ == '__main__':    
+if __name__ == '__main__':
     for type in [2]:
         # for temp in ["300K/", "400K/"]:
         for temp in ["300"]:
             # for a in ["h2"]:
             for a in ["h2", "ch4"]:
-                
                 main_path = f"/media/andrey/Samsung_T5/PHD/Kerogen/type{type}matrix/{temp}K/{a}/"
                 data_path = main_path + f"type{type}.{a}.{temp}.gro"
                 save_path = main_path + "/trj.gro"

@@ -1,23 +1,24 @@
-from pathlib import Path
-import sys
 import os
-from os.path import join, realpath
-import numpy as np
-import matplotlib.pyplot as plt
 import pickle
+import sys
+from os.path import join, realpath
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import numpy as np
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
 sys.path.append(parent_dir)
 
-from examples.utils import get_params
 from base.trajectory import Trajectory
-from processes.trap_extractor import TrapExtractor
+from examples.utils import get_params
 from processes.trajectory_extended_analizer import (
-    TrajectoryExtendedAnalizer,
     ExtendedParams,
+    TrajectoryAnalizer,
+    TrajectoryExtendedAnalizer,
 )
-from processes.trajectory_extended_analizer import TrajectoryAnalizer
+from processes.trap_extractor import TrapExtractor
 
 
 def pltdistr(times, prefix: str, n: int = 50):
@@ -99,32 +100,14 @@ def run(
 if __name__ == '__main__':
     path_to_data = "/media/andrey/Samsung_T5/PHD/Kerogen/"
     input_data = [
-        (
-            path_to_data + "type1matrix/300K/ch4/",
-            "type1-300K-CH4", 1
-        ),
-        (
-            path_to_data + "type1matrix/300K/h2/",
-            "type1-300K-H2", 2
-        ),
-        (
-            path_to_data + "type1matrix/400K/ch4/",
-            "type1-400K-CH4", 1
-        ),
-        (
-            path_to_data + "type1matrix/400K/h2/",
-            "type1-400K-H2", 2
-        ),
-        (
-            path_to_data + "type2matrix/300K/ch4/",
-            "type2-300K-CH4", 1
-        ),
-        (
-            path_to_data + "type2matrix/300K/h2/",
-            "type2-300K-H2", 2
-        ),
+        (path_to_data + "type1matrix/300K/ch4/", "type1-300K-CH4", 1),
+        (path_to_data + "type1matrix/300K/h2/", "type1-300K-H2", 2),
+        (path_to_data + "type1matrix/400K/ch4/", "type1-400K-CH4", 1),
+        (path_to_data + "type1matrix/400K/h2/", "type1-400K-H2", 2),
+        (path_to_data + "type2matrix/300K/ch4/", "type2-300K-CH4", 1),
+        (path_to_data + "type2matrix/300K/h2/", "type2-300K-H2", 2),
     ]
-    for path, prefix, step  in input_data:
+    for path, prefix, step in input_data:
         traj_path = path + "/trj.gro"
         tl_path = path + "/throat_lengths.npy"
         pil_path = path + "/pi_l.npy"

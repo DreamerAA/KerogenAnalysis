@@ -1,16 +1,18 @@
-from processes.trajectory_analyzer import TrajectoryAnalizer, AnalizerParams
+from dataclasses import dataclass
+from typing import Optional
+
+import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
+
 from base.trajectory import Trajectory
-from dataclasses import dataclass
 from processes.distribution_fitter import (
-    WeibullFitter,
     FittingData,
-    GammaFitter,
     GammaCurveFitter,
+    GammaFitter,
+    WeibullFitter,
 )
-import matplotlib.pyplot as plt
-from typing import Optional
+from processes.trajectory_analyzer import AnalizerParams, TrajectoryAnalizer
 
 
 @dataclass

@@ -1,25 +1,25 @@
-import sys
 import argparse
 import json
-import time
-from pathlib import Path
-from typing import Tuple, Any, List
-from os import listdir
-from os.path import isfile, join, dirname, realpath
 import subprocess
-from scipy.stats import weibull_min, exponweib
-import numpy as np
+import sys
+import time
+from os import listdir
+from os.path import dirname, isfile, join, realpath
+from pathlib import Path
+from typing import Any, List, Tuple
+
 import matplotlib.pyplot as plt
 import networkx as nx
-import seaborn as sns
+import numpy as np
 import pandas as pd
+import seaborn as sns
+from scipy.stats import exponweib, weibull_min
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
 sys.path.append(parent_dir)
 
 from base.reader import Reader
-
 
 # def drawDistr(axs, radiuses, throat_lengths, label):
 #     n = 50
@@ -47,7 +47,6 @@ from base.reader import Reader
 def build_distributions(paths: List[Tuple[str, str]]) -> None:
     result = {}
     for path_to_pnms, hist_prefix in paths:
-
         onlyfiles = [
             f for f in listdir(path_to_pnms) if isfile(join(path_to_pnms, f))
         ]
@@ -87,7 +86,9 @@ def build_distributions(paths: List[Tuple[str, str]]) -> None:
         columns=['Count throats', 'Prefix'],
     )
     plt.figure()
-    sns.histplot(data=dct, x="Count throats", hue="Prefix").set(title="Count throat distribution in the porenetwork")
+    sns.histplot(data=dct, x="Count throats", hue="Prefix").set(
+        title="Count throat distribution in the porenetwork"
+    )
     # plt.legend()
     plt.show()
 
