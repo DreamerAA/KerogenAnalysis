@@ -37,8 +37,9 @@ def visualize_dist_trajectory(traj_path: str, num: int) -> None:
 if __name__ == '__main__':
     prefix = "/media/andrey/Samsung_T5/PHD/Kerogen/"
 
+    type = "type1matrix"
     temp = "300K"
     el, step = "h2", 1
-    traj_path = prefix + f"{temp}/{el}/trj.gro"
+    traj_path = prefix + f"{type}/{temp}/{el}/trj.gro"
     num = 12
     visualize_dist_trajectory(traj_path, num)
