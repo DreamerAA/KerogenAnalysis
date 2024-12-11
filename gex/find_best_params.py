@@ -2,10 +2,13 @@ import argparse
 import sys
 import time
 from os.path import realpath
+import os
 from pathlib import Path
+import matplotlib.pyplot as plt
 
 import numpy as np
 from joblib import Parallel, delayed
+import pickle
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
@@ -17,76 +20,44 @@ from processes.kerogen_walk_simulator import KerogenWalkSimulator
 from processes.trajectory_extended_analizer import TrajectoryAnalizer
 
 
-def run(prefix):
-    radiuses, throat_lengths = Reader.read_pnm_data(
-        prefix, scale=1e10, border=0.015
-    )
+def run(path):
+    lm = []
+    pv = []
+    mus = []
+    for k in [0.0, 0.5, 1.0]:
+        for p in [0.0, 0.5, 1.0]:
+            result_name = f"{path}/{k}_{p}.pickle"
+            assert Path(result_name).is_file()
+            with open(result_name, 'rb') as f:
+                errors = pickle.load(f)
+            min_ind = np.array(
+                [e for e, _ in errors], dtype=np.float32
+            ).argmin()
+            min_error = errors[min_ind][0]
+            indexes = np.where(errors == min_error)[0]
 
-    ps_type = 'poisson'  # poisson uniform
-    ps = ps_generate(ps_type)
+            print(f"K = {k}, p = {p}")
+            for i in indexes:
+                print(i, ": ", errors[i])
 
-    ppl = create_cdf(radiuses)
-    ptl = create_cdf(throat_lengths)
+            if k == 1.0:
+                for i in indexes:
+                    params = errors[i][1]
+                    tmu = tuple(params.list_mu)
+                    if tmu in mus:
+                        index = mus.index(tmu)
+                    else:
+                        index = len(mus) 
+                        mus.append(tmu)
+                    lm.append(index)
+                    pv.append(params.p_value)
+        print(mus)
 
-    simulator = KerogenWalkSimulator(ppl, ps, ptl, 0.5, 0.5)
-    trjs = [simulator.run(2000) for i in range(6)]
-    l_real_traps = [trj.traps.copy() for trj in trjs]
 
-    llmu = [
-        [0.5, 1.0, 1.5, 2.0, 2.5, 3.0],
-        [1.5, 2.0, 2.5],
-        [0.5, 1],
-        [2.5, 3],
-        [0.5, 3.0],
-        [1.5, 2.0],
-        [0.5],
-        [1],
-        [1.5],
-        [2],
-        [2.5],
-        [3],
-    ]
-    ind = 0
-    errors = []
-    start_time = time.time()
-    for j, lmu in enumerate(llmu):
-        params = get_params(lmu=lmu, num_jobs=6)
-
-        def wrap(i, param):
-            matrix_analyzer = TrajectoryAnalizer(param)
-            me = 0
-
-            for trj, real_traps in zip(trjs, l_real_traps):
-                matrix_traps_result = matrix_analyzer.run(trj).astype(np.int32)
-                me += np.sum(np.abs(real_traps - matrix_traps_result))
-            print(
-                f"Ready {len(params) * j + (i + 1)} from {len(params) * len(llmu)} time = {time.time() - start_time}s "
-            )
-            return (me, param)
-
-        res = Parallel(n_jobs=6)(
-            delayed(wrap)(i, param) for i, param in enumerate(params)
-        )
-        errors += res
-
-        # for param in params:
-        #     matrix_analyzer = TrajectoryAnalizer(param)
-        #     me = 0
-        #     for trj, real_traps in zip(trjs, l_real_traps):
-        #         matrix_traps_result = matrix_analyzer.run(trj).astype(np.int32)
-        #         me += np.sum(np.abs(real_traps - matrix_traps_result))
-
-        #     errors.append((me, param))
-
-        ind += 1
-        print(f"Checked {ind} from {len(llmu)}")
-
-        min_ind = np.array([e for e, _ in errors], dtype=np.float32).argmin()
-        print(errors[min_ind][1])
-
-    print('final!')
-    min_ind = np.array([e for e, _ in errors], dtype=np.float32).argmin()
-    print(errors[min_ind][1])
+    plt.figure()
+    plt.hist(lm)
+    plt.title("list mu")
+    plt.show()
 
 
 if __name__ == '__main__':
@@ -94,7 +65,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--path_to_data',
         type=str,
-        default="../data/Kerogen/time_trapping_results/ch4/num=1597500000_500_500_500",
+        default="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/errors/",
     )
     args = parser.parse_args()
 

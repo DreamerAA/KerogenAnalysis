@@ -199,10 +199,11 @@ class KerogenWalkSimulator:
             traps[cur_pos_ind : (cur_pos_ind + count_steps)] = True
             return cur_pos_ind + count_steps, cur_trap_ind
 
-        cur_pos_ind, cur_trap_ind = steps_inside(
-            cur_pos_ind, cur_trap_ind, self.ps, count_points
-        )
-        cur_pos_ind, cur_trap_ind = move_next(cur_pos_ind, cur_trap_ind)
+        for _ in range(10):
+            cur_pos_ind, cur_trap_ind = steps_inside(
+                cur_pos_ind, cur_trap_ind, self.ps, count_points
+            )
+            cur_pos_ind, cur_trap_ind = move_next(cur_pos_ind, cur_trap_ind)
         cur_pos_ind, cur_trap_ind = steps_inside(
             cur_pos_ind, cur_trap_ind, self.ps, count_points
         )
@@ -258,7 +259,7 @@ class KerogenWalkSimulator:
             *tuple(Range(k - f, l + f) for k, l, f in zip(mmin, mmax, df))
         )
 
-        print(f"Count move next: {count_move_next}")
-        print(f"Count move adjacent: {count_move_adj}")
-        print(f"Count iter inside: {count_iter_inside}")
+        # print(f"Count move next: {count_move_next}")
+        # print(f"Count move adjacent: {count_move_adj}")
+        # print(f"Count iter inside: {count_iter_inside}")
         return Trajectory(points, np.arange(count_points), bbox, traps=traps)

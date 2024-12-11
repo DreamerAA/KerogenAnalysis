@@ -29,7 +29,11 @@ def run(path_to_pnm):
     simulator = KerogenWalkSimulator(ppl, ps, ptl, 1.0, 1.0)
     traj = simulator.run(1000)
     Visualizer.draw_trajectoryes(
-        [traj], radius=0.2, periodic=False, wrap_mode=WrapMode.AXES
+        [traj],
+        radius=0.2,
+        periodic=False,
+        wrap_mode=WrapMode.AXES,
+        with_points=True,
     )
     Visualizer.show()
 

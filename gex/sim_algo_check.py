@@ -4,7 +4,7 @@ import sys
 import time
 from os.path import realpath
 from pathlib import Path
-
+from copy import deepcopy
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import poisson
@@ -24,129 +24,151 @@ from processes.trajectory_extended_analizer import (
 )
 
 
-def run(prefix, count_trj=10, count_steps=3000):
+def run(
+    prefix: str,
+    path_to_save: str,
+    path_to_pil: str,
+    count_trj=10,
+    count_steps=2000,
+):
     radiuses, throat_lengths = Reader.read_pnm_data(
         prefix, scale=1e10, border=0.015
     )
 
-    pset = np.array(
-        [
-            (
-                ExtendedParams(
-                    traj_type='fBm',
-                    nu=0.1,
-                    diag_percentile=10,
-                    kernel_size=1,
-                    list_mu=[0.5, 1.0],
-                    p_value=0.9,
-                    num_jobs=3,
-                    critical_probability=0.0,
-                ),
-                'matrix optimal for p = 0.5',
-            ),
-            (
-                ExtendedParams(
-                    traj_type='fBm',
-                    nu=0.1,
-                    diag_percentile=0,
-                    kernel_size=0,
-                    list_mu=[1.5, 2.0, 2.5],
-                    p_value=0.9,
-                    num_jobs=3,
-                    critical_probability=0.0,
-                ),
-                'matrix optimal for p = 0.0',
-            ),
-        ]
-    )
+    pset = {
+        0.0: ExtendedParams(
+            traj_type='Bm',
+            nu=0.9,
+            diag_percentile=0,
+            kernel_size=1,
+            list_mu=[0.5, 1.0, 1.5, 2.0, 2.5, 3.0],
+            p_value=0.9,
+            num_jobs=3,
+            critical_probability=0.0,
+        ),
+        0.5: ExtendedParams(
+            traj_type='Bm',
+            nu=0.1,
+            diag_percentile=0,
+            kernel_size=1,
+            list_mu=[1.5],
+            p_value=0.9,
+            num_jobs=3,
+            critical_probability=0.0,
+        ),
+        1.0: ExtendedParams(
+            traj_type='fBm',
+            nu=0.1,
+            diag_percentile=0,
+            kernel_size=0,
+            list_mu=[1.],
+            p_value=0.01,
+            num_jobs=3,
+            critical_probability=0.0,
+        ),
+    }
 
-    ps_type = 'uniform'  # poisson uniform
+    ps_type = 'poisson'  # poisson uniform
     ps = ps_generate(ps_type)
 
     ind = 0
     ppl = create_cdf(radiuses)
     ptl = create_cdf(throat_lengths)
 
-    pi_l_file_name = prefix + f"_pi_l.npy"
-    if os.path.isfile(pi_l_file_name):
-        pi_l = np.load(pi_l_file_name)
+    if os.path.isfile(path_to_pil):
+        pi_l = np.load(path_to_pil)
     else:
         generator = PiLDistrGenerator()
         pi_l = generator.run(radiuses)
-        np.save(pi_l_file_name, pi_l)
 
-    for params, msuffix in pset:
-        plt.figure()
-
-        prob_analizer = TrajectoryExtendedAnalizer(params, pi_l, throat_lengths)
+    for k, params in pset.items():
+        
+        eparams = deepcopy(params)
+        eparams.critical_probability = 0.1
         matrix_analyzer = TrajectoryAnalizer(params)
+        prob_analizer = TrajectoryExtendedAnalizer(params, pi_l, throat_lengths)
+        hybrid_analizer = TrajectoryExtendedAnalizer(
+            eparams, pi_l, throat_lengths
+        )
 
         prob = np.arange(1.1, step=0.1)
         r_matrix_error = np.zeros(shape=(len(prob),))
         r_prob_error = np.zeros(shape=(len(prob),))
+        r_hybrid_error = np.zeros(shape=(len(prob),))
 
-        for style, k in zip(['solid', 'dotted', 'dashed'], [0.1, 0.5, 0.9]):
-            path_to_save = (
-                '/'.join(prefix.split('/')[:-1]) + "/errors/" + ps_type
-            )
-            matrix_er_fn = path_to_save + f"/matrix_k={k}_{msuffix}.npy"
-            prob_er_fn = path_to_save + f"/prob_k={k}_{msuffix}.npy"
-            if (
-                not Path(prob_er_fn).is_file()
-                or not Path(matrix_er_fn).is_file()
-            ):
-                for j, p in enumerate(prob):
-                    simulator = KerogenWalkSimulator(ppl, ps, ptl, k, p)
+        
+        matrix_er_fn = path_to_save + f"/matrix_k={k}.npy"
+        prob_er_fn = path_to_save + f"/prob_k={k}.npy"
+        hybrid_er_fn = path_to_save + f"/hybrid_k={k}.npy"
+        if (
+            not Path(prob_er_fn).is_file()
+            or not Path(matrix_er_fn).is_file()
+            or not Path(hybrid_er_fn).is_file()
+        ):
+            for j, p in enumerate(prob):
+                simulator = KerogenWalkSimulator(ppl, ps, ptl, k, p)
 
-                    for i in range(count_trj):
-                        start_time = time.time()
-                        traj = simulator.run(count_steps)
-                        real_traps = traj.traps.copy().astype(np.int32)
-                        matrix_traps_result = matrix_analyzer.run(traj).astype(
-                            np.int32
-                        )
-                        prob_traps_result = prob_analizer.run(traj).astype(
-                            np.int32
-                        )
+                for i in range(count_trj):
+                    start_time = time.time()
+                    traj = simulator.run(count_steps)
+                    real_traps = traj.traps.copy().astype(np.int32)
 
-                        prob_v1 = np.hstack((real_traps[0], prob_traps_result))
-                        prob_v2 = np.hstack((prob_traps_result, real_traps[-1]))
+                    matrix_traps_result = matrix_analyzer.run(traj).astype(
+                        np.int32
+                    )
+                    prob_traps_result = prob_analizer.run(traj).astype(
+                        np.int32
+                    )
+                    hybrid_traps_result = hybrid_analizer.run(
+                        traj, matrix_traps_result
+                    ).astype(np.int32)
 
-                        matrix_error = np.sum(
-                            np.abs(real_traps - matrix_traps_result)
-                        )
-                        prob_error = min(
-                            np.sum(np.abs(real_traps - prob_v1)),
-                            np.sum(np.abs(real_traps - prob_v2)),
-                        )
-                        r_prob_error[j] += prob_error
-                        r_matrix_error[j] += matrix_error
+                    matrix_error = min(
+                        np.sum(
+                            np.abs(real_traps - matrix_traps_result[:-1])
+                        ),
+                        np.sum(
+                            np.abs(real_traps - matrix_traps_result[1:])
+                        ),
+                    )
+                    prob_error = np.sum(
+                        np.abs(real_traps - prob_traps_result)
+                    )
 
-                        ind += 1
-                        print(
-                            f"Ready {ind} from {count_trj*len(prob)*3*2}, trajectory num={i+1}, prob={p}, time = {time.time() - start_time}s "
-                        )
+                    hybrid_error = np.sum(
+                        np.abs(real_traps - hybrid_traps_result)
+                    )
 
-                delim = count_trj * count_steps
-                r_prob_error /= delim
-                r_matrix_error /= delim
-                np.save(matrix_er_fn, r_matrix_error)
-                np.save(prob_er_fn, r_prob_error)
+                    r_prob_error[j] += prob_error
+                    r_matrix_error[j] += matrix_error
+                    r_hybrid_error[j] += hybrid_error
 
-            r_matrix_error = np.load(matrix_er_fn)
-            r_prob_error = np.load(prob_er_fn)
+                    ind += 1
+                    print(
+                        f"Ready {ind} from {count_trj*len(prob)*3*2}, trajectory num={i+1}, prob={p}, time = {time.time() - start_time}s "
+                    )
 
-            plt.plot(prob, r_prob_error, label=f"prob k={k}", linestyle=style)
-            plt.plot(
-                prob, r_matrix_error, label=f"matrix k={k}", linestyle=style
-            )
+            delim = float(count_trj * count_steps)
+            r_prob_error /= delim
+            r_matrix_error /= delim
+            r_hybrid_error /= delim
+            np.save(matrix_er_fn, r_matrix_error)
+            np.save(prob_er_fn, r_prob_error)
+            np.save(hybrid_er_fn, r_hybrid_error)
 
-            np.save(f"", r_prob_error)
+        r_matrix_error = np.load(matrix_er_fn)
+        r_prob_error = np.load(prob_er_fn)
+        r_hybrid_error = np.load(hybrid_er_fn)
+        
+        plt.figure()
+        plt.plot(prob, r_prob_error, label="prob")
+        plt.plot(prob, r_hybrid_error, label="hybrid")
+        plt.plot(prob, r_matrix_error, label="matrix")
 
-        plt.xlabel("Probability return to previous trap")
+        plt.xlabel("Probability move to next trap")
         plt.ylabel("Avarage error as (Count Error)/(Count Points)")
         plt.title(
-            f"Trajectory count steps {count_steps}, count trajectories {count_trj}, {msuffix}"
+            f"Errors for k = {k}, trajectory count steps {count_steps}, count trajectories {count_trj}"
         )
         plt.legend()
 
@@ -158,8 +180,18 @@ if __name__ == '__main__':
     parser.add_argument(
         '--path_to_data',
         type=str,
-        default="../data/Kerogen/time_trapping_results/ch4/num=1597500000_500_500_500",
+        default="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/pnm/num=1640025000_500_500_500",
+    )
+    parser.add_argument(
+        '--path_to_save',
+        type=str,
+        default="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/errors/",
+    )
+    parser.add_argument(
+        '--path_to_pil',
+        type=str,
+        default="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/pi_l.npy",
     )
     args = parser.parse_args()
 
-    run(args.path_to_data)
+    run(args.path_to_data, args.path_to_save, args.path_to_pil)

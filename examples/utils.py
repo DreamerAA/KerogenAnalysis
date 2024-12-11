@@ -11,13 +11,16 @@ from scipy.stats import poisson
 def ps_generate(type: str, max_count_step: int = 100) -> npt.NDArray[np.float32]: 
     steps = np.arange(0, max_count_step)
     if type == 'poisson':
+        steps = np.arange(0, max_count_step)
         prob = poisson.cdf(steps, 100, loc=-50)
-        prob[0] = 0
+        prob[:-1] = prob[:-1] - prob[0]
+        prob[1:] = prob[1:] + (1 - prob[-1])
 
         ps = np.zeros(shape=(len(steps) + 1, 2), dtype=np.float32)
         ps[1:, 0] = steps
         ps[1:, 1] = prob
     else:
+        steps = np.arange(0, max_count_step)
         prob = (steps.astype(np.float32)) * 0.01
         ps = np.zeros(shape=(len(steps) + 1, 2), dtype=np.float32)
         ps[1:, 0] = steps
