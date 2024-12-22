@@ -21,19 +21,20 @@ def run(path_to_pnm):
     )
 
     ps_type = 'uniform'  # poisson uniform
-    ps = ps_generate(ps_type)
+    ps = ps_generate(ps_type, max_count_step=50)
 
     ppl = create_cdf(radiuses)
     ptl = create_cdf(throat_lengths)
 
-    simulator = KerogenWalkSimulator(ppl, ps, ptl, 1.0, 1.0)
+    simulator = KerogenWalkSimulator(ppl, ps, ptl, 0.1, 0.8)
     traj = simulator.run(1000)
     Visualizer.draw_trajectoryes(
         [traj],
-        radius=0.2,
+        radius=0.1,
         periodic=False,
-        wrap_mode=WrapMode.AXES,
+        wrap_mode=WrapMode.EMPTY,
         with_points=True,
+        color_type='clusters'
     )
     Visualizer.show()
 

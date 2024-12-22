@@ -4,7 +4,7 @@ from typing import Optional
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
-
+import time
 from base.trajectory import Trajectory
 from processes.distribution_fitter import (
     FittingData,
@@ -46,10 +46,11 @@ class TrajectoryExtendedAnalizer:
             ):
                 analizer = TrajectoryAnalizer(self.params)
                 trap_approx = analizer.run(trj)
+                print(" --- Matrix Algorithm finished")
             else:
                 trap_approx = (-1) * np.ones(shape=(trj.count_points,))
 
-        print(" --- Matrix Algorithm finished")
+        
 
         fd_lengthes = FittingData(self.throat_lengthes, np.array([]), None)
         wfitter = WeibullFitter()
@@ -58,6 +59,8 @@ class TrajectoryExtendedAnalizer:
         fd_pi_l = FittingData(self.pi_l, np.array([]), None)
         gfitter = GammaCurveFitter()
         gfitter.run(fd_pi_l)
+
+        start_time = time.time()
 
         points = trj.points_without_periodic
         distances = self.distances(points)
@@ -93,6 +96,7 @@ class TrajectoryExtendedAnalizer:
         result[ex_t_mask] = 0
 
         print(" --- Probability Algorithm finished")
+        self.inside_time = time.time() - start_time
         return result
 
     @staticmethod

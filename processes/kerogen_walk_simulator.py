@@ -65,7 +65,7 @@ class DirGenerator:
 class ProbDensFuncWrap:
     def __init__(self, cdf, name, size=100000):
         assert cdf[-1, 1] == 1
-        self.сdf = cdf
+        self.cdf = cdf
         self.name = name
         self.cur_index = 0
         self.size = size
@@ -78,12 +78,28 @@ class ProbDensFuncWrap:
     def generate(pdf, size):
         a = np.random.uniform(0, 1, size=size)
         p = pdf[:, 1]
-        indexes = np.array([np.abs(p - v).argmin() for v in a])
-        return pdf[indexes, 0]
+        # indexes = np.array([np.abs(p - v).argmin() for v in a])
+        # return pdf[indexes, 0]
+        result = np.zeros(shape=(size,), dtype=np.float32)
+        for i, v in enumerate(a):
+            idx = np.searchsorted(p, v)
+            if idx == 0:
+                result[i] = pdf[0, 0]
+            elif idx == len(p):
+                result[i] = pdf[-1, 0]
+            else:
+                x1 = pdf[idx - 1, 0]
+                x2 = pdf[idx, 0]
+                y1 = p[idx - 1]
+                y2 = p[idx]
+                k = (y2 - y1) / (x2 - x1)
+                b = y1 - k * x1
+                result[i] = (v - b) / k
+        return result
 
     def get(self):
         if self.cur_index >= self.size:
-            self.cur_arr = ProbDensFuncWrap.generate(self.сdf, self.size)
+            self.cur_arr = ProbDensFuncWrap.generate(self.cdf, self.size)
             self.cur_index = 0
             print(
                 f"Generated {self.name}: min={self.cur_arr.min()}, max={self.cur_arr.max()}"
@@ -93,7 +109,7 @@ class ProbDensFuncWrap:
         return v
 
     def get_full(self):
-        return ProbDensFuncWrap.generate(self.сdf, self.size)
+        return ProbDensFuncWrap.generate(self.cdf, self.size)
 
 
 class KerogenWalkSimulator:
@@ -130,8 +146,11 @@ class KerogenWalkSimulator:
             points = points[indexes, :]
             if points.shape[0] > 0:
                 assert (points[0, :]).shape == pos.shape
+            
             for i in range(3):
-                points[:, i] = points[:, i] + pos[i]
+                points[:, i] = points[:, i] * (np.array(np.random.uniform(1., 3., size=points.shape[0]), dtype=np.float32) if random.random() < 0.4 else 1)
+            
+            points = points + pos
 
             return points
 
@@ -154,7 +173,7 @@ class KerogenWalkSimulator:
         def move_next(cur_pos_ind, cur_trap_ind):
             lenght = self.ptl.get()
             dir = self.dir_gen.get()
-
+            
             pos = points[cur_pos_ind, :] + dir * lenght
             points[cur_pos_ind + 1, :] = pos
 
@@ -174,7 +193,7 @@ class KerogenWalkSimulator:
             trap_pos = np.array(node['pos'])
             size = node['size']
             new_pos = KerogenWalkSimulator.gen_new_pos(1, size, trap_pos)
-            assert np.sqrt(np.sum((trap_pos - new_pos) ** 2)) <= size
+            # assert np.sqrt(np.sum((trap_pos - new_pos) ** 2)) <= size
             points[cur_pos_ind + 1, :] = new_pos
             traps[cur_pos_ind] = False
             return cur_pos_ind + 1, node_num
@@ -193,9 +212,11 @@ class KerogenWalkSimulator:
             trap_pos = np.array(node['pos'])
             size = node['size']
 
+            new_pos = KerogenWalkSimulator.gen_new_pos(count_steps, size, trap_pos)
             points[
                 (cur_pos_ind + 1) : (cur_pos_ind + count_steps + 1)
-            ] = KerogenWalkSimulator.gen_new_pos(count_steps, size, trap_pos)
+            ] = new_pos
+            # assert np.all(np.sqrt(np.sum((new_pos - trap_pos) ** 2, axis=1)) <= size)
             traps[cur_pos_ind : (cur_pos_ind + count_steps)] = True
             return cur_pos_ind + count_steps, cur_trap_ind
 
@@ -203,7 +224,14 @@ class KerogenWalkSimulator:
             cur_pos_ind, cur_trap_ind = steps_inside(
                 cur_pos_ind, cur_trap_ind, self.ps, count_points
             )
+            if cur_pos_ind + 1 == count_points:
+                cur_pos_ind = 0
+                points[0, :] = points[-1, :]
+                points[1:, :] = 0.
+                traps[:] = False
+
             cur_pos_ind, cur_trap_ind = move_next(cur_pos_ind, cur_trap_ind)
+
         cur_pos_ind, cur_trap_ind = steps_inside(
             cur_pos_ind, cur_trap_ind, self.ps, count_points
         )

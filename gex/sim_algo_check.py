@@ -8,6 +8,8 @@ from copy import deepcopy
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import poisson
+import pandas as pd
+import seaborn as sns
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
@@ -28,7 +30,7 @@ def run(
     prefix: str,
     path_to_save: str,
     path_to_pil: str,
-    count_trj=10,
+    count_trj=100,
     count_steps=2000,
 ):
     radiuses, throat_lengths = Reader.read_pnm_data(
@@ -36,7 +38,17 @@ def run(
     )
 
     pset = {
-        0.0: ExtendedParams(
+        # 0.0: ExtendedParams(
+        #     traj_type='Bm',
+        #     nu=0.9,
+        #     diag_percentile=0,
+        #     kernel_size=1,
+        #     list_mu=[0.5, 1.0, 1.5, 2.0, 2.5, 3.0],
+        #     p_value=0.9,
+        #     num_jobs=3,
+        #     critical_probability=0.0,
+        # ),
+        0.1: ExtendedParams(
             traj_type='Bm',
             nu=0.9,
             diag_percentile=0,
@@ -53,10 +65,10 @@ def run(
             kernel_size=1,
             list_mu=[1.5],
             p_value=0.9,
-            num_jobs=3,
+            num_jobs=1,
             critical_probability=0.0,
         ),
-        1.0: ExtendedParams(
+        0.9: ExtendedParams(
             traj_type='fBm',
             nu=0.1,
             diag_percentile=0,
@@ -66,9 +78,19 @@ def run(
             num_jobs=3,
             critical_probability=0.0,
         ),
+        # 1.0: ExtendedParams(
+        #     traj_type='fBm',
+        #     nu=0.1,
+        #     diag_percentile=0,
+        #     kernel_size=0,
+        #     list_mu=[1.],
+        #     p_value=0.01,
+        #     num_jobs=3,
+        #     critical_probability=0.0,
+        # ),
     }
 
-    ps_type = 'poisson'  # poisson uniform
+    ps_type = 'uniform'  # poisson uniform
     ps = ps_generate(ps_type)
 
     ind = 0
@@ -81,6 +103,8 @@ def run(
         generator = PiLDistrGenerator()
         pi_l = generator.run(radiuses)
 
+    header_trajs = [f"Trajectory_{i+1}" for i in range(count_trj)]  # Названия траектори
+
     for k, params in pset.items():
         
         eparams = deepcopy(params)
@@ -91,15 +115,16 @@ def run(
             eparams, pi_l, throat_lengths
         )
 
-        prob = np.arange(1.1, step=0.1)
-        r_matrix_error = np.zeros(shape=(len(prob),))
-        r_prob_error = np.zeros(shape=(len(prob),))
-        r_hybrid_error = np.zeros(shape=(len(prob),))
-
+        prob = np.arange(1.05, step=0.05)
         
-        matrix_er_fn = path_to_save + f"/matrix_k={k}.npy"
-        prob_er_fn = path_to_save + f"/prob_k={k}.npy"
-        hybrid_er_fn = path_to_save + f"/hybrid_k={k}.npy"
+        ar_matrix_error = np.zeros(shape=(len(prob), count_trj))
+        ar_prob_error = np.zeros(shape=(len(prob), count_trj))
+        ar_hybrid_error = np.zeros(shape=(len(prob), count_trj))
+
+        header = f"_k={k}_countSteps={count_steps}_countTrj={count_trj}.npy"
+        matrix_er_fn = path_to_save + "/matrix" + header
+        prob_er_fn = path_to_save + "/prob" + header
+        hybrid_er_fn = path_to_save + "/hybrid" + header
         if (
             not Path(prob_er_fn).is_file()
             or not Path(matrix_er_fn).is_file()
@@ -139,38 +164,60 @@ def run(
                         np.abs(real_traps - hybrid_traps_result)
                     )
 
-                    r_prob_error[j] += prob_error
-                    r_matrix_error[j] += matrix_error
-                    r_hybrid_error[j] += hybrid_error
+                    ar_prob_error[j, i] = prob_error
+                    ar_matrix_error[j, i] = matrix_error
+                    ar_hybrid_error[j, i] = hybrid_error
 
                     ind += 1
                     print(
-                        f"Ready {ind} from {count_trj*len(prob)*3*2}, trajectory num={i+1}, prob={p}, time = {time.time() - start_time}s "
+                        f"Ready {ind} from {count_trj*len(prob)*len(pset.items())}, trajectory num={i+1}, prob={p}, time = {time.time() - start_time}s "
                     )
 
-            delim = float(count_trj * count_steps)
-            r_prob_error /= delim
-            r_matrix_error /= delim
-            r_hybrid_error /= delim
-            np.save(matrix_er_fn, r_matrix_error)
-            np.save(prob_er_fn, r_prob_error)
-            np.save(hybrid_er_fn, r_hybrid_error)
+            np.save(matrix_er_fn, ar_matrix_error)
+            np.save(prob_er_fn, ar_prob_error)
+            np.save(hybrid_er_fn, ar_hybrid_error)
+        else:
+            ind += count_trj*len(prob)
 
-        r_matrix_error = np.load(matrix_er_fn)
-        r_prob_error = np.load(prob_er_fn)
-        r_hybrid_error = np.load(hybrid_er_fn)
+            
+        ar_matrix_error = np.load(matrix_er_fn)
+        ar_prob_error = np.load(prob_er_fn)
+        ar_hybrid_error = np.load(hybrid_er_fn)
+
+        ar_matrix_error /= count_steps
+        ar_prob_error /= count_steps
+        ar_hybrid_error /= count_steps
+
+        df_matrix = pd.DataFrame(ar_matrix_error, columns=header_trajs)
+        df_prob = pd.DataFrame(ar_prob_error, columns=header_trajs)
+        df_hybrid = pd.DataFrame(ar_hybrid_error, columns=header_trajs)
         
-        plt.figure()
-        plt.plot(prob, r_prob_error, label="prob")
-        plt.plot(prob, r_hybrid_error, label="hybrid")
-        plt.plot(prob, r_matrix_error, label="matrix")
+        df_matrix["Probability"] = prob
+        df_prob["Probability"] = prob
+        df_hybrid["Probability"] = prob
 
-        plt.xlabel("Probability move to next trap")
-        plt.ylabel("Avarage error as (Count Error)/(Count Points)")
+        df_matrix_long = df_matrix.melt(id_vars=["Probability"], var_name="Trajectory", value_name="Error")
+        df_prob_long = df_prob.melt(id_vars=["Probability"], var_name="Trajectory", value_name="Error")
+        df_hybrid_long = df_hybrid.melt(id_vars=["Probability"], var_name="Trajectory", value_name="Error")
+
+        # df_hybrid_long["Erorr"] = df_hybrid_long["Error"] / count_steps
+        # df_prob_long["Erorr"] = df_prob_long["Error"] / count_steps
+        # df_matrix_long["Erorr"] = df_matrix_long["Error"] / count_steps
+
+        plt.figure()
+        sns.lineplot(data=df_prob_long, x="Probability", y="Error", label="Probabilistic", legend=False)
+        sns.lineplot(data=df_hybrid_long, x="Probability", y="Error", label="Hybrid", legend=False)
+        sns.lineplot(data=df_matrix_long, x="Probability", y="Error", label="Structural", legend=False)
+
+        plt.xlabel("Probability move to next trap", fontsize=12)
+        plt.ylabel("Avarage error as (Count Error)/(Count Steps)", fontsize=12)
         plt.title(
-            f"Errors for k = {k}, trajectory count steps {count_steps}, count trajectories {count_trj}"
+            f"Errors for k = {k}, count trajectories {count_trj},\n trajectory count steps {count_steps}", fontsize=14
         )
-        plt.legend()
+        # plt.yticks([0.009, 0.013, 0.017],fontsize=24)
+        plt.yticks(fontsize=12)
+        plt.xticks(fontsize=12)
+        plt.legend(frameon=False, prop={'size': 12})
 
     plt.show()
 

@@ -689,7 +689,7 @@ class Visualizer:
             renderer.AddActor(actor)
             if with_points:
                 actor = Visualizer.create_trj_points_actor(
-                    trj, periodic, radius * 0.25
+                    trj, periodic, radius * 0.25, color_type
                 )
                 renderer.AddActor(actor)
 
@@ -901,7 +901,7 @@ class Visualizer:
         actor = vtkActor()
         actor.SetMapper(mapper)
 
-        actor.GetProperty().SetOpacity(0.1)  # 0.1
+        actor.GetProperty().SetOpacity(0.2)  # 0.1
         actor.GetProperty().SetSpecular(0.1)
         actor.GetProperty().SetSpecularPower(80)
         actor.GetProperty().SetDiffuse(0.9)
@@ -912,7 +912,7 @@ class Visualizer:
 
     @staticmethod
     def create_trj_points_actor(
-        trj: Trajectory, periodic: bool = True, radius: int = 1
+        trj: Trajectory, periodic: bool = True, radius: int = 1, color_type: str = ''
     ) -> None:
         tp = trj.points_without_periodic if not periodic else trj.points
 
@@ -926,18 +926,33 @@ class Visualizer:
         pdata.SetName("clusters")
         pdata.SetNumberOfValues(pcount)
 
+        scales = vtkDoubleArray()
+        scales.SetName("scales")
+        scales.SetNumberOfValues(pcount)
+
         for i in range(pcount):
             points.SetPoint(i, tp[i, 0], tp[i, 1], tp[i, 2])
-            pdata.SetValue(i, 1.0)
+            if color_type == 'clusters':
+                zero_trap = (i > 0 and i < pcount - 2) and not trj.traps[i] and not trj.traps[i + 1]
+                pdata.SetValue(i, 0.0 if zero_trap else 1.0)
+                scales.SetValue(i, 2.0 if zero_trap else 1.0)
+            else:
+                scales.SetValue(i, 1.0)
+                pdata.SetValue(i, 1.0)
+
         polydata = vtkPolyData()
         polydata.SetPoints(points)
         polydata.GetPointData().AddArray(pdata)
+        polydata.GetPointData().AddArray(scales)
+        polydata.GetPointData().SetActiveScalars(scales.GetName())
 
         # const double pore_scale = vis_set->poreScaleRadius();
         sphere_source = vtkSphereSource()
-        sphere_source.SetRadius(radius)
+        # sphere_source.SetRadius(radius)
         glyph = vtkGlyph3D()
-        # pore_glyph.SetScaleFactor(pore_scale)
+        glyph.SetScaleModeToScaleByScalar()
+        glyph.SetScaleFactor(2*radius)
+
         glyph.SetSourceConnection(sphere_source.GetOutputPort())
         glyph.SetInputData(polydata)
 
@@ -945,17 +960,21 @@ class Visualizer:
         color = colors.GetColor3d("gray")
 
         ctf = vtkColorTransferFunction()
-        if trj.traps is not None:
-            count_clusters = trj.traps.max() + 1
-            for i in range(count_clusters):
-                ctf.AddRGBPoint(
-                    float(i) / trj.traps.max(),
-                    random.uniform(0, 1),
-                    random.uniform(0, 1),
-                    random.uniform(0, 1),
-                )
-        else:
-            ctf.AddRGBPoint(0, *color)
+        if color_type == 'clusters':
+            assert trj.traps is not None
+            zero_trap_color = colors.GetColor3d("red")
+            ctf.AddRGBPoint(0, *zero_trap_color)
+        # if trj.traps is not None:
+        #     count_clusters = trj.traps.max() + 1
+        #     for i in range(count_clusters):
+        #         ctf.AddRGBPoint(
+        #             float(i) / trj.traps.max(),
+        #             random.uniform(0, 1),
+        #             random.uniform(0, 1),
+        #             random.uniform(0, 1),
+        #         )
+
+        ctf.AddRGBPoint(1, *color)
 
         mapper = vtkPolyDataMapper()
         mapper.SetInputConnection(glyph.GetOutputPort())
