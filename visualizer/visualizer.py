@@ -132,6 +132,82 @@ class Visualizer:
         plt.yticks(None, fontsize=18)
         return degree, hist
 
+    def draw_pnm_and_img(
+        G,
+        img,
+        node_pos_corr,
+        isovalue,
+        bbox,
+        size_node=0.25,
+        size_edge=0.02,
+        save_pos_path='',
+        scale="full_by_1",
+        **kwargs,
+    ):
+        renderer = vtkRenderer()
+
+        positions = None
+        corr = None
+        if type(dict()) == type(node_pos_corr):
+            nums = np.array(list(node_pos_corr.keys()), dtype=int)
+            positions = np.zeros(shape=(nums.shape[0], 3), dtype=float)
+            corr = np.zeros(shape=(nums.max() + 1,), dtype=int)
+            i = 0
+            for k in node_pos_corr.keys():
+                positions[i, :] = node_pos_corr[k]
+                corr[int(k)] = i
+                i = i + 1
+        else:
+            positions = node_pos_corr[0]
+            corr = node_pos_corr[1]
+
+        data_for_vis = (G, positions, corr)
+
+        focal_pos, camera_pos = Visualizer.draw_graph(
+            renderer,
+            data_for_vis,
+            size_node,
+            size_edge,
+            save_pos_path,
+            scale,
+            **kwargs,
+        )
+
+        Visualizer.add_img_actor(renderer, img, False, bbox, isovalue=isovalue)
+
+        renWin = vtkRenderWindow()
+        renWin.AddRenderer(renderer)
+
+        style = vtkInteractorStyleTrackballCamera()
+        # style = vtkInteractorStyleFlight()
+        # style = vtkInteractorStyleTrackballActor()
+        iren = vtkRenderWindowInteractor()
+        iren.SetRenderWindow(renWin)
+        iren.SetInteractorStyle(style)
+
+        # Add the actors
+
+        camera = renderer.GetActiveCamera()
+        camera.SetFocalPoint(focal_pos[0], focal_pos[1], focal_pos[2])
+        camera.SetPosition(camera_pos[0], camera_pos[1], camera_pos[2])
+        # renWin.SetSize(640, 640)
+
+        renWin.Render()
+        renWin.Render()
+        iren.Initialize()
+
+        if 'animation' in kwargs:
+            # Sign up to receive TimerEvent
+            cb = vtkTimerCallbackCamera(5000, [], [camera], iren)
+            iren.AddObserver('TimerEvent', cb.execute)
+            cb.timerId = iren.CreateRepeatingTimer(500)
+
+        renWin.Render()
+        # renWin.FullScreenOn()
+        renWin.SetSize(1900, 1080)
+        iren.Start()
+
+
     def draw_nxvtk(
         G,
         node_pos_corr,
@@ -160,7 +236,7 @@ class Visualizer:
         """
 
         # Now create the RenderWindow, Renderer and Interactor
-        ren = vtkRenderer()
+        renderer = vtkRenderer()
 
         positions = None
         corr = None
@@ -180,7 +256,7 @@ class Visualizer:
         data_for_vis = (G, positions, corr)
 
         focal_pos, camera_pos = Visualizer.draw_graph(
-            ren,
+            renderer,
             data_for_vis,
             size_node,
             size_edge,
@@ -188,9 +264,11 @@ class Visualizer:
             scale,
             **kwargs,
         )
+        
+        
 
         renWin = vtkRenderWindow()
-        renWin.AddRenderer(ren)
+        renWin.AddRenderer(renderer)
 
         style = vtkInteractorStyleTrackballCamera()
         # style = vtkInteractorStyleFlight()
@@ -201,7 +279,7 @@ class Visualizer:
 
         # Add the actors
 
-        camera = ren.GetActiveCamera()
+        camera = renderer.GetActiveCamera()
         camera.SetFocalPoint(focal_pos[0], focal_pos[1], focal_pos[2])
         camera.SetPosition(camera_pos[0], camera_pos[1], camera_pos[2])
         # renWin.SetSize(640, 640)
@@ -362,13 +440,13 @@ class Visualizer:
         glyphMapper = vtkPolyDataMapper()
         glyphMapper.SetInputConnection(glyphPoints.GetOutputPort())
         glyphMapper.SetScalarModeToUsePointFieldData()
-        glyphMapper.SelectColorArray(pore_data.GetName())
-        glyphMapper.SetLookupTable(color_transfer)
+        # glyphMapper.SelectColorArray(pore_data.GetName())
+        # glyphMapper.SetLookupTable(color_transfer)
         glyphMapper.Update()
 
         glyph = vtkActor()
         glyph.SetMapper(glyphMapper)
-        glyph.GetProperty().SetDiffuseColor(1.0, 0.0, 0.0)
+        glyph.GetProperty().SetDiffuseColor(0.96, 0.95, 0.73)
         glyph.GetProperty().SetSpecular(0.3)
         glyph.GetProperty().SetSpecularPower(30)
 
@@ -398,19 +476,24 @@ class Visualizer:
         Tubes.SetNumberOfSides(16)
         Tubes.SetInputData(edgeData)
         Tubes.SetRadius(size_edge)
+        # Tubes.SetVaryRadiusToVaryRadiusByScalar()
+        Tubes.SetRadiusFactor(1.)
         #
-        profileMapper = vtkPolyDataMapper()
-        profileMapper.SetInputConnection(Tubes.GetOutputPort())
+        throat_mapper = vtkPolyDataMapper()
+        throat_mapper.SetInputConnection(Tubes.GetOutputPort())
 
+        colors = vtkNamedColors()
+        
         #
-        profile = vtkActor()
-        profile.SetMapper(profileMapper)
-        profile.GetProperty().SetDiffuseColor(0.0, 0.0, 0.0)
-        profile.GetProperty().SetSpecular(0.3)
-        profile.GetProperty().SetSpecularPower(30)
+        throat_actor = vtkActor()
+        throat_actor.SetMapper(throat_mapper)
+        # throat_actor.GetProperty().SetColor(colorsGetColor3d("Blue"))
+        throat_actor.GetProperty().SetDiffuseColor(0.61, 0.76, 0.74)
+        throat_actor.GetProperty().SetSpecular(0.3)
+        throat_actor.GetProperty().SetSpecularPower(30)
 
         ren.AddActor(glyph)
-        ren.AddActor(profile)
+        ren.AddActor(throat_actor)
         ren.SetBackground(colors.GetColor3d("White"))
 
         mid = positions.mean(axis=0)
@@ -476,12 +559,12 @@ class Visualizer:
     @staticmethod
     def create_volume_img(image_data) -> vtk.vtkVolume:
         composite_opacity = vtk.vtkPiecewiseFunction()
-        composite_opacity.AddPoint(0, 0.3)
-        composite_opacity.AddPoint(1, 0.99)
+        composite_opacity.AddPoint(0, 0.1)
+        composite_opacity.AddPoint(1, 0.6)
 
         color_transfer_function = vtk.vtkColorTransferFunction()
         color_transfer_function.AddRGBPoint(0, 0.26851, 0.009605, 0.335427)
-        color_transfer_function.AddRGBPoint(1, 0.993248, 0.906157, 0.143936)
+        color_transfer_function.AddRGBPoint(1, 205./255., 164./255., 52./255.)
 
         volume_property = vtk.vtkVolumeProperty()
         volume_property.SetColor(color_transfer_function)
@@ -514,8 +597,8 @@ class Visualizer:
         lut.SetTableRange(0, 1)
         lut.SetScaleToLinear()
         lut.Build()
-        # lut.SetTableValue(0, 0,0,0,0)
-        lut.SetTableValue(1, 0, 0, 1, 1)
+        lut.SetTableValue(0, 0.93, 0.42, 0.35, 1)
+        lut.SetTableValue(1, 1, 0, 1, 1)
 
         mapper = vtk.vtkPolyDataMapper()
         mapper.SetInputConnection(marchingcube.GetOutputPort())
@@ -545,7 +628,7 @@ class Visualizer:
             ren.AddActor(mactor)
 
         if bbox is not None:
-            pcenter = bbox.center()
+            pcenter = bbox.min()
             mactor.SetPosition(*pcenter)
 
     @staticmethod
@@ -594,21 +677,22 @@ class Visualizer:
         renWin.SetSize(1900, 1080)
         iren.Start()
 
+    @staticmethod
     def draw_float_img(
         img: npt.NDArray[np.float32],
         isovalue: float,
         bbox: BoundingBox,
         **kwargs,
     ) -> None:
-        ren = vtkRenderer()
+        renderer = vtkOpenGLRenderer()
 
-        Visualizer.add_img_actor(ren, img, False, bbox, isovalue=isovalue)
+        Visualizer.add_img_actor(renderer, img, False, bbox, isovalue=isovalue)
 
         colors = vtkNamedColors()
-        ren.SetBackground(colors.GetColor3d("White"))
+        renderer.SetBackground(colors.GetColor3d("White"))
 
         renWin = vtkRenderWindow()
-        renWin.AddRenderer(ren)
+        renWin.AddRenderer(renderer)
 
         style = vtkInteractorStyleTrackballCamera()
         iren = vtkRenderWindowInteractor()
@@ -619,14 +703,11 @@ class Visualizer:
         center = bbox.center()
         cm_pos = center + bbox.size()
 
-        camera = ren.GetActiveCamera()
+        camera = renderer.GetActiveCamera()
         # size = img.shape
         camera.SetFocalPoint(*center)
         camera.SetPosition(*cm_pos)
         # renWin.SetSize(640, 640)
-
-        renWin.Render()
-        iren.Initialize()
 
         if 'animation' in kwargs:
             # Sign up to receive TimerEvent
@@ -634,10 +715,8 @@ class Visualizer:
             iren.AddObserver('TimerEvent', cb.execute)
             cb.timerId = iren.CreateRepeatingTimer(500)
 
-        renWin.Render()
-        # renWin.FullScreenOn()
-        renWin.SetSize(1900, 1080)
-        iren.Start()
+        win_col = WinStructCollection(iren)
+        collection.append(win_col)
 
     @staticmethod
     def create_trajectory_actor(
@@ -1023,13 +1102,22 @@ class Visualizer:
         bbox: BoundingBox,
         trj: Trajectory,
         volume_mode,
+        with_points: bool = True,
+        radius: int = 0.05,
     ) -> None:
         ren = vtkRenderer()
 
         Visualizer.add_img_actor(ren, img, volume_mode, bbox)
 
-        actor = Visualizer.create_trajectory_actor(trj, False)
+        actor = Visualizer.create_trajectory_actor(
+            trj, False, 'dist', radius
+        )
         ren.AddActor(actor)
+        if with_points:
+            actor = Visualizer.create_trj_points_actor(
+                trj, False, radius * 0.25, 'dist'
+            )
+            ren.AddActor(actor)
 
         colors = vtkNamedColors()
         ren.SetBackground(colors.GetColor3d("White"))

@@ -20,7 +20,7 @@ class StepsInfo:
         self.delta = -1
 
     def getStep(self, line: str) -> None:
-        els = (line[:-2]).split('=')
+        els = (line[:-1]).split('=')
         res = int(els[2])
         if res < 0:
             res = self.steps[-1] + self.delta
@@ -34,6 +34,32 @@ class StepsInfo:
 
 
 class Reader:
+    @staticmethod
+    def read_structures_by_num(
+        path_to_structure: str, indexes: List[int]
+    ) -> List[Tuple[List[AtomData], Tuple[float, float, float]]]:
+        structures = []
+        info = StepsInfo()
+        with open(path_to_structure) as f:
+            is_end = False
+            while not is_end:
+                num = Reader.read_head_struct(f, info)
+                # print(f" -- Current num: {num}")
+                if num == -1:
+                    is_end = True
+                    continue
+
+                if num not in indexes:
+                    is_end = Reader.skip_struct_main_part(f)
+                    if is_end:
+                        break
+                else:
+                    atoms, size = Reader.read_raw_struct_ff_main(f)
+                    structures.append((num, np.array(atoms), size))
+                    print(" -- Reading struct is ended!")
+
+        return structures
+
     @staticmethod
     def read_struct_and_linked_list(
         path_to_structure: str, path_to_linked_list: str
@@ -59,7 +85,7 @@ class Reader:
         return np.array(radiuses, dtype=np.float32)
 
     @staticmethod
-    def read_pnm_linklist(filename: str) -> npt.NDArray[np.int32]:
+    def read_pnm_linklist(filename: str) -> Tuple[npt.NDArray[np.int32], npt.NDArray[np.int32]]:
         count = -1
         with open(filename) as f:
             if count == -1:
@@ -89,6 +115,12 @@ class Reader:
         return res, res_l
 
     @staticmethod
+    def read_link_radiuses(filename: str) -> npt.NDArray[np.float32]:
+        with open(filename) as f:
+            radiuses = [float(line.split("    ")[2]) for line in f]
+        return np.array(radiuses, dtype=np.float32)
+
+    @staticmethod
     def type_to_type_id(type: str) -> int:
         if type[0].lower() == 'c':
             return 0
@@ -105,12 +137,12 @@ class Reader:
     @staticmethod
     def read_raw_struct(path_to_structure: str) -> Tuple[Any]:
         with open(path_to_structure) as f:
-            atoms, size = Reader.read_raw_struct_ff(f)
+            atoms, size, _ = Reader.read_raw_struct_ff(f)
         atoms = np.array(atoms)
         return atoms, size
 
     @staticmethod
-    def read_head_struct(f, info: StepsInfo) -> int:
+    def read_head_struct(f, info: StepsInfo = StepsInfo()) -> int:
         try:
             simul_num = str(next(f))
             info.getStep(simul_num)
@@ -122,7 +154,7 @@ class Reader:
     @staticmethod
     def read_raw_struct_ff(
         f: TextIOWrapper,
-    ) -> Tuple[List[AtomData], Tuple[float, float, float]]:
+    ) -> Tuple[List[AtomData], Tuple[float, float, float], int]:
         simul_num = Reader.read_head_struct(f)
         if simul_num == -1:
             return None, None, simul_num
@@ -192,7 +224,7 @@ class Reader:
     @staticmethod
     def read_pnm_data(
         path_to_pnm: str, scale: float, border: float
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         path_to_node_2 = path_to_pnm + "_node2.dat"
         path_to_link_1 = path_to_pnm + "_link1.dat"
 
@@ -218,6 +250,45 @@ class Reader:
         throat_lengths *= scale
         throat_lengths.sort()
         return radiuses, throat_lengths
+
+    @staticmethod
+    def read_pore_positions(path: str) -> np.ndarray:
+        with open(path, "rt") as f:
+            line = f.readline()
+            count_pores = int(line.split("    ")[0])
+            positions = np.zeros((count_pores, 3), dtype=np.float32)
+            for i in range(count_pores):
+                line = f.readline()
+                splits = line.split("    ")
+                x = float(splits[1])
+                y = float(splits[2])
+                z = float(splits[3])
+                positions[i, :] = [x, y, z]
+        return positions
+
+
+    @staticmethod
+    def read_pnm_ext_data(
+        path_to_pnm: str
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        path_to_node_1 = path_to_pnm + "_node1.dat"
+        path_to_node_2 = path_to_pnm + "_node2.dat"
+        path_to_link_1 = path_to_pnm + "_link1.dat"
+
+        radiuses = Reader.read_psd(path_to_node_2)
+
+        linked_list, t_throat_lengths = Reader.read_pnm_linklist(path_to_link_1)
+        mask0 = linked_list[:, 0] <= 0
+        mask1 = linked_list[:, 1] <= 0
+
+
+        throat_mask = np.logical_not(np.logical_or(mask0, mask1))
+        t_throat_lengths = t_throat_lengths[throat_mask, :]
+        linked_list = linked_list[throat_mask]
+        linked_list[:, 0] -= 1
+        linked_list[:, 1] -= 1
+
+        return radiuses, t_throat_lengths, linked_list, Reader.read_pore_positions(path_to_node_1)
 
     @staticmethod
     def read_np_img(path: str) -> npt.NDArray[np.int32]:

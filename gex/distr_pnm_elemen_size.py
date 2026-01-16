@@ -7,7 +7,7 @@ from os import listdir
 from os.path import dirname, isfile, join, realpath
 from pathlib import Path
 from typing import Any, List, Tuple
-
+from scipy.signal import savgol_filter
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import exponweib, weibull_min
@@ -30,7 +30,7 @@ def extract_weibull_psd(
     return psd_params, tld_params, radiuses, throat_lengths
 
 
-def drawDistr(axs, radiuses, throat_lengths, label):
+def drawDistr(axs, radiuses, throat_lengths, label, smooth: bool=True):
     n = 50
 
     def plot_hist(data, maxes, title, xlabel):
@@ -38,9 +38,15 @@ def drawDistr(axs, radiuses, throat_lengths, label):
         xdel = bb[1] - bb[0]
         x = bb[:-1] + xdel * 0.5
         pn = p / np.sum(p * xdel)
+        if smooth:
+            pn = savgol_filter(pn, 25, 3)
+            pn[pn < 0] = 0
         maxes.plot(x, pn, label=label)
-        maxes.set_title(title)
-        maxes.set_xlabel(xlabel)
+        maxes.set_title(title, fontsize=12)
+        maxes.set_xlabel(xlabel, fontsize=12)
+        maxes.tick_params(axis='x', labelsize=12)
+        maxes.tick_params(axis='y', labelsize=12)
+        
 
     plot_hist(
         radiuses, axs[0], "PDF(Pore size distribution)", "Pore diameter (A)"
@@ -54,14 +60,14 @@ def drawDistr(axs, radiuses, throat_lengths, label):
 
 
 def build_distributions(
-    paths: List[Tuple[str, str]], pnm_step=10, avarage=False
+    paths: List[Tuple[str, str]], pnm_step=10, avarage: bool=False, smooth: bool=True
 ) -> None:
     fig, axs = plt.subplots(1, 2)
     for path_to_pnms, hist_prefix in paths:
         onlyfiles = [
             f for f in listdir(path_to_pnms) if isfile(join(path_to_pnms, f))
         ]
-        onlyfiles = [file for file in onlyfiles if "_link1" in file]
+        onlyfiles = [file for file in onlyfiles if "_link1" in file and file.startswith("num")]
         steps = [int((file.split("=")[1]).split("_")[0]) for file in onlyfiles]
         sorted_lfiles = list(zip(steps, onlyfiles))
         sorted_lfiles = sorted(sorted_lfiles, key=lambda x: x[0])
@@ -82,17 +88,20 @@ def build_distributions(
                     ar_throat_lengths = np.concatenate(
                         (ar_throat_lengths, throat_lengths)
                     )
-            drawDistr(axs, ar_radiuses, ar_throat_lengths, hist_prefix)
+            drawDistr(axs, ar_radiuses, ar_throat_lengths, hist_prefix, smooth)
         else:
             for step, file in sorted_lfiles[::pnm_step]:
                 radiuses, throat_lengths = Reader.read_pnm_data(
                     join(path_to_pnms, file[:-10]), scale=1e10, border=0.015
                 )
+                time = int(50 + (step - 25000.)*500./250000.)
+                print(f"Step: {step} Time: {time}")
                 drawDistr(
-                    axs, radiuses, throat_lengths, hist_prefix + str(step)
+                    axs, radiuses, throat_lengths, hist_prefix + ", $t = " + str(time) + "$ psec" , smooth
                 )
-
-    plt.legend()
+    plt.yticks(fontsize=12)
+    plt.xticks(fontsize=12)
+    plt.legend(frameon=False, prop={'size': 12})
     plt.show()
 
 
@@ -101,29 +110,39 @@ if __name__ == '__main__':
         [
             (
                 "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/pnm/",
-                "type1-300K-CH4",
+                "$CH_4$",
             ),
             (
                 "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/h2/pnm/",
-                "type1-300K-H2",
+                "$H_2$",
             ),
-            (
-                "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/400K/ch4/pnm/",
-                "type1-400K-CH4",
-            ),
-            (
-                "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/400K/h2/pnm/",
-                "type1-400K-H2",
-            ),
-            (
-                "/media/andrey/Samsung_T5/PHD/Kerogen/type2matrix/300K/ch4/pnm/",
-                "type2-300K-CH4",
-            ),
-            (
-                "/media/andrey/Samsung_T5/PHD/Kerogen/type2matrix/300K/h2/pnm/",
-                "type2-300K-H2",
-            ),
+
+            # (
+            #     "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/pnm/",
+            #     "type1-300K-CH4",
+            # ),
+            # (
+            #     "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/h2/pnm/",
+            #     "type1-300K-H2",
+            # ),
+            # (
+            #     "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/400K/ch4/pnm/",
+            #     "type1-400K-CH4",
+            # ),
+            # (
+            #     "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/400K/h2/pnm/",
+            #     "type1-400K-H2",
+            # ),
+            # (
+            #     "/media/andrey/Samsung_T5/PHD/Kerogen/type2matrix/300K/ch4/pnm/",
+            #     "type2-300K-CH4",
+            # ),
+            # (
+            #     "/media/andrey/Samsung_T5/PHD/Kerogen/type2matrix/300K/h2/pnm/",
+            #     "type2-300K-H2",
+            # ),
         ],
-        pnm_step=1,
-        avarage=True,
+        pnm_step=40,
+        avarage=False,
+        smooth=True
     )

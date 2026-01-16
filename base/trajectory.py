@@ -72,31 +72,6 @@ class Trajectory:
         return npoints
 
     @cached_property
-    def points_without_periodic_old(self) -> npt.NDArray[np.float64]:
-        borders = self.box.max()
-        s_2 = borders.min() / 2
-        diff = self.points[1:] - self.points[:-1]
-        npoints = np.zeros(shape=self.points.shape, dtype=np.float32)
-
-        npoints[0, :] = self.points[0, :]
-
-        shift = np.zeros(shape=(3,), dtype=np.float32)
-        for i in range(diff.shape[0]):
-            cdiff = diff[i]
-            s_mask = np.abs(cdiff) < s_2
-            ns_mask = ~s_mask
-            # был справа появился слева
-            neg_mask = np.logical_and(cdiff < 0, ns_mask)
-            pos_mask = np.logical_and(cdiff >= 0, ns_mask)  # наоборот
-            shift[s_mask] = cdiff[s_mask]
-            shift[neg_mask] = cdiff[neg_mask] + borders[neg_mask]
-            shift[pos_mask] = cdiff[pos_mask] - borders[pos_mask]
-
-            npoints[i + 1, :] = npoints[i, :] + shift
-
-        return npoints
-
-    @cached_property
     def count_points(self) -> int:
         return self.points.shape[0]
 

@@ -2,7 +2,7 @@ from typing import Optional
 import numpy as np
 from typing import List
 from processes.trajectory_analyzer import AnalizerParams
-from visualizer.visualizer import Visualizer
+from visualizer.visualizer import Visualizer, WrapMode
 from base.trajectory import Trajectory
 import numpy.typing as npt
 from scipy.stats import poisson
@@ -48,7 +48,7 @@ def visualize_trajectory(
     traj: Trajectory, color_type='dist', win_name: str = ""
 ) -> None:
     Visualizer.draw_trajectoryes(
-        [traj], color_type=color_type, plot_box=False, window_name=win_name
+        [traj], color_type=color_type, wrap_mode=WrapMode.EMPTY, window_name=win_name, with_points=True, radius=0.1
     )
 
 

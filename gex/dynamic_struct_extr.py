@@ -71,29 +71,7 @@ def read_structures(
     return structures
 
 
-def read_structures_by_num(
-    path_to_structure: str, indexes: List[int]
-) -> List[Tuple[List[AtomData], Tuple[float, float, float]]]:
-    structures = []
-    info = StepsInfo()
-    with open(path_to_structure) as f:
-        is_end = False
-        while not is_end:
-            num = Reader.read_head_struct(f, info)
-            if num == -1:
-                is_end = True
-                continue
 
-            if num not in indexes:
-                is_end = Reader.skip_struct_main_part(f)
-                if is_end:
-                    break
-            else:
-                atoms, size = Reader.read_raw_struct_ff_main(f)
-                structures.append((num, np.array(atoms), size))
-                print(" -- Reading struct is ended!")
-
-    return structures
 
 
 def dynamic_struct_extr(path_to_structure: str) -> None:
@@ -163,7 +141,7 @@ def extanded_struct_extr(
     ref_size: int,
 ) -> None:
     start_time = time.time()
-    structures = read_structures_by_num(path_to_structure, indexes)
+    structures = Reader.read_structures_by_num(path_to_structure, indexes)
 
     print(f" -- Count structures: {len(structures)}")
     print(f" -- Count structures after filter: {len(structures)}")

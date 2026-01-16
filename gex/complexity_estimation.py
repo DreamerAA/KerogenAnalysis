@@ -94,49 +94,60 @@ if __name__ == '__main__':
     trj = simulator.run(1000)
 
     steps = [
-        (get_matrix, 'r', "Structural", 0),
-        (get_prob, 'g', "Probabilistic", 1),
-        (get_hybrid, 'b', "Hybrid", 2)
+        (get_matrix, 'r', "Structural", 0, 2),
+        (get_prob, 'g', "Probabilistic", 1, 1),
+        (get_hybrid, 'b', "Hybrid", 2, 2)
     ]
 
-    times = np.zeros(shape=(len(trj_lens), 3), dtype=np.float32)
-    for j, trj_len in enumerate(trj_lens):
-        for getter_analyzer, _, _, k in steps:
-            for i in range(count):
-                trajectory = simulator.run(trj_len)
-                start_time = time.time()
-                analyzer = getter_analyzer()
-                analyzer.run(trajectory)
-                if k == 1:
-                    times[j, k] += analyzer.inside_time
-                else:
-                    times[j, k] += time.time() - start_time
-                print(f"Current ex time {times[j, k]/(i+1)}")
+    times_path = "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/400K/h2/times.npy"
+    if os.path.isfile(times_path):
+        times = np.load(times_path)
+    else:
+        times = np.zeros(shape=(len(trj_lens), 3), dtype=np.float32)
+        for j, trj_len in enumerate(trj_lens):
+            for getter_analyzer, _, _, k, _ in steps:
+                for i in range(count):
+                    trajectory = simulator.run(trj_len)
+                    start_time = time.time()
+                    analyzer = getter_analyzer()
+                    analyzer.run(trajectory)
+                    if k == 1:
+                        times[j, k] += analyzer.inside_time
+                    else:
+                        times[j, k] += time.time() - start_time
+                    print(f"Current ex time {times[j, k]/(i+1)}")
 
-        print("End estimation for trj_len = ", trj_len)
+            print("End estimation for trj_len = ", trj_len)
+
+        np.save(times_path, times)
 
     times /= float(count)
     
     times = times[1:,:]
     trj_lens = trj_lens[1:]
 
-    def add_plot(atime, color, name):
-        fitfunc = lambda p, x: p[0] * x**2 + p[1] * x + p[2]
+    def add_plot(atime, color, name, fit_degree: int = 2):
         errfunc = lambda p, x, y: fitfunc(p, x) - y
-        p0 = np.array([1.0, 1.0, 0.0], dtype=np.float32)
+        if fit_degree == 2:
+            fitfunc = lambda p, x: p[0] * x**2 + p[1] * x + p[2]
+            p0 = np.array([1.0, 1.0, 0.0], dtype=np.float32)
+        else:
+            fitfunc = lambda p, x: p[0] * x + p[1]
+            p0 = np.array([1.0, 0.0], dtype=np.float32)
+
         p2, success = optimize.leastsq(errfunc, p0[:], args=(trj_lens, atime))
         print(f"p = {p2}")
         plt.scatter(
             trj_lens, atime, s=20, marker='o', c=color, label=name
         )
-        plt.plot(trj_lens, fitfunc(p2, trj_lens), color=color, label="fit " + name)
+        plt.plot(trj_lens, fitfunc(p2, trj_lens), color=color, label=name + " fit by " + ("ax^2 + bx + c" if fit_degree == 2 else "ax + b"))
 
-    for _, color, name, ind in steps:
-        add_plot(times[:, ind], color, name)
+    for _, color, name, ind, fd in steps:
+        add_plot(times[:, ind], color, name, fd)
         
     plt.xlabel('Trajectory length', fontsize=12)
-    plt.ylabel('Execution Time', fontsize=12)
+    plt.ylabel('Execution Time, sec', fontsize=12)
     plt.yticks(fontsize=12)
     plt.xticks(fontsize=12)
-    plt.legend(frameon=False)
+    plt.legend(frameon=False, fontsize=12)
     plt.show()

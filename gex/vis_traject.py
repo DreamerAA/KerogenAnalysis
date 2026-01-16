@@ -21,20 +21,24 @@ from base.trajectory import Trajectory
 from visualizer.visualizer import Visualizer, WrapMode
 
 
-def visualize_dist_trajectory(traj_path: str, num: int, traps_path: str) -> None:
+def visualize_dist_trajectory(traj_path: str, num: int, traps_path: str = "") -> None:
     trajectories = Trajectory.read_trajectoryes(traj_path)
 
-    with open(traps_path, 'rb') as f:
-        trajectories[num].traps = pickle.load(f)
+    use_clusters = len(traps_path) != 0
 
+    if use_clusters:
+        with open(traps_path, 'rb') as f:
+            trajectories[num].traps = pickle.load(f)
+
+    
     print(trajectories[num].points.shape)
     Visualizer.draw_trajectoryes(
         [trajectories[num]],
         wrap_mode=WrapMode.EMPTY,
         periodic=False,
-        radius=0.1,
+        radius=0.15,
         with_points=True,
-        color_type='clusters'
+        color_type='clusters' if use_clusters else 'dist',
     )
     Visualizer.show()
 
@@ -47,7 +51,8 @@ if __name__ == '__main__':
     el = "h2"
     traps_type = "Structural" # "Probabilistic" "Structural"
     
-    num = 12
+    num = 1
     traj_path = prefix + f"{type}/{temp}/{el}/trj.gro"
     traps_path = prefix + f"{type}/{temp}/{el}/traps/{traps_type}/traps_{num}.pickle"
-    visualize_dist_trajectory(traj_path, num, traps_path)
+    visualize_dist_trajectory(traj_path, num)
+    # visualize_dist_trajectory(traj_path, num, traps_path)

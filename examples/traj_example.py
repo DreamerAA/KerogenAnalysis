@@ -53,7 +53,10 @@ def analizy_visualize(trj, params, win_name: str):
     trj.traps = analizer.run(trj)
     clusters = measure.label(trj.traps, connectivity=1).astype(np.float32)
     print(f" --- Count clusters: {clusters.max()}")
+    del trj.__dict__['points_without_periodic']
     visualize_trajectory(trj, 'clusters', win_name)
+
+    # visualize_trajectory(trj, 'dist', win_name)
 
 
 def run_and_plot_trap_time_distribution(
@@ -97,14 +100,21 @@ def run_default_analizer(path: str, win_name: str) -> None:
     # analize_script(4)
 
     
-    visualize_trajectory(trajectories[12],plot_box=True)
-    visualize_trajectory(trajectories[14])
-    visualize_trajectory(trajectories[19])
+    # visualize_trajectory(trajectories[12],plot_box=True)
+    # visualize_trajectory(trajectories[14])
+    # visualize_trajectory(trajectories[19])
 
-    # params = AnalizerParams(traj_type='fBm', nu=0.9, diag_percentile=50 , kernel_size=1, list_mu=np.array([0.5, 1. , 1.5, 2. , 2.5, 3.]), p_value=0.01)
-    # params.list_mu = np.array([1.5, 2])
+    params = AnalizerParams(
+        traj_type='Bm', 
+        nu=0.9, 
+        diag_percentile=0, 
+        kernel_size=1, 
+        list_mu=np.array([0.5, 1. , 1.5, 2. , 2.5, 3.]), 
+        p_value=0.9,
+        num_jobs=3
+    )    
     trj = trajectories[0]
-    # analizy_visualize(trj, params, win_name)
+    analizy_visualize(trj, params, win_name)
 
     # visualize_trajectories(trajectories)
     # animate_trajectoryes(trajectories)
@@ -124,7 +134,7 @@ def run_default_analizer(path: str, win_name: str) -> None:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    def_path = "/media/andrey/Samsung_T5/PHD/Kerogen/400K/h2/"
+    def_path = "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/400K/ch4/"
     parser.add_argument(
         '--traj_path',
         type=str,
