@@ -85,7 +85,9 @@ class Reader:
         return np.array(radiuses, dtype=np.float32)
 
     @staticmethod
-    def read_pnm_linklist(filename: str) -> Tuple[npt.NDArray[np.int32], npt.NDArray[np.int32]]:
+    def read_pnm_linklist(
+        filename: str,
+    ) -> Tuple[npt.NDArray[np.int32], npt.NDArray[np.int32]]:
         count = -1
         with open(filename) as f:
             if count == -1:
@@ -149,7 +151,6 @@ class Reader:
         except StopIteration:
             return -1
         return info.steps[-1]
-        
 
     @staticmethod
     def read_raw_struct_ff(
@@ -181,7 +182,7 @@ class Reader:
                 if type_id == -1:
                     print(f"Error in line {i}: {line}, error: {e}")
                     raise RuntimeError()
-                
+
                 x = float(line[20:28])
                 y = float(line[28:36])
                 z = float(line[36:44])
@@ -196,7 +197,7 @@ class Reader:
 
                 if "KRG" in struct_type:
                     atoms.append(data)
-                    
+
             except Exception as e:
                 print(i, line)
                 print(f"Error in line {i}: {line}, error: {e}")
@@ -224,7 +225,7 @@ class Reader:
     @staticmethod
     def read_pnm_data(
         path_to_pnm: str, scale: float, border: float
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ) -> Tuple[np.ndarray, np.ndarray]:
         path_to_node_2 = path_to_pnm + "_node2.dat"
         path_to_link_1 = path_to_pnm + "_link1.dat"
 
@@ -266,10 +267,9 @@ class Reader:
                 positions[i, :] = [x, y, z]
         return positions
 
-
     @staticmethod
     def read_pnm_ext_data(
-        path_to_pnm: str
+        path_to_pnm: str,
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         path_to_node_1 = path_to_pnm + "_node1.dat"
         path_to_node_2 = path_to_pnm + "_node2.dat"
@@ -281,14 +281,18 @@ class Reader:
         mask0 = linked_list[:, 0] <= 0
         mask1 = linked_list[:, 1] <= 0
 
-
         throat_mask = np.logical_not(np.logical_or(mask0, mask1))
         t_throat_lengths = t_throat_lengths[throat_mask, :]
         linked_list = linked_list[throat_mask]
         linked_list[:, 0] -= 1
         linked_list[:, 1] -= 1
 
-        return radiuses, t_throat_lengths, linked_list, Reader.read_pore_positions(path_to_node_1)
+        return (
+            radiuses,
+            t_throat_lengths,
+            linked_list,
+            Reader.read_pore_positions(path_to_node_1),
+        )
 
     @staticmethod
     def read_np_img(path: str) -> npt.NDArray[np.int32]:

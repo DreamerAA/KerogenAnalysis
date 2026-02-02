@@ -55,7 +55,7 @@ def run(
             kernel_size=1,
             list_mu=[0.5, 1.0, 1.5, 2.0, 2.5, 3.0],
             p_value=0.9,
-            num_jobs=3,
+            num_jobs=1,
             critical_probability=0.0,
         ),
         0.5: ExtendedParams(
@@ -73,9 +73,9 @@ def run(
             nu=0.1,
             diag_percentile=0,
             kernel_size=0,
-            list_mu=[1.],
+            list_mu=[1.0],
             p_value=0.01,
-            num_jobs=3,
+            num_jobs=1,
             critical_probability=0.0,
         ),
         # 1.0: ExtendedParams(
@@ -103,10 +103,12 @@ def run(
         generator = PiLDistrGenerator()
         pi_l = generator.run(radiuses)
 
-    header_trajs = [f"Trajectory_{i+1}" for i in range(count_trj)]  # Названия траектори
+    header_trajs = [
+        f"Trajectory_{i+1}" for i in range(count_trj)
+    ]  # Названия траектори
 
     for k, params in pset.items():
-        
+
         eparams = deepcopy(params)
         eparams.critical_probability = 0.1
         matrix_analyzer = TrajectoryAnalizer(params)
@@ -116,7 +118,7 @@ def run(
         )
 
         prob = np.arange(1.05, step=0.05)
-        
+
         ar_matrix_error = np.zeros(shape=(len(prob), count_trj))
         ar_prob_error = np.zeros(shape=(len(prob), count_trj))
         ar_hybrid_error = np.zeros(shape=(len(prob), count_trj))
@@ -126,9 +128,10 @@ def run(
         prob_er_fn = path_to_save + "/prob" + header
         hybrid_er_fn = path_to_save + "/hybrid" + header
         if (
-            not Path(prob_er_fn).is_file()
-            or not Path(matrix_er_fn).is_file()
-            or not Path(hybrid_er_fn).is_file()
+            True
+            # not Path(prob_er_fn).is_file()
+            # or not Path(matrix_er_fn).is_file()
+            # or not Path(hybrid_er_fn).is_file()
         ):
             for j, p in enumerate(prob):
                 simulator = KerogenWalkSimulator(ppl, ps, ptl, k, p)
@@ -141,24 +144,16 @@ def run(
                     matrix_traps_result = matrix_analyzer.run(traj).astype(
                         np.int32
                     )
-                    prob_traps_result = prob_analizer.run(traj).astype(
-                        np.int32
-                    )
+                    prob_traps_result = prob_analizer.run(traj).astype(np.int32)
                     hybrid_traps_result = hybrid_analizer.run(
                         traj, matrix_traps_result
                     ).astype(np.int32)
 
                     matrix_error = min(
-                        np.sum(
-                            np.abs(real_traps - matrix_traps_result[:-1])
-                        ),
-                        np.sum(
-                            np.abs(real_traps - matrix_traps_result[1:])
-                        ),
+                        np.sum(np.abs(real_traps - matrix_traps_result[:-1])),
+                        np.sum(np.abs(real_traps - matrix_traps_result[1:])),
                     )
-                    prob_error = np.sum(
-                        np.abs(real_traps - prob_traps_result)
-                    )
+                    prob_error = np.sum(np.abs(real_traps - prob_traps_result))
 
                     hybrid_error = np.sum(
                         np.abs(real_traps - hybrid_traps_result)
@@ -177,9 +172,8 @@ def run(
             np.save(prob_er_fn, ar_prob_error)
             np.save(hybrid_er_fn, ar_hybrid_error)
         else:
-            ind += count_trj*len(prob)
+            ind += count_trj * len(prob)
 
-            
         ar_matrix_error = np.load(matrix_er_fn)
         ar_prob_error = np.load(prob_er_fn)
         ar_hybrid_error = np.load(hybrid_er_fn)
@@ -191,28 +185,53 @@ def run(
         df_matrix = pd.DataFrame(ar_matrix_error, columns=header_trajs)
         df_prob = pd.DataFrame(ar_prob_error, columns=header_trajs)
         df_hybrid = pd.DataFrame(ar_hybrid_error, columns=header_trajs)
-        
+
         df_matrix["Probability"] = prob
         df_prob["Probability"] = prob
         df_hybrid["Probability"] = prob
 
-        df_matrix_long = df_matrix.melt(id_vars=["Probability"], var_name="Trajectory", value_name="Error")
-        df_prob_long = df_prob.melt(id_vars=["Probability"], var_name="Trajectory", value_name="Error")
-        df_hybrid_long = df_hybrid.melt(id_vars=["Probability"], var_name="Trajectory", value_name="Error")
+        df_matrix_long = df_matrix.melt(
+            id_vars=["Probability"], var_name="Trajectory", value_name="Error"
+        )
+        df_prob_long = df_prob.melt(
+            id_vars=["Probability"], var_name="Trajectory", value_name="Error"
+        )
+        df_hybrid_long = df_hybrid.melt(
+            id_vars=["Probability"], var_name="Trajectory", value_name="Error"
+        )
 
         # df_hybrid_long["Erorr"] = df_hybrid_long["Error"] / count_steps
         # df_prob_long["Erorr"] = df_prob_long["Error"] / count_steps
         # df_matrix_long["Erorr"] = df_matrix_long["Error"] / count_steps
 
         plt.figure()
-        sns.lineplot(data=df_prob_long, x="Probability", y="Error", label="Probabilistic", legend=False)
-        sns.lineplot(data=df_hybrid_long, x="Probability", y="Error", label="Hybrid", legend=False)
-        sns.lineplot(data=df_matrix_long, x="Probability", y="Error", label="Structural", legend=False)
+        sns.lineplot(
+            data=df_prob_long,
+            x="Probability",
+            y="Error",
+            label="Probabilistic",
+            legend=False,
+        )
+        sns.lineplot(
+            data=df_hybrid_long,
+            x="Probability",
+            y="Error",
+            label="Hybrid",
+            legend=False,
+        )
+        sns.lineplot(
+            data=df_matrix_long,
+            x="Probability",
+            y="Error",
+            label="Structural",
+            legend=False,
+        )
 
         plt.xlabel("Probability move to next trap", fontsize=12)
         plt.ylabel("Avarage error as (Count Error)/(Count Steps)", fontsize=12)
         plt.title(
-            f"Errors for k = {k}, count trajectories {count_trj},\n trajectory count steps {count_steps}", fontsize=14
+            f"Errors for k = {k}, count trajectories {count_trj},\n trajectory count steps {count_steps}",
+            fontsize=14,
         )
         # plt.yticks([0.009, 0.013, 0.017],fontsize=24)
         plt.yticks(fontsize=12)

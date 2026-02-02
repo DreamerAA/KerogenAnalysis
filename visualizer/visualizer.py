@@ -41,6 +41,19 @@ from base.boundingbox import BoundingBox
 from base.trajectory import Trajectory
 
 
+def visualize_trajectory(
+    traj: Trajectory, color_type='dist', win_name: str = ""
+) -> None:
+    Visualizer.draw_trajectoryes(
+        [traj],
+        color_type=color_type,
+        wrap_mode=WrapMode.EMPTY,
+        window_name=win_name,
+        with_points=True,
+        radius=0.1,
+    )
+
+
 class WrapMode(Enum):
     EMPTY = 0
     BOX = 1
@@ -207,7 +220,6 @@ class Visualizer:
         renWin.SetSize(1900, 1080)
         iren.Start()
 
-
     def draw_nxvtk(
         G,
         node_pos_corr,
@@ -264,8 +276,6 @@ class Visualizer:
             scale,
             **kwargs,
         )
-        
-        
 
         renWin = vtkRenderWindow()
         renWin.AddRenderer(renderer)
@@ -477,13 +487,13 @@ class Visualizer:
         Tubes.SetInputData(edgeData)
         Tubes.SetRadius(size_edge)
         # Tubes.SetVaryRadiusToVaryRadiusByScalar()
-        Tubes.SetRadiusFactor(1.)
+        Tubes.SetRadiusFactor(1.0)
         #
         throat_mapper = vtkPolyDataMapper()
         throat_mapper.SetInputConnection(Tubes.GetOutputPort())
 
         colors = vtkNamedColors()
-        
+
         #
         throat_actor = vtkActor()
         throat_actor.SetMapper(throat_mapper)
@@ -564,7 +574,9 @@ class Visualizer:
 
         color_transfer_function = vtk.vtkColorTransferFunction()
         color_transfer_function.AddRGBPoint(0, 0.26851, 0.009605, 0.335427)
-        color_transfer_function.AddRGBPoint(1, 205./255., 164./255., 52./255.)
+        color_transfer_function.AddRGBPoint(
+            1, 205.0 / 255.0, 164.0 / 255.0, 52.0 / 255.0
+        )
 
         volume_property = vtk.vtkVolumeProperty()
         volume_property.SetColor(color_transfer_function)
@@ -991,7 +1003,10 @@ class Visualizer:
 
     @staticmethod
     def create_trj_points_actor(
-        trj: Trajectory, periodic: bool = True, radius: int = 1, color_type: str = ''
+        trj: Trajectory,
+        periodic: bool = True,
+        radius: int = 1,
+        color_type: str = '',
     ) -> None:
         tp = trj.points_without_periodic if not periodic else trj.points
 
@@ -1012,7 +1027,11 @@ class Visualizer:
         for i in range(pcount):
             points.SetPoint(i, tp[i, 0], tp[i, 1], tp[i, 2])
             if color_type == 'clusters':
-                zero_trap = (i > 0 and i < pcount - 2) and not trj.traps[i] and not trj.traps[i + 1]
+                zero_trap = (
+                    (i > 0 and i < pcount - 2)
+                    and not trj.traps[i]
+                    and not trj.traps[i + 1]
+                )
                 pdata.SetValue(i, 0.0 if zero_trap else 1.0)
                 scales.SetValue(i, 2.0 if zero_trap else 1.0)
             else:
@@ -1030,7 +1049,7 @@ class Visualizer:
         # sphere_source.SetRadius(radius)
         glyph = vtkGlyph3D()
         glyph.SetScaleModeToScaleByScalar()
-        glyph.SetScaleFactor(2*radius)
+        glyph.SetScaleFactor(2 * radius)
 
         glyph.SetSourceConnection(sphere_source.GetOutputPort())
         glyph.SetInputData(polydata)
@@ -1109,9 +1128,7 @@ class Visualizer:
 
         Visualizer.add_img_actor(ren, img, volume_mode, bbox)
 
-        actor = Visualizer.create_trajectory_actor(
-            trj, False, 'dist', radius
-        )
+        actor = Visualizer.create_trajectory_actor(trj, False, 'dist', radius)
         ren.AddActor(actor)
         if with_points:
             actor = Visualizer.create_trj_points_actor(

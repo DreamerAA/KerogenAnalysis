@@ -2,13 +2,13 @@ from typing import Optional
 import numpy as np
 from typing import List
 from processes.trajectory_analyzer import AnalizerParams
-from visualizer.visualizer import Visualizer, WrapMode
-from base.trajectory import Trajectory
 import numpy.typing as npt
 from scipy.stats import poisson
 
 
-def ps_generate(type: str, max_count_step: int = 100) -> npt.NDArray[np.float32]: 
+def ps_generate(
+    type: str, max_count_step: int = 100
+) -> npt.NDArray[np.float32]:
     steps = np.arange(0, max_count_step)
     if type == 'poisson':
         steps = np.arange(0, max_count_step)
@@ -42,14 +42,6 @@ def write_binary_file(array: npt.NDArray[np.int8], file_name: str) -> None:
         for i in range(array.shape[2]):
             for j in range(array.shape[1]):
                 file.write(bytes(bytearray(array[:, j, i])))
-
-
-def visualize_trajectory(
-    traj: Trajectory, color_type='dist', win_name: str = ""
-) -> None:
-    Visualizer.draw_trajectoryes(
-        [traj], color_type=color_type, wrap_mode=WrapMode.EMPTY, window_name=win_name, with_points=True, radius=0.1
-    )
 
 
 def all_params():
