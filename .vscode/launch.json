@@ -11,6 +11,22 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": true
+        },
+        {
+            "name": "Trap distr builder",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "gex.trap_distr_builder",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "Sim algo check",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "gex.sim_algo_check",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}"
         }
     ]
 }

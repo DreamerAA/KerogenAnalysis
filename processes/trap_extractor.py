@@ -6,15 +6,15 @@ import numpy.typing as npt
 from base.trajectory import Trajectory
 from base.trap_sequence import TrapSequence
 
-from .trajectory_analyzer import TrajectoryAnalizer
+from .struct_trajectory_analyzer import StructTrajectoryAnalizer
 
 
 class TrapExtractor:
-    def __init__(self, analyzer: TrajectoryAnalizer):
+    def __init__(self, analyzer: StructTrajectoryAnalizer):
         self.analyzer = analyzer
 
-    def run(self, trj: Trajectory, run_func) -> TrapSequence:
-        traps_result = run_func(self.analyzer, trj)
+    def run(self, trj: Trajectory) -> TrapSequence:
+        traps_result = self.analyzer.run(trj)
         trj.traps = traps_result
         return TrapExtractor.get_trap_seq(trj)
 

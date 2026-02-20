@@ -1,23 +1,15 @@
 import argparse
 import sys
-import time
 from os.path import realpath
-import os
 from pathlib import Path
 import matplotlib.pyplot as plt
 
 import numpy as np
-from joblib import Parallel, delayed
 import pickle
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
 sys.path.append(parent_dir)
-
-from base.reader import Reader
-from examples.utils import create_cdf, get_params, ps_generate
-from processes.kerogen_walk_simulator import KerogenWalkSimulator
-from processes.trajectory_extended_analizer import TrajectoryAnalizer
 
 
 def run(path):
@@ -47,12 +39,11 @@ def run(path):
                     if tmu in mus:
                         index = mus.index(tmu)
                     else:
-                        index = len(mus) 
+                        index = len(mus)
                         mus.append(tmu)
                     lm.append(index)
                     pv.append(params.p_value)
         print(mus)
-
 
     plt.figure()
     plt.hist(lm)

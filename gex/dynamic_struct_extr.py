@@ -17,7 +17,7 @@ from base.kerogendata import AtomData, KerogenData
 from base.periodizer import Periodizer
 from base.reader import Reader, StepsInfo
 from base.trajectory import Trajectory
-from base.utils import create_box_mask
+from utils.utils import create_box_mask
 from examples.utils import write_binary_file
 from processes.segmentaion import Segmentator
 from visualizer.visualizer import Visualizer
@@ -69,9 +69,6 @@ def read_structures(
                     break
 
     return structures
-
-
-
 
 
 def dynamic_struct_extr(path_to_structure: str) -> None:

@@ -6,9 +6,6 @@ from typing import List, Tuple
 from skimage import measure
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-import seaborn as sns
-import os
 from pathlib import Path
 from os.path import realpath
 
@@ -16,14 +13,14 @@ path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
 sys.path.append(parent_dir)
 
-from processes.trajectory_extended_analizer import (
-    TrajectoryExtendedAnalizer,
-    ExtendedParams,
-)
+
 from base.trajectory import Trajectory
-from processes.trajectory_analyzer import TrajectoryAnalizer, AnalizerParams
+from processes.struct_trajectory_analyzer import (
+    StructTrajectoryAnalizer,
+    StructAnalizerParams,
+)
 from visualizer.visualizer import Visualizer
-from examples.utils import get_params, visualize_trajectory
+from examples.utils import visualize_trajectory
 
 
 def visualize_dist_trajectory(traj: Trajectory) -> None:
@@ -48,8 +45,8 @@ def animate_trajectoryes(trajs: List[Trajectory]) -> None:
     Visualizer.animate_trajectoryes(trajs)
 
 
-def analizy_visualize(trj, params, win_name: str):
-    analizer = TrajectoryAnalizer(params)
+def analizy_visualize(trj, params: StructAnalizerParams, win_name: str):
+    analizer = StructTrajectoryAnalizer(params)
     trj.traps = analizer.run(trj)
     clusters = measure.label(trj.traps, connectivity=1).astype(np.float32)
     print(f" --- Count clusters: {clusters.max()}")
@@ -60,7 +57,8 @@ def analizy_visualize(trj, params, win_name: str):
 
 
 def run_and_plot_trap_time_distribution(
-    trajectories: List[Trajectory], aparams: List[Tuple[int, AnalizerParams]]
+    trajectories: List[Trajectory],
+    aparams: List[Tuple[int, StructAnalizerParams]],
 ):
     fix, axs = plt.subplots(len(aparams))
     for i, ind_params in enumerate(aparams):
@@ -71,7 +69,7 @@ def run_and_plot_trap_time_distribution(
             if my_file.is_file():
                 trj.traps = np.load(my_file)
             else:
-                analizer = TrajectoryAnalizer(trj, ind_params[1])
+                analizer = StructTrajectoryAnalizer(trj, ind_params[1])
 
             np.save(f"./output/h2_traj/{i}/{ind_params[0]}.npy", trj.traps)
             print(f" --- Trajectory number: {j+1}, Params number: {i+1}")
@@ -93,26 +91,25 @@ def get_trap_time_distribution(trajectories: List[Trajectory]):
 
 def run_default_analizer(path: str, win_name: str) -> None:
     trajectories = Trajectory.read_trajectoryes(path)
-    aparams = get_params([154, 162, 186])
+    aparams = StructAnalizerParams.get_params([154, 162, 186])
     params = aparams[0]
 
     # run_and_plot_trap_time_distribution(trajectories, list(zip(indexes, aparams)))
     # analize_script(4)
 
-    
     # visualize_trajectory(trajectories[12],plot_box=True)
     # visualize_trajectory(trajectories[14])
     # visualize_trajectory(trajectories[19])
 
-    params = AnalizerParams(
-        traj_type='Bm', 
-        nu=0.9, 
-        diag_percentile=0, 
-        kernel_size=1, 
-        list_mu=np.array([0.5, 1. , 1.5, 2. , 2.5, 3.]), 
+    params = StructAnalizerParams(
+        traj_type='Bm',
+        nu=0.9,
+        diag_percentile=0,
+        kernel_size=1,
+        list_mu=np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0]),
         p_value=0.9,
-        num_jobs=3
-    )    
+        num_jobs=3,
+    )
     trj = trajectories[0]
     analizy_visualize(trj, params, win_name)
 
@@ -139,7 +136,7 @@ if __name__ == '__main__':
         '--traj_path',
         type=str,
         # default="../data/methan_traj/meth_1.7_micros.1.gro"
-        default=def_path+"trj.gro"
+        default=def_path + "trj.gro",
     )
     parser.add_argument(
         '--throat_len_path',

@@ -1,5 +1,5 @@
 import sys
-import os 
+import os
 from pathlib import Path
 from os import listdir
 from os.path import realpath, join, isfile
@@ -21,7 +21,7 @@ from base.kerogendata import AtomData, KerogenData
 from base.periodizer import Periodizer
 from base.reader import Reader
 from base.trajectory import Trajectory
-from base.utils import create_box_mask
+from utils.utils import create_box_mask
 from processes.segmentaion import Segmentator
 from visualizer.visualizer import Visualizer
 from examples.utils import write_binary_file
@@ -54,6 +54,7 @@ def get_size(type_id: int) -> float:
 def get_ext_size(type_id: int) -> float:
     return ext_radius[type_id]
 
+
 def extanded_struct_extr(
     path_to_structure: str,
     path_to_save: str,
@@ -61,7 +62,7 @@ def extanded_struct_extr(
     cut_cell: bool,
     ref_size: int,
 ) -> None:
-    
+
     structures = Reader.read_structures_by_num(path_to_structure, indexes)
     for num, atoms, size in structures:
         bbox = Segmentator.cut_cell(size, 4) if cut_cell else Segmentator.full_cell(size)  # type: ignore
@@ -96,11 +97,13 @@ def extanded_struct_extr(
             + f"./bin_img_num={num}_cell={prf_cell}_is={img_size}_ar={additional_radius}_resolution={str_resolution}.raw"
         )
 
-        if os.path.isfile(float_file_name) and os.path.isfile(binarized_file_name):
+        if os.path.isfile(float_file_name) and os.path.isfile(
+            binarized_file_name
+        ):
             with open(float_file_name, 'rb') as f:  # type: ignore
                 float_img = np.load(f)  # type: ignore
             with open(binarized_file_name, 'rb') as f:
-                bin_img = np.fromfile(f, dtype=np.uint8)   # type: ignore
+                bin_img = np.fromfile(f, dtype=np.uint8)  # type: ignore
         else:
             print(f" --- Image size for calculating: {img_size}")
             segmentator = Segmentator(
@@ -114,13 +117,14 @@ def extanded_struct_extr(
             bin_img = segmentator.binarize()
             np.save(float_file_name, float_img)  # type: ignore
             bin_img.astype('uint8').tofile(binarized_file_name)
-        
+
         float_img = ndimage.gaussian_filter(float_img, 4)
 
         # float_img = np.pad(float_img, [(1, 1), (1, 1), (1, 1)], 'maximum')
         # Visualizer.draw_float_img(float_img, 0.11, kerogen_data.box)
 
     # Visualizer.show()
+
 
 def run_extractor(prefix: str, bin_path: str, config_path: str):
     img_path = join(prefix, "images")
@@ -139,7 +143,11 @@ def run_extractor(prefix: str, bin_path: str, config_path: str):
         config["input_data"]["size"]["y"] = size[1]
         config["input_data"]["size"]["z"] = size[2]
 
-        config["output_data"]["statoil_prefix"] = join(prefix, "pnm", f"bin_num={num}_size=({size[0]},{size[1]},{size[2]})_resolution={str_resolution}")
+        config["output_data"]["statoil_prefix"] = join(
+            prefix,
+            "pnm",
+            f"bin_num={num}_size=({size[0]},{size[1]},{size[2]})_resolution={str_resolution}",
+        )
         with open(config_path, "w") as file:
             json.dump(config, file)
 
@@ -157,17 +165,15 @@ def run_extractor(prefix: str, bin_path: str, config_path: str):
         if errcode != 0:
             print("Error!!!")
         print(f"File {file} is calculated")
-                
+
 
 def read_and_draw_pnm(pnm_path: str, path_to_img):
     r, tl, ll, positions = Reader.read_pnm_ext_data(pnm_path)
 
     colors_data = {
-        0: (1., 0.0, 0.0, 1.0),
+        0: (1.0, 0.0, 0.0, 1.0),
     }
-    scales_data = {
-        i: rad for i, rad in enumerate(r)
-    }
+    scales_data = {i: rad for i, rad in enumerate(r)}
 
     node_pos = {idx: pos for idx, pos in enumerate(positions)}
 
@@ -180,17 +186,16 @@ def read_and_draw_pnm(pnm_path: str, path_to_img):
 
     graph = nx.Graph()
     graph.add_nodes_from(
-        [
-            (i, {"color_id": 0, "scale_id": i})
-            for i, _ in enumerate(r)
-        ]
+        [(i, {"color_id": 0, "scale_id": i}) for i, _ in enumerate(r)]
     )
-    graph.add_weighted_edges_from([(l[0], l[1], tl[i, 0]) for i, l in enumerate(ll)])
+    graph.add_weighted_edges_from(
+        [(l[0], l[1], tl[i, 0]) for i, l in enumerate(ll)]
+    )
 
     float_img = np.load(path_to_img)
     float_img = ndimage.gaussian_filter(float_img, 4)
     float_img = np.pad(float_img, [(1, 1), (1, 1), (1, 1)], 'maximum')
-    float_img[:, (float_img.shape[1]//2):, :] = 10.*float_img.max()
+    float_img[:, (float_img.shape[1] // 2) :, :] = 10.0 * float_img.max()
 
     Visualizer.draw_pnm_and_img(  # type: ignore
         graph,
@@ -205,6 +210,7 @@ def read_and_draw_pnm(pnm_path: str, path_to_img):
         scale='non',
     )
     Visualizer.show()
+
 
 if "__main__" == __name__:
     indexes = [16275000, 796275000, 1640025000]
@@ -253,6 +259,14 @@ if "__main__" == __name__:
     # run_extractor(ker_prefix, args.extractor_path, args.config_extractor_path)
 
     read_and_draw_pnm(
-        join(ker_prefix, "pnm", "bin_num=1640025000_size=(200,200,200)_resolution=0.031154750.raw"),
-        join(ker_prefix, "images", "float_img_num=1640025000_cell=partcell_is=(200, 200, 200)_ar=0.0_resolution=0.031154750.npy")
+        join(
+            ker_prefix,
+            "pnm",
+            "bin_num=1640025000_size=(200,200,200)_resolution=0.031154750.raw",
+        ),
+        join(
+            ker_prefix,
+            "images",
+            "float_img_num=1640025000_cell=partcell_is=(200, 200, 200)_ar=0.0_resolution=0.031154750.npy",
+        ),
     )

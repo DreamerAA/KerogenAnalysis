@@ -5,6 +5,12 @@ from typing import List
 from base.kerogendata import AtomData
 from base.boundingbox import BoundingBox
 
+NPBArray = npt.NDArray[np.bool_]
+NPFArray = npt.NDArray[np.float32]
+NPIArray = npt.NDArray[np.int32]
+f32 = np.float32
+i32 = np.int32
+
 
 def create_box_mask(atoms: List[AtomData], box: BoundingBox):
     removed_atoms = set()

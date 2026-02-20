@@ -1,31 +1,17 @@
-import argparse
-import os
-import pickle
 import sys
-from os import listdir
-from os.path import dirname, isfile, join, realpath
+from os.path import isfile, realpath
 from pathlib import Path
-from typing import List
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from joblib import Parallel, delayed
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
 sys.path.append(parent_dir)
 
 from base.trajectory import Trajectory
-from base.trap_sequence import TrapSequence
-from examples.utils import get_params, visualize_trajectory
-from processes.trajectory_extended_analizer import (
-    ExtendedParams,
-    TrajectoryAnalizer,
-    TrajectoryExtendedAnalizer,
-)
-from processes.trap_extractor import TrapExtractor
 
 
 def smooth(x, window_len=11, window='hanning'):

@@ -2,12 +2,12 @@ import argparse
 import os
 import sys
 import time
-from os.path import realpath
+from os.path import realpath, join
 from pathlib import Path
 from copy import deepcopy
+from typing import Dict
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.stats import poisson
 import pandas as pd
 import seaborn as sns
 
@@ -16,39 +16,43 @@ parent_dir = str(path.parent.parent.absolute())
 sys.path.append(parent_dir)
 
 from base.reader import Reader
-from examples.utils import create_cdf, get_params, ps_generate
+from examples.utils import create_cdf, ps_generate
 from processes.kerogen_walk_simulator import KerogenWalkSimulator
 from processes.pil_distr_generator import PiLDistrGenerator
-from processes.trajectory_extended_analizer import (
-    ExtendedParams,
-    TrajectoryAnalizer,
-    TrajectoryExtendedAnalizer,
+
+from processes.hybrid_trajectory_analizer import (
+    HybridAnalizerParams,
+    HybridTrajectoryAnalizer,
 )
+from processes.struct_trajectory_analyzer import (
+    StructTrajectoryAnalizer,
+    StructAnalizerParams,
+)
+from processes.probability_trajectory_analizer import (
+    ProbabilityTrajectoryAnalizer,
+    ProbabilityAnalizerParams,
+)
+
+np.random.default_rng(1111)
 
 
 def run(
-    prefix: str,
-    path_to_save: str,
-    path_to_pil: str,
-    count_trj=100,
-    count_steps=2000,
+    path_to_main: str,
+    pnm_name: str,
+    count_trj=2,
+    count_steps=1000,
 ):
+    path_to_save: str = join(path_to_main, "errors")
+    path_to_pil: str = join(path_to_main, "pi_l.npy")
+    path_to_prob_fitters = join(path_to_main, "fitters", pnm_name)
+    path_to_pnm: str = join(path_to_main, "pnm", pnm_name)
+
     radiuses, throat_lengths = Reader.read_pnm_data(
-        prefix, scale=1e10, border=0.015
+        path_to_pnm, scale=1e10, border=0.015
     )
 
-    pset = {
-        # 0.0: ExtendedParams(
-        #     traj_type='Bm',
-        #     nu=0.9,
-        #     diag_percentile=0,
-        #     kernel_size=1,
-        #     list_mu=[0.5, 1.0, 1.5, 2.0, 2.5, 3.0],
-        #     p_value=0.9,
-        #     num_jobs=3,
-        #     critical_probability=0.0,
-        # ),
-        0.1: ExtendedParams(
+    params_struct_set = {
+        0.1: StructAnalizerParams(
             traj_type='Bm',
             nu=0.9,
             diag_percentile=0,
@@ -56,9 +60,8 @@ def run(
             list_mu=[0.5, 1.0, 1.5, 2.0, 2.5, 3.0],
             p_value=0.9,
             num_jobs=1,
-            critical_probability=0.0,
         ),
-        0.5: ExtendedParams(
+        0.5: StructAnalizerParams(
             traj_type='Bm',
             nu=0.1,
             diag_percentile=0,
@@ -66,9 +69,8 @@ def run(
             list_mu=[1.5],
             p_value=0.9,
             num_jobs=1,
-            critical_probability=0.0,
         ),
-        0.9: ExtendedParams(
+        0.9: StructAnalizerParams(
             traj_type='fBm',
             nu=0.1,
             diag_percentile=0,
@@ -76,18 +78,30 @@ def run(
             list_mu=[1.0],
             p_value=0.01,
             num_jobs=1,
-            critical_probability=0.0,
         ),
-        # 1.0: ExtendedParams(
-        #     traj_type='fBm',
-        #     nu=0.1,
-        #     diag_percentile=0,
-        #     kernel_size=0,
-        #     list_mu=[1.],
-        #     p_value=0.01,
-        #     num_jobs=3,
-        #     critical_probability=0.0,
-        # ),
+    }
+
+    params_prob_set = {
+        k: ProbabilityAnalizerParams(
+            critical_probability=1e-3,
+        )
+        for k in [0.1, 0.5, 0.9]
+    }
+    params_hybrid_set = {
+        k: HybridAnalizerParams(
+            params_prob_set[k],
+            params_struct_set[k],
+            0.1,
+        )
+        for k in [0.1, 0.5, 0.9]
+    }
+    pset = {
+        k: {
+            "hybrid": params_hybrid_set[k],
+            "struct": params_struct_set[k],
+            "prob": params_prob_set[k],
+        }
+        for k in [0.1, 0.5, 0.9]
     }
 
     ps_type = 'uniform'  # poisson uniform
@@ -102,22 +116,23 @@ def run(
     else:
         generator = PiLDistrGenerator()
         pi_l = generator.run(radiuses)
+        np.save(path_to_pil, pi_l)
 
     header_trajs = [
         f"Trajectory_{i+1}" for i in range(count_trj)
     ]  # Названия траектори
 
     for k, params in pset.items():
-
-        eparams = deepcopy(params)
-        eparams.critical_probability = 0.1
-        matrix_analyzer = TrajectoryAnalizer(params)
-        prob_analizer = TrajectoryExtendedAnalizer(params, pi_l, throat_lengths)
-        hybrid_analizer = TrajectoryExtendedAnalizer(
-            eparams, pi_l, throat_lengths
+        matrix_analyzer = StructTrajectoryAnalizer(params["struct"])
+        prob_analizer = ProbabilityTrajectoryAnalizer(
+            params["prob"], pi_l, throat_lengths
         )
 
-        prob = np.arange(1.05, step=0.05)
+        hybrid_analizer = HybridTrajectoryAnalizer(
+            params["hybrid"], pi_l, throat_lengths
+        )
+
+        prob = np.arange(0.0, 1.05, 0.05)
 
         ar_matrix_error = np.zeros(shape=(len(prob), count_trj))
         ar_prob_error = np.zeros(shape=(len(prob), count_trj))
@@ -128,10 +143,10 @@ def run(
         prob_er_fn = path_to_save + "/prob" + header
         hybrid_er_fn = path_to_save + "/hybrid" + header
         if (
-            True
-            # not Path(prob_er_fn).is_file()
-            # or not Path(matrix_er_fn).is_file()
-            # or not Path(hybrid_er_fn).is_file()
+            # True
+            not Path(prob_er_fn).is_file()
+            or not Path(matrix_er_fn).is_file()
+            or not Path(hybrid_er_fn).is_file()
         ):
             for j, p in enumerate(prob):
                 simulator = KerogenWalkSimulator(ppl, ps, ptl, k, p)
@@ -144,10 +159,15 @@ def run(
                     matrix_traps_result = matrix_analyzer.run(traj).astype(
                         np.int32
                     )
+
                     prob_traps_result = prob_analizer.run(traj).astype(np.int32)
-                    hybrid_traps_result = hybrid_analizer.run(
-                        traj, matrix_traps_result
-                    ).astype(np.int32)
+                    fitters = prob_analizer.get_fitters()
+                    hybrid_analizer.set_prob_fitters(*fitters)
+
+                    hybrid_analizer.set_trap_approx(matrix_traps_result)
+                    hybrid_traps_result = hybrid_analizer.run(traj).astype(
+                        np.int32
+                    )
 
                     matrix_error = min(
                         np.sum(np.abs(real_traps - matrix_traps_result[:-1])),
@@ -244,20 +264,26 @@ def run(
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--path_to_data',
+        '--path_to_main',
         type=str,
-        default="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/pnm/num=1640025000_500_500_500",
+        default="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/",
     )
     parser.add_argument(
-        '--path_to_save',
+        '--pnm_name',
         type=str,
-        default="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/errors/",
+        default="num=1640025000_500_500_500",
     )
-    parser.add_argument(
-        '--path_to_pil',
-        type=str,
-        default="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/pi_l.npy",
-    )
+
+    # parser.add_argument(
+    #     '--path_to_save',
+    #     type=str,
+    #     default="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/errors/",
+    # )
+    # parser.add_argument(
+    #     '--path_to_pil',
+    #     type=str,
+    #     default="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/pi_l.npy",
+    # )
     args = parser.parse_args()
 
-    run(args.path_to_data, args.path_to_save, args.path_to_pil)
+    run(args.path_to_main, args.pnm_name)

@@ -18,7 +18,7 @@ from base.kerogendata import AtomData, KerogenData
 from base.periodizer import Periodizer
 from base.reader import Reader
 from base.trajectory import Trajectory
-from base.utils import create_box_mask
+from utils.utils import create_box_mask
 from processes.segmentaion import Segmentator
 from visualizer.visualizer import Visualizer
 from examples.utils import write_binary_file

@@ -1,7 +1,4 @@
-from typing import Optional
 import numpy as np
-from typing import List
-from processes.trajectory_analyzer import AnalizerParams
 import numpy.typing as npt
 from scipy.stats import poisson
 
@@ -42,37 +39,3 @@ def write_binary_file(array: npt.NDArray[np.int8], file_name: str) -> None:
         for i in range(array.shape[2]):
             for j in range(array.shape[1]):
                 file.write(bytes(bytearray(array[:, j, i])))
-
-
-def all_params():
-    # good params  [154, 162, 186]
-    params = {}
-    i = 0
-    for dp in [0, 10, 50]:  # 0 - bad
-        for pv in [0.01, 0.1, 0.9]:  # 0.9 - bad
-            for nu in [0.1, 0.5, 0.9]:
-                for tt in ['fBm', 'Bm']:  # fBm - best
-                    for ks in [0, 1, 2, 3]:
-                        for lm in [[0.5, 1, 1.5, 2, 2.5, 3]]:
-                            params[i] = (dp, pv, nu, tt, ks)
-                            i = i + 1
-    return params
-
-
-def get_params(
-    indexes: Optional[List[int]] = None,
-    lmu: Optional[List[int]] = None,
-    num_jobs: int = 1,
-) -> List[AnalizerParams]:
-    list_mu = np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0]) if lmu is None else lmu
-    atparams = all_params()
-    if indexes is not None:
-        tparams = [atparams[i] for i in indexes]
-    else:
-        tparams = [v for _, v in atparams.items()]
-
-    aparams = [
-        AnalizerParams(tt, nu, dp, ks, list_mu, pv, num_jobs)
-        for dp, pv, nu, tt, ks in tparams
-    ]
-    return aparams

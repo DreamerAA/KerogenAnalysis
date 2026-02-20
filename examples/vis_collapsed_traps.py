@@ -1,11 +1,10 @@
 import argparse
 from pathlib import Path
 import sys
-import os
+
 from os import listdir
-from os.path import isfile, join, dirname, realpath
-import numpy as np
-import matplotlib.pyplot as plt
+from os.path import isfile, join, realpath
+
 import pickle
 from typing import List
 
@@ -13,16 +12,9 @@ path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
 sys.path.append(parent_dir)
 
-from examples.utils import get_params, visualize_trajectory
-from base.trap_sequence import TrapSequence
 from base.trajectory import Trajectory
-from base.boundingbox import BoundingBox, Range
+
 from processes.trap_extractor import TrapExtractor
-from processes.trajectory_extended_analizer import (
-    TrajectoryExtendedAnalizer,
-    ExtendedParams,
-)
-from processes.trajectory_extended_analizer import TrajectoryAnalizer
 from visualizer.visualizer import Visualizer
 
 

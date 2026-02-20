@@ -1,12 +1,10 @@
 import argparse
 import sys
 import time
-import os
 from os.path import realpath
 from pathlib import Path
 
 import numpy as np
-from joblib import Parallel, delayed
 import pickle
 
 path = Path(realpath(__file__))
@@ -16,7 +14,10 @@ sys.path.append(parent_dir)
 from base.reader import Reader
 from examples.utils import create_cdf, get_params, ps_generate
 from processes.kerogen_walk_simulator import KerogenWalkSimulator
-from processes.trajectory_extended_analizer import TrajectoryAnalizer
+from processes.struct_trajectory_analyzer import (
+    StructTrajectoryAnalizer,
+    StructAnalizerParams,
+)
 
 
 def run(prefix, path_to_save):
@@ -59,10 +60,10 @@ def run(prefix, path_to_save):
 
             for j, lmu in enumerate(llmu):
                 start_time = time.time()
-                params = get_params(lmu=lmu, num_jobs=6)
+                params = StructAnalizerParams.get_params(lmu=lmu, num_jobs=6)
 
                 def wrap(param):
-                    matrix_analyzer = TrajectoryAnalizer(param)
+                    matrix_analyzer = StructTrajectoryAnalizer(param)
                     me = 0.0
 
                     for trj, real_traps in zip(trjs, l_real_traps):

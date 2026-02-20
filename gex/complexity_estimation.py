@@ -5,24 +5,29 @@ import time
 from os.path import realpath
 from pathlib import Path
 from copy import deepcopy
-import inspect
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import optimize
-from scipy.stats import poisson
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
 sys.path.append(parent_dir)
 
 from base.reader import Reader
-from examples.utils import create_cdf, get_params, ps_generate
+from examples.utils import create_cdf, ps_generate
 from processes.kerogen_walk_simulator import KerogenWalkSimulator
 from processes.pil_distr_generator import PiLDistrGenerator
-from processes.trajectory_extended_analizer import (
-    ExtendedParams,
-    TrajectoryAnalizer,
-    TrajectoryExtendedAnalizer,
+from processes.hybrid_trajectory_analizer import (
+    HybridAnalizerParams,
+    HybridTrajectoryAnalizer,
+)
+from processes.struct_trajectory_analyzer import (
+    StructTrajectoryAnalizer,
+    StructAnalizerParams,
+)
+from processes.probability_trajectory_analizer import (
+    ProbabilityTrajectoryAnalizer,
+    ProbabilityAnalizerParams,
 )
 
 if __name__ == '__main__':
@@ -43,17 +48,6 @@ if __name__ == '__main__':
 
     radiuses, throat_lengths = Reader.read_pnm_data(
         args.path_to_pnm, scale=1e10, border=0.015
-    )
-
-    params = ExtendedParams(
-        traj_type='fBm',
-        nu=0.1,
-        diag_percentile=10,
-        kernel_size=2,
-        list_mu=[0.5, 1., 1.5, 2., 2.5, 3.],
-        p_value=0.9,
-        num_jobs=1,
-        critical_probability=0.0,
     )
 
     print("Start generate ps")
@@ -78,15 +72,41 @@ if __name__ == '__main__':
 
     print("Start estimation")
 
-    eparams = deepcopy(params)
-    eparams.critical_probability = 0.1
-
     def get_matrix():
-        return TrajectoryAnalizer(params)
+        params = StructAnalizerParams(
+            traj_type='fBm',
+            nu=0.1,
+            diag_percentile=10,
+            kernel_size=2,
+            list_mu=[0.5, 1.0, 1.5, 2.0, 2.5, 3.0],
+            p_value=0.9,
+            num_jobs=1,
+        )
+        return StructTrajectoryAnalizer(params)
+
     def get_prob():
-        return TrajectoryExtendedAnalizer(params, pi_l, throat_lengths)
+        params = ProbabilityAnalizerParams(
+            critical_probability=1e-3,
+        )
+        return ProbabilityTrajectoryAnalizer(params, pi_l, throat_lengths)
+
     def get_hybrid():
-        return TrajectoryExtendedAnalizer(eparams, pi_l, throat_lengths)
+        params = HybridAnalizerParams(
+            ProbabilityAnalizerParams(
+                critical_probability=1e-3,
+            ),
+            StructAnalizerParams(
+                traj_type='fBm',
+                nu=0.1,
+                diag_percentile=10,
+                kernel_size=2,
+                list_mu=[0.5, 1.0, 1.5, 2.0, 2.5, 3.0],
+                p_value=0.9,
+                num_jobs=1,
+            ),
+            0.1,
+        )
+        return HybridTrajectoryAnalizer(params, pi_l, throat_lengths)
 
     count = 5
     trj_lens = np.arange(500, 6000, 500)
@@ -96,10 +116,12 @@ if __name__ == '__main__':
     steps = [
         (get_matrix, 'r', "Structural", 0, 2),
         (get_prob, 'g', "Probabilistic", 1, 1),
-        (get_hybrid, 'b', "Hybrid", 2, 2)
+        (get_hybrid, 'b', "Hybrid", 2, 2),
     ]
 
-    times_path = "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/400K/h2/times.npy"
+    times_path = (
+        "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/400K/h2/times.npy"
+    )
     if os.path.isfile(times_path):
         times = np.load(times_path)
     else:
@@ -111,10 +133,7 @@ if __name__ == '__main__':
                     start_time = time.time()
                     analyzer = getter_analyzer()
                     analyzer.run(trajectory)
-                    if k == 1:
-                        times[j, k] += analyzer.inside_time
-                    else:
-                        times[j, k] += time.time() - start_time
+                    times[j, k] += time.time() - start_time
                     print(f"Current ex time {times[j, k]/(i+1)}")
 
             print("End estimation for trj_len = ", trj_len)
@@ -122,8 +141,8 @@ if __name__ == '__main__':
         np.save(times_path, times)
 
     times /= float(count)
-    
-    times = times[1:,:]
+
+    times = times[1:, :]
     trj_lens = trj_lens[1:]
 
     def add_plot(atime, color, name, fit_degree: int = 2):
@@ -137,14 +156,19 @@ if __name__ == '__main__':
 
         p2, success = optimize.leastsq(errfunc, p0[:], args=(trj_lens, atime))
         print(f"p = {p2}")
-        plt.scatter(
-            trj_lens, atime, s=20, marker='o', c=color, label=name
+        plt.scatter(trj_lens, atime, s=20, marker='o', c=color, label=name)
+        plt.plot(
+            trj_lens,
+            fitfunc(p2, trj_lens),
+            color=color,
+            label=name
+            + " fit by "
+            + ("ax^2 + bx + c" if fit_degree == 2 else "ax + b"),
         )
-        plt.plot(trj_lens, fitfunc(p2, trj_lens), color=color, label=name + " fit by " + ("ax^2 + bx + c" if fit_degree == 2 else "ax + b"))
 
     for _, color, name, ind, fd in steps:
         add_plot(times[:, ind], color, name, fd)
-        
+
     plt.xlabel('Trajectory length', fontsize=12)
     plt.ylabel('Execution Time, sec', fontsize=12)
     plt.yticks(fontsize=12)
