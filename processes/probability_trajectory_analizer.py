@@ -9,12 +9,13 @@ import numpy.typing as npt
 import time
 from base.trajectory import Trajectory
 from processes.distribution_fitter import (
-    GammaCurveFitter,
+    GammaFitter,
     WeibullFitter,
 )
 from processes.trajectory_analyzer import TrajectoryAnalyzer
 
-from utils.utils import NPFArray, NPIArray, NPBArray
+from utils.utils import kprint
+from utils.types import NPFArray, NPIArray, NPBArray, f32
 
 
 @dataclass
@@ -26,16 +27,16 @@ class ProbabilityTrajectoryAnalizer(TrajectoryAnalyzer):
     def __init__(
         self,
         params: ProbabilityAnalizerParams,
-        pi_l: NPFArray,
-        throat_lengthes: NPFArray,
+        pi_l_gf: GammaFitter,
+        throat_lengthes_wf: WeibullFitter,
     ):
         self.params = params
-        self.throat_lengthes = throat_lengthes
-        self.pi_l = pi_l
+        self.throat_lengthes_wf: WeibullFitter = throat_lengthes_wf
+        self.pi_l_gf: GammaFitter = pi_l_gf
         self.trap_approx: Optional[NPIArray] = None
 
         self.transition_step_fitter: Optional[WeibullFitter] = None
-        self.trapped_step_fitter: Optional[GammaCurveFitter] = None
+        self.trapped_step_fitter: Optional[GammaFitter] = None
 
     @cached_property
     @abstractmethod
@@ -49,42 +50,17 @@ class ProbabilityTrajectoryAnalizer(TrajectoryAnalyzer):
         self,
         trj: Trajectory,
     ) -> NPBArray:
-        result = self.analyze(
+        _, probabilityies = self.analyze(
             trj,
-            self.throat_lengthes,
-            self.pi_l,
+            self.throat_lengthes_wf,
+            self.pi_l_gf,
             self.params.critical_probability,
-            self.transition_step_fitter,
-            self.trapped_step_fitter,
         )
-        if self.transition_step_fitter is None:
-            self.transition_step_fitter = result[4]
-        if self.trapped_step_fitter is None:
-            self.trapped_step_fitter = result[5]
-        return result[0]
-
-    def set_prob_fitters(
-        self,
-        transition_step_fitter: WeibullFitter,
-        trapped_step_fitter: GammaCurveFitter,
-    ):
-        self.transition_step_fitter = transition_step_fitter
-        self.trapped_step_fitter = trapped_step_fitter
-
-    def save_fitters(self, path: str):
-        if not os.path.exists(path):
-            os.makedirs(path)
-
-        with open(path + "transition_step_fitter.json", "w") as f:
-            pickle.dump(self.transition_step_fitter, f)
-        with open(path + "trapped_step_fitter.json", "w") as f:
-            pickle.dump(self.trapped_step_fitter, f)
-
-    def get_fitters(self) -> tuple[WeibullFitter, GammaCurveFitter]:
-        return self.transition_step_fitter, self.trapped_step_fitter
+        result = probabilityies > 0.5
+        return result
 
     @staticmethod
-    def load_fitters(path: str) -> tuple[WeibullFitter, GammaCurveFitter]:
+    def load_fitters(path: str) -> tuple[WeibullFitter, GammaFitter]:
         with open(path + "transition_step_fitter.json", "r") as f:
             transition_step_fitter = pickle.load(f)
         with open(path + "trapped_step_fitter.json", "r") as f:
@@ -92,73 +68,70 @@ class ProbabilityTrajectoryAnalizer(TrajectoryAnalyzer):
         return transition_step_fitter, trapped_step_fitter
 
     @staticmethod
-    def analyze(
+    def analyze2(
         trj: Trajectory,
-        throat_lengthes: NPFArray,
-        pi_l: NPFArray,
+        transition_step_fitter: WeibullFitter,
+        trapped_step_fitter: GammaFitter,
         critical_probability: float,
-        transition_step_fitter: Optional[WeibullFitter] = None,
-        trapped_step_fitter: Optional[GammaCurveFitter] = None,
-    ) -> Tuple[
-        NPBArray, float, NPFArray, NPFArray, WeibullFitter, GammaCurveFitter
-    ]:
-        if transition_step_fitter is None:
-            transition_step_fitter = WeibullFitter()
-            transition_step_fitter.fit(throat_lengthes)
-
-        if trapped_step_fitter is None:
-            trapped_step_fitter = GammaCurveFitter()
-            trapped_step_fitter.fit(pi_l)
-
+    ) -> Tuple[float, NPFArray]:
         points = trj.points_without_periodic
         distances = ProbabilityTrajectoryAnalizer.distances(points)
-        p_length_given_trap = trapped_step_fitter.pdf(distances)
-        p_length_given_not_trap = transition_step_fitter.pdf(distances)
 
-        p_length_given_trap /= p_length_given_trap + p_length_given_not_trap
-        p_length_given_not_trap /= p_length_given_trap + p_length_given_not_trap
+        L_T = trapped_step_fitter.pdf(distances).astype(np.float64)  # p(x|trap)
+        L_C = transition_step_fitter.pdf(distances).astype(
+            np.float64
+        )  # p(x|not_trap)
 
-        # x = np.linspace(0, distances.max(), 1000)
-        # yp = trapped_step_fitter.pdf(x, fd_pi_l)
-        # yt = transition_step_wfitter.pdf(x, fd_lengthes)
+        eps = 1e-300
+        L_T = np.maximum(L_T, eps)
+        L_C = np.maximum(L_C, eps)
 
-        p_trap = 0.5  # A priori probability of a trap
-        prev_p_trap = 1.0
-        result = np.zeros(shape=(len(p_length_given_trap),), dtype=np.bool_)
+        p_trap = 0.5
+        prev = np.inf
         iterations = 0
-        while np.abs(p_trap - prev_p_trap) > critical_probability:
-            full_probability = (
-                p_length_given_trap * p_trap
-                + p_length_given_not_trap * (1 - p_trap)
-            )
-            p_trap_given_length = (
-                p_length_given_trap * p_trap / full_probability
-            )
-            assert not np.any(p_trap_given_length > 1)
+        while np.abs(p_trap - prev) > critical_probability:
+            prev = p_trap
 
-            result[:] = 0
-            result[p_trap_given_length > 0.5] = 1
+            denom = p_trap * L_T + (1.0 - p_trap) * L_C
+            denom = np.maximum(denom, eps)
 
-            prev_p_trap = p_trap
-            p_trap = np.sum(result) / len(result)
+            gamma = (p_trap * L_T) / denom  # P(trap | x)
+            # EM update: ожидаемая доля
+            p_trap = float(gamma.mean())
+            # kprint(
+            #     f"Iteration: {iterations}, count steps inside traps: {np.sum(gamma > 0.5)}"
+            # )
             iterations += 1
 
-        print(
-            " --- Probability Algorithm finished! "
-            f"Trap Probability = {p_trap}, "
-            f"Iterations = {iterations}, "
-            f"Error = {np.abs(p_trap - prev_p_trap)}"
-        )
+        # print(
+        #     " --- Analyze finished! "
+        #     f"Trap Probability = {p_trap}, "
+        #     f"Iterations = {iterations}, "
+        #     f"Error = {np.abs(p_trap - prev)}"
+        # )
         assert trapped_step_fitter is not None
         assert transition_step_fitter is not None
-        return (
-            result,
-            p_trap,
-            p_length_given_trap,
-            p_length_given_not_trap,
-            transition_step_fitter,
-            trapped_step_fitter,
-        )
+
+        return (p_trap, gamma)
+
+    @staticmethod
+    def analyze(
+        trj: Trajectory,
+        transition_step_fitter: WeibullFitter,
+        trapped_step_fitter: GammaFitter,
+        critical_probability: float,
+    ) -> Tuple[float, NPFArray]:
+        points = trj.points_without_periodic
+        distances = ProbabilityTrajectoryAnalizer.distances(points)
+
+        L_T = trapped_step_fitter.pdf(distances).astype(f32)  # p(x|trap)
+        L_C = transition_step_fitter.pdf(distances).astype(f32)  # p(x|not_trap)
+
+        p_trap = 0.5
+        gamma = np.zeros(shape=L_T.shape, dtype=f32)
+        gamma[L_T > L_C] = 1.0
+
+        return (p_trap, gamma)
 
     @staticmethod
     def distances(points: NPFArray) -> NPFArray:

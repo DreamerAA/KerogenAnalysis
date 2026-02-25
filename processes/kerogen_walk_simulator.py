@@ -13,6 +13,9 @@ import networkx as nx
 import numpy as np
 import numpy.typing as npt
 
+from base.bufferedsampler import BufferedSampler
+from processes.distribution_fitter import WeibullFitter
+
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
 sys.path.append(parent_dir)
@@ -21,21 +24,19 @@ from base.boundingbox import BoundingBox, Range
 from base.trajectory import Trajectory
 
 
-class OneGenerator:
-    def __init__(self):
-        self.ind = 0
-        self.s = 100000
-        self.directions = self.gen()
+class Uniform01:
+    def rvs(self, size: int) -> NPFArray:
+        return np.random.random(size).astype(np.float32)
 
-    def gen(self):
-        return np.random.uniform(0, 1, size=self.s)
 
-    def get(self):
-        if self.ind >= self.s:
-            self.directions = self.gen()
-            self.ind = 0
-        self.ind += 1
-        return self.directions[self.ind - 1]
+class UnitVector3:
+    def rvs(self, size: int) -> npt.NDArray[np.float32]:
+        v = np.random.normal(0.0, 1.0, size=(size, 3)).astype(np.float32)
+        norm = np.linalg.norm(v, axis=1).astype(np.float32)
+        # крайне редко norm=0; подстрахуемся
+        norm = np.where(norm == 0, 1.0, norm).astype(np.float32)
+        v /= norm[:, None]
+        return v
 
 
 class DirGenerator:
@@ -62,75 +63,31 @@ class DirGenerator:
         return self.directions[self.ind - 1, :]
 
 
-class ProbDensFuncWrap:
-    def __init__(self, cdf, name, size=100000):
-        assert cdf[-1, 1] == 1
-        self.cdf = cdf
-        self.name = name
-        self.cur_index = 0
-        self.size = size
-        self.cur_arr = ProbDensFuncWrap.generate(cdf, size)
-        print(
-            f"Generated {self.name}: min={self.cur_arr.min()}, max={self.cur_arr.max()}"
-        )
-
-    @staticmethod
-    def generate(pdf, size):
-        a = np.random.uniform(0, 1, size=size)
-        p = pdf[:, 1]
-        # indexes = np.array([np.abs(p - v).argmin() for v in a])
-        # return pdf[indexes, 0]
-        result = np.zeros(shape=(size,), dtype=np.float32)
-        for i, v in enumerate(a):
-            idx = np.searchsorted(p, v)
-            if idx == 0:
-                result[i] = pdf[0, 0]
-            elif idx == len(p):
-                result[i] = pdf[-1, 0]
-            else:
-                x1 = pdf[idx - 1, 0]
-                x2 = pdf[idx, 0]
-                y1 = p[idx - 1]
-                y2 = p[idx]
-                k = (y2 - y1) / (x2 - x1)
-                b = y1 - k * x1
-                result[i] = (v - b) / k
-        return result
-
-    def get(self):
-        if self.cur_index >= self.size:
-            self.cur_arr = ProbDensFuncWrap.generate(self.cdf, self.size)
-            self.cur_index = 0
-            print(
-                f"Generated {self.name}: min={self.cur_arr.min()}, max={self.cur_arr.max()}"
-            )
-        v = self.cur_arr[self.cur_index]
-        self.cur_index += 1
-        return v
-
-    def get_full(self):
-        return ProbDensFuncWrap.generate(self.cdf, self.size)
-
-
 class KerogenWalkSimulator:
-    def __init__(self, psd, ps, ptl, k, p):
+    def __init__(
+        self,
+        bs_psd: BufferedSampler,
+        bs_ps: BufferedSampler,
+        bs_ptl: BufferedSampler,
+        k,
+        p,
+    ):
         """
         :param self: Represent the instance of the class
-        :param psd: pore size distribution (cdf)
-        :param ps: steps in trap distribution (cdf)
-        :param ptl: the probability that a segment of length L is throat (cdf)
-        :param p: probability of returning to the previous pore and 1 - p walking
-        :param k: probability of stepping further (from the trap) and 1 - K staying in the current pore
+        :param bs_psd: trap size distribution
+        :param bs_ps: count steps in trap distribution
+        :param bs_ptl: distribution of length steps between traps
+        :param p: probability of moving to the next trap and 1 - p return to adjacent traps
+        :param k: probability of stepping further (from the trap) and 1 - K staying in the current trap
         :return: Nothing
-        :doc-author: Trelent
         """
-        self.psd = ProbDensFuncWrap(psd, 'ppl')
-        self.ps = ProbDensFuncWrap(ps, 'ps')
-        self.ptl = ProbDensFuncWrap(ptl, 'ptl')
+        self.bs_psd = bs_psd
+        self.bs_ps = bs_ps
+        self.bs_ptl = bs_ptl
         self.p = p
         self.k = k
-        self.dir_gen = DirGenerator()
-        self.el_gen = OneGenerator()
+        self.bs_dir = BufferedSampler(UnitVector3(), "dir", size=100_000)
+        self.bs_el = BufferedSampler(Uniform01(), "el", size=100_000)
 
     @staticmethod
     def gen_new_pos(cout_points, radius, pos):
@@ -146,10 +103,17 @@ class KerogenWalkSimulator:
             points = points[indexes, :]
             if points.shape[0] > 0:
                 assert (points[0, :]).shape == pos.shape
-            
+
             for i in range(3):
-                points[:, i] = points[:, i] * (np.array(np.random.uniform(1., 3., size=points.shape[0]), dtype=np.float32) if random.random() < 0.4 else 1)
-            
+                points[:, i] = points[:, i] * (
+                    np.array(
+                        np.random.uniform(1.0, 3.0, size=points.shape[0]),
+                        dtype=np.float32,
+                    )
+                    if random.random() < 0.4
+                    else 1
+                )
+
             points = points + pos
 
             return points
@@ -168,17 +132,17 @@ class KerogenWalkSimulator:
         cur_trap_ind = 0
 
         graph = nx.Graph()
-        graph.add_node(cur_trap_ind, pos=[0, 0, 0], size=self.psd.get())
+        graph.add_node(cur_trap_ind, pos=[0, 0, 0], size=self.bs_psd.get())
 
         def move_next(cur_pos_ind, cur_trap_ind):
-            lenght = self.ptl.get()
-            dir = self.dir_gen.get()
-            
+            lenght = self.bs_ptl.get()
+            dir = self.bs_dir.get()
+
             pos = points[cur_pos_ind, :] + dir * lenght
             points[cur_pos_ind + 1, :] = pos
 
             graph.add_node(
-                graph.number_of_nodes(), pos=pos, size=self.psd.get()
+                graph.number_of_nodes(), pos=pos, size=self.bs_psd.get()
             )
             graph.add_edge(cur_trap_ind, graph.number_of_nodes() - 1)
             traps[cur_pos_ind] = False
@@ -201,7 +165,7 @@ class KerogenWalkSimulator:
         def steps_inside(
             cur_pos_ind: int,
             cur_trap_ind: int,
-            ps: ProbDensFuncWrap,
+            ps: BufferedSampler,
             max_count_steps: int,
         ):
             node = graph.nodes[cur_trap_ind]
@@ -212,28 +176,30 @@ class KerogenWalkSimulator:
             trap_pos = np.array(node['pos'])
             size = node['size']
 
-            new_pos = KerogenWalkSimulator.gen_new_pos(count_steps, size, trap_pos)
-            points[
-                (cur_pos_ind + 1) : (cur_pos_ind + count_steps + 1)
-            ] = new_pos
+            new_pos = KerogenWalkSimulator.gen_new_pos(
+                count_steps, size, trap_pos
+            )
+            points[(cur_pos_ind + 1) : (cur_pos_ind + count_steps + 1)] = (
+                new_pos
+            )
             # assert np.all(np.sqrt(np.sum((new_pos - trap_pos) ** 2, axis=1)) <= size)
             traps[cur_pos_ind : (cur_pos_ind + count_steps)] = True
             return cur_pos_ind + count_steps, cur_trap_ind
 
         for _ in range(10):
             cur_pos_ind, cur_trap_ind = steps_inside(
-                cur_pos_ind, cur_trap_ind, self.ps, count_points
+                cur_pos_ind, cur_trap_ind, self.bs_ps, count_points
             )
             if cur_pos_ind + 1 == count_points:
                 cur_pos_ind = 0
                 points[0, :] = points[-1, :]
-                points[1:, :] = 0.
+                points[1:, :] = 0.0
                 traps[:] = False
 
             cur_pos_ind, cur_trap_ind = move_next(cur_pos_ind, cur_trap_ind)
 
         cur_pos_ind, cur_trap_ind = steps_inside(
-            cur_pos_ind, cur_trap_ind, self.ps, count_points
+            cur_pos_ind, cur_trap_ind, self.bs_ps, count_points
         )
 
         point_start_ind = cur_pos_ind
@@ -257,7 +223,7 @@ class KerogenWalkSimulator:
         count_move_adj = 0
         count_iter_inside = 0
         while cur_pos_ind + 1 < max_count_points:
-            if self.el_gen.get() < self.p:
+            if self.bs_el.get() < self.p:
                 count_move_next += 1
                 cur_pos_ind, cur_trap_ind = move_next(cur_pos_ind, cur_trap_ind)
             else:
@@ -269,10 +235,10 @@ class KerogenWalkSimulator:
             if cur_pos_ind >= max_count_points:
                 break
 
-            if self.el_gen.get() <= 1 - self.k:
+            if self.bs_el.get() <= 1 - self.k:
                 count_iter_inside += 1
                 cur_pos_ind, cur_trap_ind = steps_inside(
-                    cur_pos_ind, cur_trap_ind, self.ps, max_count_points
+                    cur_pos_ind, cur_trap_ind, self.bs_ps, max_count_points
                 )
 
         assert (

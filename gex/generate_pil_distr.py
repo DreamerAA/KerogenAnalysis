@@ -1,7 +1,9 @@
+import pickle
 import sys
 from os import listdir
-from os.path import dirname, isfile, join, realpath
+from os.path import dirname, isfile, join, realpath, exists
 from pathlib import Path
+
 from typing import Any, Tuple
 
 import matplotlib.pyplot as plt
@@ -12,6 +14,13 @@ from matplotlib import cm
 from scipy.stats import exponweib
 from sklearn.metrics import pairwise_distances
 from scipy.signal import savgol_filter
+from utils.types import NPFArray
+from processes.distribution_fitter import (
+    GammaFitter,
+    WeibullFitter,
+)
+from utils.utils import kprint
+from utils.timer import Timer
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
@@ -84,34 +93,61 @@ def get_radiuses_lengthes(path_to_pnms: str):
     return radiuses, throat_lengths
 
 
-def generate_pil_distribution(path_to_pnms: str, path_to_save: str) -> None:
-    if isfile(path_to_save + "pi_l.npy") and isfile(
-        path_to_save + "throat_lengths.npy"
-    ):
-        return np.load(path_to_save + "pi_l.npy")
-
-    radiuses, throat_lengths = get_radiuses_lengthes(path_to_pnms)
+def generate_pil_distribution(path_to_pnms: str, path_to_save: str):
+    path_rads = join(path_to_save, "radiuses.npy")
+    path_lens = join(path_to_save, "throat_lengths.npy")
+    if isfile(path_lens) and isfile(path_rads):
+        radiuses = np.load(path_rads)
+        throat_lengths = np.load(path_lens)
+    else:
+        radiuses, throat_lengths = get_radiuses_lengthes(path_to_pnms)
+        np.save(path_rads, radiuses)
+        np.save(path_lens, throat_lengths)
 
     generator = PiLDistrGenerator()
-    pi_l = generator.run(radiuses)
 
-    np.save(path_to_save + "pi_l.npy", pi_l)
-    np.save(path_to_save + "throat_lengths.npy", throat_lengths)
-    return pi_l
+    paht_pi_l = join(path_to_save, "pi_l_curve.npy")
+    if isfile(paht_pi_l):
+        pi_l = np.load(paht_pi_l)
+    else:
+        pi_l = generator.get_curve(radiuses)
+        np.save(paht_pi_l, pi_l)
+
+    timer = Timer()
+    timer.start()
+    paht_pi_l_gf = join(path_to_save, "pi_l_gamma_fitter.pkl")
+    data = generator.gen_set(radiuses)
+    gfitter = GammaFitter()
+    gfitter.fit(data)
+    with open(paht_pi_l_gf, "wb") as f:
+        pickle.dump(gfitter, f)
+    timer.stop("Gamma fitter")
+
+    timer.start()
+    path_tl_wf = join(path_to_save, "throat_lengths_weibull_fitter.pkl")
+    wfitter = WeibullFitter()
+    wfitter.fit(throat_lengths)
+    with open(path_tl_wf, "wb") as f:
+        pickle.dump(wfitter, f)
+    timer.stop("Weibull fitter")
 
 
 if __name__ == '__main__':
-    mpath = "/media/andrey/Samsung_T5/PHD/Kerogen/type2matrix/"
 
-    # for tem in ["300K", "400K"]:
-    for tem in ["300K"]:
-        # for el in ["h2", "ch4"]:
-        for el in ["h2"]:
-            path_to_save = mpath + f"{tem}/{el}/"
-            path_to_pnm = path_to_save + "/pnm/"
+    for mtype in ["type1matrix", "type2matrix"]:
+        # for mtype in ["type1matrix"]:
+        mpath = join("/media/andrey/Samsung_T5/PHD/Kerogen/", mtype)
+        for tem in ["300K", "400K"]:
+            if not exists(join(mpath, tem)):
+                continue
+            # for tem in ["300K"]:
+            for el in ["h2", "ch4"]:
+                # for el in ["ch4"]:
+                path_to_save = join(mpath, tem, el)
+                path_to_pnm = join(path_to_save, "pnm")
 
-            generate_pil_distribution(path_to_pnm, path_to_save)
+                generate_pil_distribution(path_to_pnm, path_to_save)
 
-            plot_distributions(path_to_pnm, path_to_save)
+                # plot_distributions(path_to_pnm, path_to_save)
 
-    plt.show()
+    # plt.show()

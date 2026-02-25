@@ -1,12 +1,8 @@
-from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 
-import numpy as np
-import numpy.typing as npt
-from scipy.stats import exponweib, gamma, weibull_min
-
-NPFArray = npt.NDArray[np.float64]
+from utils.types import NPFArray, f32
+from scipy.stats import exponweib, gamma
 
 
 class DistributionType(Enum):
@@ -18,22 +14,31 @@ class WeibullFitter:
     ftype: DistributionType = DistributionType.EXPWEIB
 
     def __init__(self):
-        self.params: Optional[NPFArray] = None
+        self.params: Optional[tuple[float, float, float, float]] = None
 
     def fit(self, data: NPFArray):
         assert self.params is None
-        self.params = exponweib.fit(data, floc=0)
+        # exponweib.fit возвращает (a, c, loc, scale)
+        self.params = tuple(float(v) for v in exponweib.fit(np.asarray(data)))
+
+    def rvs(self, size: int) -> NPFArray:
+        assert self.params is not None
+        a, c, loc, scale = self.params
+        # это использует scipy/numpy RNG внутри, векторно
+        return exponweib.rvs(a, c, loc=loc, scale=scale, size=size).astype(f32)
 
     def pdf(self, x: NPFArray) -> NPFArray:
         assert self.params is not None
-        return exponweib.pdf(x, *self.params)
+        a, c, loc, scale = self.params
+        return exponweib.pdf(x, a, c, loc=loc, scale=scale).astype(f32)
 
     def cdf(self, x: NPFArray) -> NPFArray:
         assert self.params is not None
-        return exponweib.cdf(x, *self.params)
+        a, c, loc, scale = self.params
+        return exponweib.cdf(x, a, c, loc=loc, scale=scale).astype(f32)
 
 
-class GammaCurveFitter:
+class GammaFitter:
     ftype: DistributionType = DistributionType.GAMMA
 
     def __init__(self):
@@ -50,7 +55,7 @@ class GammaCurveFitter:
         # unif_p = np.random.uniform(0, 1, size=count_points)
         # ndata = np.array(
         #     [GammaCurveFitter.interp(sp, x, csum) for sp in unif_p],
-        #     dtype=np.float32,
+        #     dtype=f32,
         # )
 
         # params = gamma.fit(ndata)

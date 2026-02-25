@@ -8,7 +8,7 @@ import numpy.typing as npt
 import time
 from base.trajectory import Trajectory
 from processes.distribution_fitter import (
-    GammaCurveFitter,
+    GammaFitter,
     WeibullFitter,
 )
 from processes.struct_trajectory_analyzer import (
@@ -20,7 +20,7 @@ from processes.probability_trajectory_analizer import (
     ProbabilityAnalizerParams,
 )
 from processes.trajectory_analyzer import TrajectoryAnalyzer
-from utils.utils import NPFArray, NPIArray, NPBArray, f32
+from utils.types import NPFArray, NPBArray, f32
 
 
 @dataclass
@@ -34,12 +34,12 @@ class HybridTrajectoryAnalizer(TrajectoryAnalyzer):
     def __init__(
         self,
         params: HybridAnalizerParams,
-        pi_l: NPFArray,
-        throat_lengthes: NPFArray,
+        pi_l_gf: GammaFitter,
+        throat_lengthes_wf: WeibullFitter,
     ):
         self.params = params
-        self.throat_lengthes = throat_lengthes
-        self.pi_l = pi_l
+        self.throat_lengthes_wf: WeibullFitter = throat_lengthes_wf
+        self.pi_l_gf: GammaFitter = pi_l_gf
         self.trap_approx: Optional[NPBArray] = None
 
     @cached_property
@@ -58,38 +58,21 @@ class HybridTrajectoryAnalizer(TrajectoryAnalyzer):
             print(" --- Matrix Algorithm finished")
         return self.trap_approx
 
-    def set_prob_fitters(
-        self,
-        transition_step_fitter: WeibullFitter,
-        trapped_step_fitter: GammaCurveFitter,
-    ):
-        self.transition_step_fitter = transition_step_fitter
-        self.trapped_step_fitter = trapped_step_fitter
-
     def run(
         self,
         trj: Trajectory,
     ) -> NPBArray:
         trap_approx = self.get_trap_approx(trj)
 
-        prob_analyzer = ProbabilityTrajectoryAnalizer.analyze(
+        _, probabilityies = ProbabilityTrajectoryAnalizer.analyze(
             trj,
-            self.throat_lengthes,
-            self.pi_l,
+            self.throat_lengthes_wf,
+            self.pi_l_gf,
             self.params.prob_params.critical_probability,
-            transition_step_fitter=self.transition_step_fitter,
-            trapped_step_fitter=self.trapped_step_fitter,
         )
-        result, _, p_length_given_trap, p_length_given_not_trap, _, _ = (
-            prob_analyzer
-        )
-        struct_mask = (
-            np.abs(p_length_given_trap - p_length_given_not_trap)
-            < self.params.prob_diff
-        )
+        result = probabilityies > 0.5
+        struct_mask = np.abs(probabilityies - 0.5) < self.params.prob_diff
         result[struct_mask] = trap_approx[1:][struct_mask]
-
-        print(" --- Probability Algorithm finished")
         assert not np.any(result == -1)
         return result
 

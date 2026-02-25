@@ -1,24 +1,28 @@
 import argparse
 import os
+import pickle
 import sys
 import time
-from os.path import realpath, join
+from os.path import realpath, join, isfile
 from pathlib import Path
-from copy import deepcopy
-from typing import Dict
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import json
+from dataclasses import dataclass
+from typing import Any, Dict, Optional, Tuple
+from base.discretecdf import DiscreteCDF
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
 sys.path.append(parent_dir)
 
-from base.reader import Reader
-from examples.utils import create_cdf, ps_generate
+from base.bufferedsampler import BufferedSampler
+
+from base.empiricalcdf import EmpiricalCDF
+from utils.utils import kprint, ps_generate, create_empirical_cdf
 from processes.kerogen_walk_simulator import KerogenWalkSimulator
-from processes.pil_distr_generator import PiLDistrGenerator
 
 from processes.hybrid_trajectory_analizer import (
     HybridAnalizerParams,
@@ -33,23 +37,47 @@ from processes.probability_trajectory_analizer import (
     ProbabilityAnalizerParams,
 )
 
+
 np.random.default_rng(1111)
+
+
+def _atomic_pickle_dump(obj: Any, path: str) -> None:
+    tmp = path + ".tmp"
+    with open(tmp, "wb") as f:
+        pickle.dump(obj, f, protocol=pickle.HIGHEST_PROTOCOL)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
+
+
+def _atomic_npy_save(path: str, arr: np.ndarray) -> None:
+    final_path = path if path.endswith(".npy") else path + ".npy"
+    tmp_path = final_path + ".tmp"
+
+    with open(tmp_path, "wb") as f:
+        np.save(f, arr)
+        f.flush()
+        os.fsync(f.fileno())
+
+    os.replace(tmp_path, final_path)
+
+
+def _calc_total_jobs(count_trj: int, prob: np.ndarray) -> int:
+    return count_trj * len(prob)
 
 
 def run(
     path_to_main: str,
-    pnm_name: str,
-    count_trj=2,
-    count_steps=1000,
+    count_trj=20,
+    count_steps=2500,
 ):
     path_to_save: str = join(path_to_main, "errors")
-    path_to_pil: str = join(path_to_main, "pi_l.npy")
-    path_to_prob_fitters = join(path_to_main, "fitters", pnm_name)
-    path_to_pnm: str = join(path_to_main, "pnm", pnm_name)
+    path_to_pil_gf: str = join(path_to_main, "pi_l_gamma_fitter.pkl")
+    path_to_tl_wf: str = join(path_to_main, "throat_lengths_weibull_fitter.pkl")
+    path_to_radiuses: str = join(path_to_main, "radiuses.npy")
 
-    radiuses, throat_lengths = Reader.read_pnm_data(
-        path_to_pnm, scale=1e10, border=0.015
-    )
+    if not Path(path_to_save).exists():
+        os.mkdir(path_to_save)
 
     params_struct_set = {
         0.1: StructAnalizerParams(
@@ -70,7 +98,7 @@ def run(
             p_value=0.9,
             num_jobs=1,
         ),
-        0.9: StructAnalizerParams(
+        0.95: StructAnalizerParams(
             traj_type='fBm',
             nu=0.1,
             diag_percentile=0,
@@ -85,7 +113,7 @@ def run(
         k: ProbabilityAnalizerParams(
             critical_probability=1e-3,
         )
-        for k in [0.1, 0.5, 0.9]
+        for k in [0.1, 0.5, 0.95]
     }
     params_hybrid_set = {
         k: HybridAnalizerParams(
@@ -93,7 +121,7 @@ def run(
             params_struct_set[k],
             0.1,
         )
-        for k in [0.1, 0.5, 0.9]
+        for k in [0.1, 0.5, 0.95]
     }
     pset = {
         k: {
@@ -101,98 +129,157 @@ def run(
             "struct": params_struct_set[k],
             "prob": params_prob_set[k],
         }
-        for k in [0.1, 0.5, 0.9]
+        for k in [0.1, 0.5, 0.95]
+        # for k in [0.95]
     }
 
-    ps_type = 'uniform'  # poisson uniform
-    ps = ps_generate(ps_type)
-
-    ind = 0
-    ppl = create_cdf(radiuses)
-    ptl = create_cdf(throat_lengths)
-
-    if os.path.isfile(path_to_pil):
-        pi_l = np.load(path_to_pil)
+    if isfile(path_to_pil_gf):
+        with open(path_to_pil_gf, "rb") as f:
+            pil_gamma_fitter = pickle.load(f)
     else:
-        generator = PiLDistrGenerator()
-        pi_l = generator.run(radiuses)
-        np.save(path_to_pil, pi_l)
+        raise RuntimeError("pi_l data not found")
+
+    if isfile(path_to_radiuses):
+        radiuses = np.load(path_to_radiuses)
+    else:
+        raise RuntimeError("radiuses not found")
+
+    if isfile(path_to_tl_wf):
+        with open(path_to_tl_wf, "rb") as f:
+            throat_lengths_weibull_fitter = pickle.load(f)
+    else:
+        raise RuntimeError("throat_lengths not found")
+
+    ps_type = 'uniform'  # poisson uniform
+    ps = ps_generate(ps_type, max_count_step=10)
+    psd = create_empirical_cdf(radiuses)
+    bs_ps = BufferedSampler(DiscreteCDF(ps), "ps", size=100_000)
+    bs_psd = BufferedSampler(EmpiricalCDF(psd), "psd", size=100_000)
+    bs_ptl = BufferedSampler(throat_lengths_weibull_fitter, "ptl", size=100_000)
 
     header_trajs = [
         f"Trajectory_{i+1}" for i in range(count_trj)
     ]  # Названия траектори
-
     for k, params in pset.items():
         matrix_analyzer = StructTrajectoryAnalizer(params["struct"])
         prob_analizer = ProbabilityTrajectoryAnalizer(
-            params["prob"], pi_l, throat_lengths
+            params["prob"], pil_gamma_fitter, throat_lengths_weibull_fitter
         )
 
         hybrid_analizer = HybridTrajectoryAnalizer(
-            params["hybrid"], pi_l, throat_lengths
+            params["hybrid"], pil_gamma_fitter, throat_lengths_weibull_fitter
         )
 
         prob = np.arange(0.0, 1.05, 0.05)
-
-        ar_matrix_error = np.zeros(shape=(len(prob), count_trj))
-        ar_prob_error = np.zeros(shape=(len(prob), count_trj))
-        ar_hybrid_error = np.zeros(shape=(len(prob), count_trj))
 
         header = f"_k={k}_countSteps={count_steps}_countTrj={count_trj}.npy"
         matrix_er_fn = path_to_save + "/matrix" + header
         prob_er_fn = path_to_save + "/prob" + header
         hybrid_er_fn = path_to_save + "/hybrid" + header
-        if (
-            # True
-            not Path(prob_er_fn).is_file()
-            or not Path(matrix_er_fn).is_file()
-            or not Path(hybrid_er_fn).is_file()
-        ):
-            for j, p in enumerate(prob):
-                simulator = KerogenWalkSimulator(ppl, ps, ptl, k, p)
 
-                for i in range(count_trj):
-                    start_time = time.time()
-                    traj = simulator.run(count_steps)
-                    real_traps = traj.traps.copy().astype(np.int32)
+        ckpt_fn = (
+            path_to_save
+            + f"/checkpoint_k={k}_countSteps={count_steps}_countTrj={count_trj}.pkl"
+        )
 
-                    matrix_traps_result = matrix_analyzer.run(traj).astype(
-                        np.int32
-                    )
+        prob = np.arange(0.0, 1.1, 0.1)
 
-                    prob_traps_result = prob_analizer.run(traj).astype(np.int32)
-                    fitters = prob_analizer.get_fitters()
-                    hybrid_analizer.set_prob_fitters(*fitters)
+        # Инициализация/загрузка прогресса
+        next_ind = 0
+        if Path(ckpt_fn).is_file():
+            with open(ckpt_fn, "rb") as f:
+                ckpt = pickle.load(f)
 
-                    hybrid_analizer.set_trap_approx(matrix_traps_result)
-                    hybrid_traps_result = hybrid_analizer.run(traj).astype(
-                        np.int32
-                    )
-
-                    matrix_error = min(
-                        np.sum(np.abs(real_traps - matrix_traps_result[:-1])),
-                        np.sum(np.abs(real_traps - matrix_traps_result[1:])),
-                    )
-                    prob_error = np.sum(np.abs(real_traps - prob_traps_result))
-
-                    hybrid_error = np.sum(
-                        np.abs(real_traps - hybrid_traps_result)
-                    )
-
-                    ar_prob_error[j, i] = prob_error
-                    ar_matrix_error[j, i] = matrix_error
-                    ar_hybrid_error[j, i] = hybrid_error
-
-                    ind += 1
-                    print(
-                        f"Ready {ind} from {count_trj*len(prob)*len(pset.items())}, trajectory num={i+1}, prob={p}, time = {time.time() - start_time}s "
-                    )
-
-            np.save(matrix_er_fn, ar_matrix_error)
-            np.save(prob_er_fn, ar_prob_error)
-            np.save(hybrid_er_fn, ar_hybrid_error)
+            # простая валидация, чтобы случайно не продолжить "чужой" прогресс
+            if (
+                ckpt.get("k") == k
+                and ckpt.get("count_steps") == count_steps
+                and ckpt.get("count_trj") == count_trj
+                and np.allclose(ckpt.get("prob"), prob)
+            ):
+                ar_matrix_error = ckpt["ar_matrix_error"]
+                ar_prob_error = ckpt["ar_prob_error"]
+                ar_hybrid_error = ckpt["ar_hybrid_error"]
+                next_ind = int(ckpt["next_ind"])
+                kprint(f"[RESUME] k={k}: continue from ind={next_ind}")
+            else:
+                kprint(
+                    f"[RESUME] k={k}: checkpoint params mismatch, starting from scratch"
+                )
+                ar_matrix_error = np.zeros(shape=(len(prob), count_trj))
+                ar_prob_error = np.zeros(shape=(len(prob), count_trj))
+                ar_hybrid_error = np.zeros(shape=(len(prob), count_trj))
         else:
-            ind += count_trj * len(prob)
+            ar_matrix_error = np.zeros(shape=(len(prob), count_trj))
+            ar_prob_error = np.zeros(shape=(len(prob), count_trj))
+            ar_hybrid_error = np.zeros(shape=(len(prob), count_trj))
+
+        total_jobs_k = _calc_total_jobs(count_trj, prob)
+
+        # если по этому k уже всё посчитано, то можно сразу сохранить итоговые npy и идти дальше
+        if next_ind >= total_jobs_k:
+            kprint(
+                f"[SKIP] k={k}: already finished ({next_ind}/{total_jobs_k})"
+            )
+        else:
+            # основной цикл: плоский индекс -> (j, i)
+            for flat in range(next_ind, total_jobs_k):
+                j = flat // count_trj
+                i = flat % count_trj
+                p = float(prob[j])
+
+                start_time = time.time()
+                simulator = KerogenWalkSimulator(bs_psd, bs_ps, bs_ptl, k, p)
+
+                traj = simulator.run(count_steps)
+                real_traps = traj.traps.copy().astype(np.int32)
+
+                matrix_traps_result = matrix_analyzer.run(traj).astype(np.int32)
+                prob_traps_result = prob_analizer.run(traj).astype(np.int32)
+
+                hybrid_analizer.set_trap_approx(matrix_traps_result)
+                hybrid_traps_result = hybrid_analizer.run(traj).astype(np.int32)
+
+                matrix_error = min(
+                    np.sum(np.abs(real_traps - matrix_traps_result[:-1])),
+                    np.sum(np.abs(real_traps - matrix_traps_result[1:])),
+                )
+                prob_error = np.sum(np.abs(real_traps - prob_traps_result))
+                hybrid_error = np.sum(np.abs(real_traps - hybrid_traps_result))
+
+                ar_prob_error[j, i] = prob_error
+                ar_matrix_error[j, i] = matrix_error
+                ar_hybrid_error[j, i] = hybrid_error
+
+                # глобальный ind (как у тебя в логе) — сделаем совместимым по смыслу:
+                # ind считает все k подряд, но у нас checkpoint на k.
+                # Для печати оставим "локальный" ind внутри k (1..total_jobs_k).
+                local_ind_1based = flat + 1
+
+                kprint(
+                    f"Ready {local_ind_1based} from {total_jobs_k}, trajectory num={i+1}, p={p}, k (non trap prob) = {k}, time = {time.time() - start_time}s "
+                )
+
+                # checkpoint после каждой траектории (можно реже — см. ниже)
+                ckpt = {
+                    "k": k,
+                    "count_steps": count_steps,
+                    "count_trj": count_trj,
+                    "prob": prob,
+                    "next_ind": flat + 1,
+                    "ar_matrix_error": ar_matrix_error,
+                    "ar_prob_error": ar_prob_error,
+                    "ar_hybrid_error": ar_hybrid_error,
+                }
+                _atomic_pickle_dump(ckpt, ckpt_fn)
+
+            # после завершения k — сохраняем итоговые npy атомарно
+            _atomic_npy_save(matrix_er_fn, ar_matrix_error)
+            _atomic_npy_save(prob_er_fn, ar_prob_error)
+            _atomic_npy_save(hybrid_er_fn, ar_hybrid_error)
+
+            # checkpoint можно удалить, если хочешь
+            # Path(ckpt_fn).unlink(missing_ok=True)
 
         ar_matrix_error = np.load(matrix_er_fn)
         ar_prob_error = np.load(prob_er_fn)
@@ -268,22 +355,6 @@ if __name__ == '__main__':
         type=str,
         default="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/",
     )
-    parser.add_argument(
-        '--pnm_name',
-        type=str,
-        default="num=1640025000_500_500_500",
-    )
-
-    # parser.add_argument(
-    #     '--path_to_save',
-    #     type=str,
-    #     default="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/errors/",
-    # )
-    # parser.add_argument(
-    #     '--path_to_pil',
-    #     type=str,
-    #     default="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/pi_l.npy",
-    # )
     args = parser.parse_args()
 
-    run(args.path_to_main, args.pnm_name)
+    run(args.path_to_main)

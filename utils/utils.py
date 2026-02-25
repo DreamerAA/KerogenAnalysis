@@ -1,15 +1,94 @@
 import numpy as np
 import numpy.typing as npt
 from scipy import stats
-from typing import List
+from typing import List, Any, TextIO
 from base.kerogendata import AtomData
+import builtins
+import sys
+from scipy.stats import poisson
 from base.boundingbox import BoundingBox
+from utils.types import NPFArray, NPIArray, NPBArray
 
-NPBArray = npt.NDArray[np.bool_]
-NPFArray = npt.NDArray[np.float32]
-NPIArray = npt.NDArray[np.int32]
-f32 = np.float32
-i32 = np.int32
+
+def create_empirical_cdf(vals, n=30):
+    p, bb = np.histogram(vals, bins=n)
+    xdel = bb[1] - bb[0]
+    x = (bb[:-1] + xdel * 0.5).reshape(n, 1)
+    pn = (np.cumsum(p) / np.sum(p)).reshape(n, 1)
+    pn[0] = 0
+    return np.hstack((x, pn))
+
+
+import numpy as np
+import numpy.typing as npt
+from scipy.stats import poisson
+
+
+def ps_generate(
+    type: str, max_count_step: int = 100
+) -> npt.NDArray[np.float32]:
+    steps = np.arange(0, max_count_step, dtype=np.float32)
+
+    ps = np.zeros((len(steps), 2), dtype=np.float32)
+    ps[:, 0] = steps
+
+    if type == "poisson":
+        # ВАЖНО: loc=-50 сдвигает распределение. это может давать "странные" формы на малом диапазоне steps.
+        raw = poisson.cdf(steps.astype(int), 100, loc=-50).astype(np.float32)
+
+        denom = raw[-1] - raw[0]
+        if denom <= 0:
+            # на этом диапазоне CDF почти не растёт -> деградируем в ступеньку
+            prob = np.zeros_like(raw)
+            prob[-1] = 1.0
+        else:
+            prob = (raw - raw[0]) / denom
+            prob[0] = 0.0
+            prob[-1] = 1.0
+            prob = np.maximum.accumulate(prob)
+
+        ps[:, 1] = prob
+
+    else:
+        # "uniform" ветка: линейная CDF
+        prob = steps / steps[-1] if steps[-1] != 0 else np.zeros_like(steps)
+        prob[0] = 0.0
+        prob[-1] = 1.0
+        ps[:, 1] = prob.astype(np.float32)
+
+    return ps
+
+
+def write_binary_file(array: npt.NDArray[np.int8], file_name: str) -> None:
+    with open(file_name, 'wb') as file:
+        for i in range(array.shape[2]):
+            for j in range(array.shape[1]):
+                file.write(bytes(bytearray(array[:, j, i])))
+
+
+def kprint(
+    *args: Any,
+    sep: str | None = " ",
+    end: str = "\n",
+    file: TextIO | None = None,
+    flush: bool = False,
+    prefix: str = " --- ",
+) -> None:
+    """
+    Полный аналог print(...) с префиксом перед сообщением.
+    - *args: любые объекты как и в print
+    - sep: разделитель между args; если None — без разделителя (как в print)
+    - end: окончание строки
+    - file: поток вывода (по умолчанию sys.stdout)
+    - flush: принудительная очистка буфера
+    - prefix: настраиваемый префикс (по умолчанию ' --- ')
+    """
+    if file is None:
+        file = sys.stdout
+
+    joiner = "" if sep is None else sep
+    body = joiner.join(map(str, args))  # как print: str() для каждого аргумента
+    builtins.print(prefix + body, end=end, file=file, flush=flush)
 
 
 def create_box_mask(atoms: List[AtomData], box: BoundingBox):
