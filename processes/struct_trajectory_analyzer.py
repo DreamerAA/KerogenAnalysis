@@ -13,6 +13,8 @@ from scipy import ndimage
 from scipy.signal import convolve2d
 from skimage import measure
 
+from utils.types import NPFArray, NPIArray, NPBArray, f32
+
 from base.trajectory import Trajectory
 from processes.trajectory_analyzer import TrajectoryAnalyzer
 
@@ -30,17 +32,17 @@ list_vert_median = {
 
 @njit
 def find_min_max_index(
-    index: int, arr: npt.NDArray[np.int64]
+    index: int, arr: NPBArray
 ) -> Tuple[int, int]:
     N = len(arr)
     tpos_up = index
     tpos_down = index
     for v in arr[(index + 1) :]:
-        if v == 0 or tpos_up == N - 1:
+        if not v or tpos_up == N - 1:
             break
         tpos_up += 1
     for v in arr[:(index)][::-1]:
-        if v == 0 or tpos_down == 0:
+        if not v or tpos_down == 0:
             break
         tpos_down -= 1
 
@@ -76,7 +78,7 @@ class StructAnalizerParams:
         Used to normalize the distance matrix. (lambda in article)
         and by default affects the number of filled diagonals in the distance matrix
     """
-    list_mu: npt.NDArray[np.float32] = field(
+    list_mu: npt.NDArray[f32] = field(
         default_factory=lambda: np.array([1, 1.5, 2])
     )
 
@@ -136,7 +138,7 @@ class StructTrajectoryAnalizer(TrajectoryAnalyzer):
         self.kernel = (
             np.ones(
                 shape=(2 * params.kernel_size + 1, 2 * params.kernel_size + 1),
-                dtype=np.float32,
+                dtype=f32,
             )
             / (2 * params.kernel_size + 1) ** 2
         )
@@ -145,8 +147,7 @@ class StructTrajectoryAnalizer(TrajectoryAnalyzer):
             (self.params.diag_percentile, params.traj_type)
         ]
 
-    @cached_property
-    @abstractmethod
+    @property
     def name(self) -> str:
         return "struct"
 
@@ -180,7 +181,7 @@ class StructTrajectoryAnalizer(TrajectoryAnalyzer):
         list_trapped = np.zeros((trj.count_points,), dtype=np.bool_)
         for flag, result in results:
             if flag:
-                list_trapped = np.logical_or(list_trapped, result > 0)
+                list_trapped |= result
         return list_trapped
 
     def analyse_by_mu(
@@ -219,7 +220,7 @@ class StructTrajectoryAnalizer(TrajectoryAnalyzer):
         list_index_false_trap = np.where(length_traps <= crit)[0]
 
         if len(list_index_false_trap) == 0:
-            return (False, np.zeros(shape=(0, 0), dtype=np.bool_))
+            return (False, np.zeros(shape=(count_points,), dtype=np.bool_))
 
         for ind_false_trap in list_index_false_trap:
             i1, i2 = (
@@ -230,27 +231,61 @@ class StructTrajectoryAnalizer(TrajectoryAnalyzer):
 
         return (True, list_trapped_m)
 
+    def laplacian_matrix_fast(
+        self, points: NPFArray, mu: float
+    ) -> NPFArray:
+        # N x 3
+        inc = np.asarray(points[1:] - points[:-1], dtype=f32)
+
+        # std per axis (защита от деления на ноль)
+        std = inc.std(axis=0, ddof=1).astype(f32)
+        std = np.maximum(std, 1e-12).astype(f32)
+
+        # нормализованные приращения -> "normal_inc" как у тебя
+        tmp = np.zeros((points.shape[0], 3), dtype=f32)
+        tmp[1:] = inc / std
+        X = np.cumsum(tmp, axis=0, dtype=f32)  # shape (N,3)
+
+        # Векторизованная матрица ||x_i - x_j||^2:
+        # D2 = ||x||^2[:,None] + ||x||^2[None,:] - 2 X X^T
+        x2 = np.sum(X * X, axis=1, dtype=f32)                # (N,)
+        G = X @ X.T                                                 # (N,N) float32
+        D2 = (x2[:, None] + x2[None, :] - 2.0 * G).astype(f32)
+
+        # из-за численных ошибок может появиться -1e-7: клипнем
+        np.maximum(D2, 0.0, out=D2)
+
+        # S = exp(-0.5/mu^2 * D2)
+        inv = f32(-0.5) / f32(mu * mu)
+        S = np.exp(D2 * inv, dtype=f32)
+
+        # сглаживание ядром (быстрее convolve2d для маленьких ядер)
+        if self.params.kernel_size > 0:
+            S = ndimage.convolve(S, self.kernel, mode="constant", cval=0.0)
+
+        return S
+
     def laplacian_matrix(
         self, points: npt.NDArray[np.float64], mu: float
-    ) -> npt.NDArray[np.float32]:
+    ) -> npt.NDArray[f32]:
         # UNTITLED3 Summary of this function goes here
         #    Detailed explanation goes here
         No = points.shape[0]
         inc = points[1:,] - points[:-1,]
         std = np.std(inc, 0, ddof=1)
-        tmp = np.zeros(shape=(No, 3), dtype=np.float32)
+        tmp = np.zeros(shape=(No, 3), dtype=f32)
         tmp[1:, :] = inc / std
-        normal_inc = np.cumsum(tmp, 0, dtype=np.float32)
-        S = np.zeros(shape=(No, No), dtype=np.float32)
+        normal_inc = np.cumsum(tmp, 0, dtype=f32)
+        S = np.zeros(shape=(No, No), dtype=f32)
         for i in range(No):
             ts = (normal_inc - normal_inc[i, :]) ** 2
-            ss = np.sum(ts, 1, dtype=np.float32)
+            ss = np.sum(ts, 1, dtype=f32)
             S[:, i] = ss.copy()
             S[i, :] = ss.copy()
 
         S *= -0.5 / mu**2
-        S = np.exp(S, dtype=np.float32)
-        S: npt.NDArray[np.float32] = (
+        S = np.exp(S, dtype=f32)
+        S: npt.NDArray[f32] = (
             convolve2d(S, self.kernel, 'same')
             if self.params.kernel_size > 0
             else S
@@ -264,7 +299,7 @@ class StructTrajectoryAnalizer(TrajectoryAnalyzer):
     ]:
         N = points.shape[0]
         # Laplacian matrix (distance matrix)
-        S3 = self.laplacian_matrix(points, mu)
+        S3 = self.laplacian_matrix_fast(points, mu)
         mat = S3 > np.exp(-1)
         # fill diagonals
         np.fill_diagonal(mat, True)  # first diagonal
@@ -324,7 +359,7 @@ class StructTrajectoryAnalizer(TrajectoryAnalyzer):
         List_min_max = []
         stop = 0
         while stop == 0:
-            if list_trapped[index] == 1:
+            if list_trapped[index]:
                 pos_down, pos_up = find_min_max_index(index, list_trapped)
                 List_min_max.append((pos_down, pos_up))
                 index = pos_up + 1

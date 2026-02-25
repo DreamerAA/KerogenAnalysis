@@ -815,8 +815,6 @@ class Visualizer:
 
         irradiance = renderer.GetEnvMapIrradiance()
         irradiance.SetIrradianceStep(0.3)
-        renderer.UseImageBasedLightingOn()
-        renderer.UseSphericalHarmonicsOn()
 
         win_col = WinStructCollection(iren)
         collection.append(win_col)

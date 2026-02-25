@@ -19,22 +19,19 @@ def create_empirical_cdf(vals, n=30):
     return np.hstack((x, pn))
 
 
-import numpy as np
-import numpy.typing as npt
-from scipy.stats import poisson
 
 
 def ps_generate(
-    type: str, max_count_step: int = 100
+    type: str, mean_count: int = 50
 ) -> npt.NDArray[np.float32]:
-    steps = np.arange(0, max_count_step, dtype=np.float32)
+    steps = np.arange(0, 2*mean_count, dtype=np.float32)
 
     ps = np.zeros((len(steps), 2), dtype=np.float32)
     ps[:, 0] = steps
 
     if type == "poisson":
         # ВАЖНО: loc=-50 сдвигает распределение. это может давать "странные" формы на малом диапазоне steps.
-        raw = poisson.cdf(steps.astype(int), 100, loc=-50).astype(np.float32)
+        raw = poisson.cdf(steps.astype(int), mean_count).astype(np.float32)
 
         denom = raw[-1] - raw[0]
         if denom <= 0:

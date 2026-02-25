@@ -50,7 +50,7 @@ class ProbabilityTrajectoryAnalizer(TrajectoryAnalyzer):
         self,
         trj: Trajectory,
     ) -> NPBArray:
-        _, probabilityies = self.analyze(
+        _, probabilityies = self.analyze2(
             trj,
             self.throat_lengthes_wf,
             self.pi_l_gf,
@@ -68,7 +68,7 @@ class ProbabilityTrajectoryAnalizer(TrajectoryAnalyzer):
         return transition_step_fitter, trapped_step_fitter
 
     @staticmethod
-    def analyze2(
+    def analyze(
         trj: Trajectory,
         transition_step_fitter: WeibullFitter,
         trapped_step_fitter: GammaFitter,
@@ -115,7 +115,7 @@ class ProbabilityTrajectoryAnalizer(TrajectoryAnalyzer):
         return (p_trap, gamma)
 
     @staticmethod
-    def analyze(
+    def analyze2(
         trj: Trajectory,
         transition_step_fitter: WeibullFitter,
         trapped_step_fitter: GammaFitter,

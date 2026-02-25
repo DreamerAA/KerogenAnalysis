@@ -71,6 +71,7 @@ class KerogenWalkSimulator:
         bs_ptl: BufferedSampler,
         k,
         p,
+        with_history: bool = True
     ):
         """
         :param self: Represent the instance of the class
@@ -88,6 +89,7 @@ class KerogenWalkSimulator:
         self.k = k
         self.bs_dir = BufferedSampler(UnitVector3(), "dir", size=100_000)
         self.bs_el = BufferedSampler(Uniform01(), "el", size=100_000)
+        self.with_history = with_history
 
     @staticmethod
     def gen_new_pos(cout_points, radius, pos):
@@ -186,7 +188,8 @@ class KerogenWalkSimulator:
             traps[cur_pos_ind : (cur_pos_ind + count_steps)] = True
             return cur_pos_ind + count_steps, cur_trap_ind
 
-        for _ in range(10):
+        count_history_steps = 10 if self.with_history else 1
+        for _ in range(count_history_steps):
             cur_pos_ind, cur_trap_ind = steps_inside(
                 cur_pos_ind, cur_trap_ind, self.bs_ps, count_points
             )
