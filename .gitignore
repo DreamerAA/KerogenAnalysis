@@ -4,6 +4,9 @@ kerogen/
 *.py[cod]
 *$py.class
 
+# VSCode
+.vscode
+
 # C extensions
 *.so
 
