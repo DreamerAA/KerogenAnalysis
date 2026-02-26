@@ -64,7 +64,7 @@ class HybridTrajectoryAnalizer(TrajectoryAnalyzer):
     ) -> NPBArray:
         trap_approx = self.get_trap_approx(trj)
 
-        _, probabilityies = ProbabilityTrajectoryAnalizer.analyze2(
+        _, probabilityies = ProbabilityTrajectoryAnalizer.analyze(
             trj,
             self.throat_lengthes_wf,
             self.pi_l_gf,

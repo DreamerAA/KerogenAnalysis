@@ -10,6 +10,9 @@ kerogen/
 # C extensions
 *.so
 
+# cProfile
+*.prof
+
 # Distribution / packaging
 .Python
 build/

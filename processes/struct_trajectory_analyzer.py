@@ -31,9 +31,7 @@ list_vert_median = {
 
 
 @njit
-def find_min_max_index(
-    index: int, arr: NPBArray
-) -> Tuple[int, int]:
+def find_min_max_index(index: int, arr: NPBArray) -> Tuple[int, int]:
     N = len(arr)
     tpos_up = index
     tpos_down = index
@@ -92,8 +90,6 @@ class StructAnalizerParams:
     """
     p_value: float = 0.01
 
-    num_jobs: int = 1
-
     @staticmethod
     def all_params():
         # good params  [154, 162, 186]
@@ -113,7 +109,6 @@ class StructAnalizerParams:
     def get_params(
         indexes: Optional[List[int]] = None,
         lmu: Optional[List[int]] = None,
-        num_jobs: int = 1,
     ) -> List['StructAnalizerParams']:
         list_mu = (
             np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0]) if lmu is None else lmu
@@ -125,7 +120,7 @@ class StructAnalizerParams:
             tparams = [v for _, v in atparams.items()]
 
         aparams = [
-            StructAnalizerParams(tt, nu, dp, ks, list_mu, pv, num_jobs)
+            StructAnalizerParams(tt, nu, dp, ks, list_mu, pv)
             for dp, pv, nu, tt, ks in tparams
         ]
         return aparams
@@ -147,13 +142,6 @@ class StructTrajectoryAnalizer(TrajectoryAnalyzer):
             (self.params.diag_percentile, params.traj_type)
         ]
 
-    @property
-    def name(self) -> str:
-        return "struct"
-
-    def run(self, trj: Trajectory) -> npt.NDArray[np.bool_]:
-        count_points = trj.count_points
-
         with open(
             f"./list_threshold/nuc{int(self.params.nu * 100)}diag_perc={self.params.diag_percentile}.pkl",
             'rb',
@@ -161,22 +149,26 @@ class StructTrajectoryAnalizer(TrajectoryAnalyzer):
             mat = pickle.load(handle)
 
         method = self.params.traj_type + "_3D"
-        list_threshold = mat["list_threshold"][method]
-        list_trapped = np.zeros(shape=(count_points,), dtype=np.bool_)
+        self.list_threshold = mat["list_threshold"][method]
 
+    @property
+    def name(self) -> str:
+        return "struct"
+
+    def run(self, trj: Trajectory) -> npt.NDArray[np.bool_]:
         points = trj.points_without_periodic
+        sq_dist_matrix = self.compute_pairwise_sq_dist(points)
 
         def analyse(mu: float) -> Tuple[bool, npt.NDArray[np.bool_]]:
             return self.analyse_by_mu(
-                points, self.params.p_value, self.params.nu, mu, list_threshold
+                sq_dist_matrix,
+                self.params.p_value,
+                self.params.nu,
+                mu,
+                self.list_threshold,
             )
 
-        if self.params.num_jobs != 1:
-            results = Parallel(n_jobs=self.params.num_jobs)(
-                delayed(analyse)(mu) for mu in self.params.list_mu
-            )
-        else:
-            results = [analyse(mu) for mu in self.params.list_mu]
+        results = [analyse(mu) for mu in self.params.list_mu]
 
         list_trapped = np.zeros((trj.count_points,), dtype=np.bool_)
         for flag, result in results:
@@ -186,24 +178,24 @@ class StructTrajectoryAnalizer(TrajectoryAnalyzer):
 
     def analyse_by_mu(
         self,
-        points: npt.NDArray[np.float64],
+        sq_dist_matrix: NPFArray,
         p_value: float,
         nu: float,
         mu: float,
-        list_threshold: npt.NDArray[np.int32],
-    ) -> Tuple[bool, npt.NDArray[np.bool_]]:
-        count_points = points.shape[0]
+        list_threshold: NPIArray,
+    ) -> Tuple[bool, NPBArray]:
+        count_points = sq_dist_matrix.shape[0]
         ind1 = int(mu * 2) - 1
         ind2 = int((1.0 - p_value) * 100.0) - 1  # check this shift
         crit = list_threshold[ind1, ind2]
         if count_points < crit:
-            return (False, np.zeros(shape=(0, 0), dtype=np.bool_))
+            return (False, np.zeros(shape=(count_points,), dtype=np.bool_))
         (
             list_vertical_m,
             list_diagonal_m,
             list_parallel_m,
         ) = self.RQA_block_measures(
-            points, mu, self.diag_fill_list[int(2 * mu) - 1]
+            sq_dist_matrix, mu, self.diag_fill_list[int(2 * mu) - 1]
         )
 
         list_trapped_m = (
@@ -215,12 +207,12 @@ class StructTrajectoryAnalizer(TrajectoryAnalyzer):
         )
 
         if len(List_min_max) == 0:
-            return (False, np.zeros(shape=(0, 0), dtype=np.bool_))
+            return (True, list_trapped_m)
         length_traps = List_min_max[:, 1] - List_min_max[:, 0] + 1
         list_index_false_trap = np.where(length_traps <= crit)[0]
 
         if len(list_index_false_trap) == 0:
-            return (False, np.zeros(shape=(count_points,), dtype=np.bool_))
+            return (True, list_trapped_m)
 
         for ind_false_trap in list_index_false_trap:
             i1, i2 = (
@@ -231,9 +223,7 @@ class StructTrajectoryAnalizer(TrajectoryAnalyzer):
 
         return (True, list_trapped_m)
 
-    def laplacian_matrix_fast(
-        self, points: NPFArray, mu: float
-    ) -> NPFArray:
+    def compute_pairwise_sq_dist(self, points: NPFArray) -> NPFArray:
         # N x 3
         inc = np.asarray(points[1:] - points[:-1], dtype=f32)
 
@@ -248,71 +238,48 @@ class StructTrajectoryAnalizer(TrajectoryAnalyzer):
 
         # Векторизованная матрица ||x_i - x_j||^2:
         # D2 = ||x||^2[:,None] + ||x||^2[None,:] - 2 X X^T
-        x2 = np.sum(X * X, axis=1, dtype=f32)                # (N,)
-        G = X @ X.T                                                 # (N,N) float32
-        D2 = (x2[:, None] + x2[None, :] - 2.0 * G).astype(f32)
+        x2 = np.sum(X * X, axis=1, dtype=f32)  # (N,)
+        G = X @ X.T  # (N,N) float32
+        sq_dist_matrix = (x2[:, None] + x2[None, :] - 2.0 * G).astype(f32)
 
         # из-за численных ошибок может появиться -1e-7: клипнем
-        np.maximum(D2, 0.0, out=D2)
+        np.maximum(sq_dist_matrix, 0.0, out=sq_dist_matrix)
+        return sq_dist_matrix
 
-        # S = exp(-0.5/mu^2 * D2)
-        inv = f32(-0.5) / f32(mu * mu)
-        S = np.exp(D2 * inv, dtype=f32)
-
-        # сглаживание ядром (быстрее convolve2d для маленьких ядер)
+    def bin_laplacian_matrix_fast(
+        self, sq_dist_matrix: NPFArray, mu: float
+    ) -> NPBArray:
         if self.params.kernel_size > 0:
-            S = ndimage.convolve(S, self.kernel, mode="constant", cval=0.0)
+            inv = f32(-0.5) / f32(mu * mu)
+            S = (sq_dist_matrix * inv).astype(f32, copy=False)
+            np.exp(S, out=S)  # in-place exp
+            # сглаживание ядром (быстрее convolve2d для маленьких ядер)
+            size = 2 * self.params.kernel_size + 1
+            S = ndimage.uniform_filter(S, size=size, mode="constant", cval=0.0)
+            result: NPBArray = S > np.exp(-1)
+            return result
 
-        return S
-
-    def laplacian_matrix(
-        self, points: npt.NDArray[np.float64], mu: float
-    ) -> npt.NDArray[f32]:
-        # UNTITLED3 Summary of this function goes here
-        #    Detailed explanation goes here
-        No = points.shape[0]
-        inc = points[1:,] - points[:-1,]
-        std = np.std(inc, 0, ddof=1)
-        tmp = np.zeros(shape=(No, 3), dtype=f32)
-        tmp[1:, :] = inc / std
-        normal_inc = np.cumsum(tmp, 0, dtype=f32)
-        S = np.zeros(shape=(No, No), dtype=f32)
-        for i in range(No):
-            ts = (normal_inc - normal_inc[i, :]) ** 2
-            ss = np.sum(ts, 1, dtype=f32)
-            S[:, i] = ss.copy()
-            S[i, :] = ss.copy()
-
-        S *= -0.5 / mu**2
-        S = np.exp(S, dtype=f32)
-        S: npt.NDArray[f32] = (
-            convolve2d(S, self.kernel, 'same')
-            if self.params.kernel_size > 0
-            else S
-        )
-        return S
+        return sq_dist_matrix < 2 * mu * mu
 
     def RQA_block_measures(
-        self, points: npt.NDArray[np.float64], mu: float, diagonal_max: int
-    ) -> Tuple[
-        npt.NDArray[np.int64], npt.NDArray[np.int64], npt.NDArray[np.int64]
-    ]:
-        N = points.shape[0]
+        self, sq_dist_matrix: NPFArray, mu: float, diagonal_max: int
+    ) -> Tuple[NPIArray, NPIArray, NPIArray]:
+        N = sq_dist_matrix.shape[0]
         # Laplacian matrix (distance matrix)
-        S3 = self.laplacian_matrix_fast(points, mu)
-        mat = S3 > np.exp(-1)
+        mat = self.bin_laplacian_matrix_fast(sq_dist_matrix, mu)
+
         # fill diagonals
         np.fill_diagonal(mat, True)  # first diagonal
         #  other diagonal depending on the radius size
+        base = np.arange(N)
         for num in range(1, diagonal_max + 1):
-            ind = np.array(range(N - num))
+            ind = base[: N - num]
             mat[ind, ind + num] = True
             mat[ind + num, ind] = True
 
         #  select matrix part connex to the diagonal line
         L = measure.label(mat, connectivity=2)
-        matrix = np.zeros(L.shape)
-        matrix[L == 1] = 1
+        matrix = L == 1
         #  fill holes
         matrix = ndimage.binary_fill_holes(matrix)
 
@@ -323,15 +290,18 @@ class StructTrajectoryAnalizer(TrajectoryAnalyzer):
         #  analysis
         for n in range(N):
             #  distribution of vertical lines
-            if n < N / 2:
-                list_diag_ind = np.array(range(2 * (n + 1) - 1))  # + 1
+            if n < N // 2:
+                list_diag_ind = np.arange(0, 2 * n + 1, dtype=np.int32)
             else:
-                list_diag_ind = np.array(range(2 * (n + 1) - N - 1, N))
+                start = 2 * n - N + 1
+                list_diag_ind = np.arange(start, N, dtype=np.int32)
 
             list_bin_vert = matrix[list_diag_ind, list_diag_ind[::-1]]
-            index = np.where(
-                np.logical_and(list_diag_ind == n, list_diag_ind[::-1] == n)
-            )[0][0]
+            if n < N // 2:
+                index = n
+            else:
+                start = 2 * n - N + 1
+                index = N - n - 1
 
             ud_bin, ud_ver = StructTrajectoryAnalizer.get_up_down(
                 index, n, list_bin_vert == 1, matrix[:, n] == 1
@@ -353,7 +323,7 @@ class StructTrajectoryAnalizer(TrajectoryAnalyzer):
     @staticmethod
     def Make_list_min_max_index_equal(
         list_trapped: npt.NDArray[np.bool_],
-    ) -> npt.NDArray[np.int64]:
+    ) -> NPIArray:
         N_vec = len(list_trapped)
         index = 0
         List_min_max = []

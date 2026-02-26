@@ -13,12 +13,9 @@ import networkx as nx
 import numpy as np
 import numpy.typing as npt
 
+from utils.types import NPFArray, NPIArray, NPBArray, f32
 from base.bufferedsampler import BufferedSampler
 from processes.distribution_fitter import WeibullFitter
-
-path = Path(realpath(__file__))
-parent_dir = str(path.parent.parent.absolute())
-sys.path.append(parent_dir)
 
 from base.boundingbox import BoundingBox, Range
 from base.trajectory import Trajectory
@@ -26,15 +23,15 @@ from base.trajectory import Trajectory
 
 class Uniform01:
     def rvs(self, size: int) -> NPFArray:
-        return np.random.random(size).astype(np.float32)
+        return np.random.random(size).astype(f32)
 
 
 class UnitVector3:
-    def rvs(self, size: int) -> npt.NDArray[np.float32]:
-        v = np.random.normal(0.0, 1.0, size=(size, 3)).astype(np.float32)
-        norm = np.linalg.norm(v, axis=1).astype(np.float32)
+    def rvs(self, size: int) -> NPFArray:
+        v = np.random.normal(0.0, 1.0, size=(size, 3)).astype(f32)
+        norm = np.linalg.norm(v, axis=1).astype(f32)
         # крайне редко norm=0; подстрахуемся
-        norm = np.where(norm == 0, 1.0, norm).astype(np.float32)
+        norm = np.where(norm == 0, 1.0, norm).astype(f32)
         v /= norm[:, None]
         return v
 
@@ -71,7 +68,7 @@ class KerogenWalkSimulator:
         bs_ptl: BufferedSampler,
         k,
         p,
-        with_history: bool = True
+        with_history: bool = True,
     ):
         """
         :param self: Represent the instance of the class
@@ -106,15 +103,15 @@ class KerogenWalkSimulator:
             if points.shape[0] > 0:
                 assert (points[0, :]).shape == pos.shape
 
-            for i in range(3):
-                points[:, i] = points[:, i] * (
-                    np.array(
-                        np.random.uniform(1.0, 3.0, size=points.shape[0]),
-                        dtype=np.float32,
-                    )
-                    if random.random() < 0.4
-                    else 1
-                )
+            # for i in range(3):
+            #     points[:, i] = points[:, i] * (
+            #         np.array(
+            #             np.random.uniform(1.0, 3.0, size=points.shape[0]),
+            #             dtype=f32,
+            #         )
+            #         if random.random() < 0.4
+            #         else 1
+            #     )
 
             points = points + pos
 
@@ -128,7 +125,7 @@ class KerogenWalkSimulator:
 
     def run(self, count_points) -> Trajectory:
         traps = np.zeros(shape=(count_points - 1,), dtype=np.bool_)
-        points = np.zeros(shape=(count_points, 3), dtype=np.float32)
+        points = np.zeros(shape=(count_points, 3), dtype=f32)
 
         cur_pos_ind = 0
         cur_trap_ind = 0
@@ -159,7 +156,6 @@ class KerogenWalkSimulator:
             trap_pos = np.array(node['pos'])
             size = node['size']
             new_pos = KerogenWalkSimulator.gen_new_pos(1, size, trap_pos)
-            # assert np.sqrt(np.sum((trap_pos - new_pos) ** 2)) <= size
             points[cur_pos_ind + 1, :] = new_pos
             traps[cur_pos_ind] = False
             return cur_pos_ind + 1, node_num
@@ -208,9 +204,7 @@ class KerogenWalkSimulator:
         point_start_ind = cur_pos_ind
 
         tmp_points = points
-        points = np.zeros(
-            shape=(cur_pos_ind + count_points, 3), dtype=np.float32
-        )
+        points = np.zeros(shape=(cur_pos_ind + count_points, 3), dtype=f32)
         points[:count_points, :] = tmp_points
 
         tmp_traps = traps

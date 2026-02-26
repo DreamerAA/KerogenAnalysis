@@ -50,7 +50,7 @@ class ProbabilityTrajectoryAnalizer(TrajectoryAnalyzer):
         self,
         trj: Trajectory,
     ) -> NPBArray:
-        _, probabilityies = self.analyze2(
+        _, probabilityies = self.analyze(
             trj,
             self.throat_lengthes_wf,
             self.pi_l_gf,

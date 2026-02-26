@@ -13,6 +13,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
 from base.discretecdf import DiscreteCDF
+from processes.trap_extractor import TrapExtractor
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
@@ -42,13 +43,13 @@ def save_error_corridor_png(
     out_dir: str,
     filename: str,
     prob_grid: np.ndarray,
-    ar_prob_error: np.ndarray,    # shape: (P, T)
+    ar_prob_error: np.ndarray,  # shape: (P, T)
     ar_hybrid_error: np.ndarray,  # shape: (P, T)
     ar_struct_error: np.ndarray,  # shape: (P, T)
     title: str,
-    q_low: float = 0.1,           # 10%
-    q_high: float = 0.9,          # 90%
-    center: str = "median",       # "mean" | "median"
+    q_low: float = 0.1,  # 10%
+    q_high: float = 0.9,  # 90%
+    center: str = "median",  # "mean" | "median"
 ) -> None:
     Path(out_dir).mkdir(parents=True, exist_ok=True)
 
@@ -70,15 +71,27 @@ def save_error_corridor_png(
 
     # Probabilistic
     plt.fill_between(prob_grid, p_lo, p_hi, alpha=0.2)
-    plt.plot(prob_grid, p_c, label=f"Prob ({center}, {int(q_low*100)}–{int(q_high*100)}%)")
+    plt.plot(
+        prob_grid,
+        p_c,
+        label=f"Prob ({center}, {int(q_low*100)}–{int(q_high*100)}%)",
+    )
 
     # Hybrid
     plt.fill_between(prob_grid, h_lo, h_hi, alpha=0.2)
-    plt.plot(prob_grid, h_c, label=f"Hybrid ({center}, {int(q_low*100)}–{int(q_high*100)}%)")
+    plt.plot(
+        prob_grid,
+        h_c,
+        label=f"Hybrid ({center}, {int(q_low*100)}–{int(q_high*100)}%)",
+    )
 
     # Structural
     plt.fill_between(prob_grid, s_lo, s_hi, alpha=0.2)
-    plt.plot(prob_grid, s_c, label=f"Structural ({center}, {int(q_low*100)}–{int(q_high*100)}%)")
+    plt.plot(
+        prob_grid,
+        s_c,
+        label=f"Structural ({center}, {int(q_low*100)}–{int(q_high*100)}%)",
+    )
 
     plt.grid(True)
     plt.xlabel("Probability move to next trap")
@@ -117,8 +130,8 @@ def _calc_total_jobs(count_trj: int, prob: np.ndarray) -> int:
 
 def run(
     path_to_main: str,
-    count_trj=5,
-    count_steps=5000,
+    count_trj=100,
+    count_steps=3000,
 ):
     path_to_save: str = join(path_to_main, "errors")
     path_to_pil_gf: str = join(path_to_main, "pi_l_gamma_fitter.pkl")
@@ -130,31 +143,28 @@ def run(
 
     params_struct_set = {
         0.1: StructAnalizerParams(
-            traj_type='Bm',
-            nu=0.9,
-            diag_percentile=0,
-            kernel_size=1,
-            list_mu=[0.5, 1.0, 1.5, 2.0, 2.5, 3.0],
-            p_value=0.9,
-            num_jobs=1,
-        ),
-        0.5: StructAnalizerParams(
-            traj_type='Bm',
-            nu=0.1,
-            diag_percentile=0,
-            kernel_size=1,
-            list_mu=[1.5],
-            p_value=0.9,
-            num_jobs=1,
-        ),
-        0.95: StructAnalizerParams(
             traj_type='fBm',
             nu=0.1,
             diag_percentile=0,
             kernel_size=0,
-            list_mu=[1.0],
-            p_value=0.01,
-            num_jobs=1,
+            list_mu=[0.5, 1.0, 1.5, 2.0, 2.5, 3.0],
+            p_value=0.9,
+        ),
+        0.5: StructAnalizerParams(
+            traj_type='fBm',
+            nu=0.1,
+            diag_percentile=0,
+            kernel_size=1,
+            list_mu=[1.5, 2.0],
+            p_value=0.9,
+        ),
+        0.9: StructAnalizerParams(
+            traj_type='Bm',
+            nu=0.5,
+            diag_percentile=0,
+            kernel_size=1,
+            list_mu=[1.5],
+            p_value=0.1,
         ),
     }
 
@@ -162,15 +172,15 @@ def run(
         k: ProbabilityAnalizerParams(
             critical_probability=1e-3,
         )
-        for k in [0.1, 0.5, 0.95]
+        for k in [0.1, 0.5, 0.9]
     }
     params_hybrid_set = {
         k: HybridAnalizerParams(
             params_prob_set[k],
             params_struct_set[k],
-            0.1,
+            0.3,
         )
-        for k in [0.1, 0.5, 0.95]
+        for k in [0.1, 0.5, 0.9]
     }
     pset = {
         k: {
@@ -178,10 +188,10 @@ def run(
             "struct": params_struct_set[k],
             "prob": params_prob_set[k],
         }
-        # for k in [0.1, 0.5, 0.95]
-        for k in [0.5]
+        for k in [0.1, 0.5, 0.9]
+        # for k in [0.5]
     }
-    prob_grid = np.arange(0.0, 1.1, 0.1)
+    prob_grid = np.arange(0.0, 1.05, 0.05)
 
     if isfile(path_to_pil_gf):
         with open(path_to_pil_gf, "rb") as f:
@@ -200,27 +210,32 @@ def run(
     else:
         raise RuntimeError("throat_lengths not found")
 
-    
     psd = create_empirical_cdf(radiuses)
-    bs_psd = BufferedSampler(EmpiricalCDF(psd), "psd", size=100_000)
-    bs_ptl = BufferedSampler(throat_lengths_weibull_fitter, "ptl", size=100_000)
+    bs_psd = BufferedSampler(EmpiricalCDF(psd), "psd", size=10_000)
+    bs_ptl = BufferedSampler(throat_lengths_weibull_fitter, "ptl", size=10_000)
 
     # for ps_type in ["poisson", "uniform"]:
     for ps_type in ["uniform"]:
-        for mean_count_steps in [20, 50, 100, 150, 200]:
-        # for mean_count_steps in [20, 50]:
-    
+        for mean_count_steps in [100]:
+            # for mean_count_steps in [20, 50]:
+
             ps = ps_generate(ps_type, mean_count=mean_count_steps)
-            bs_ps = BufferedSampler(DiscreteCDF(ps), "ps", size=100_000)
+            bs_ps = BufferedSampler(DiscreteCDF(ps), "ps", size=10_000)
 
             for k, params in pset.items():
+                result_shape = (len(prob_grid), count_trj)
+
                 matrix_analyzer = StructTrajectoryAnalizer(params["struct"])
                 prob_analizer = ProbabilityTrajectoryAnalizer(
-                    params["prob"], pil_gamma_fitter, throat_lengths_weibull_fitter
+                    params["prob"],
+                    pil_gamma_fitter,
+                    throat_lengths_weibull_fitter,
                 )
 
                 hybrid_analizer = HybridTrajectoryAnalizer(
-                    params["hybrid"], pil_gamma_fitter, throat_lengths_weibull_fitter
+                    params["hybrid"],
+                    pil_gamma_fitter,
+                    throat_lengths_weibull_fitter,
                 )
 
                 exp_tag = f"ps={ps_type}_mean={mean_count_steps}_count_steps={count_steps}"
@@ -230,10 +245,7 @@ def run(
                 prob_er_fn = join(path_to_save, "prob_" + header)
                 hybrid_er_fn = join(path_to_save, "hybrid_" + header)
 
-                ckpt_fn = (
-                    path_to_save
-                    + f"/checkpoint_{exp_tag}_{add_tag}.pkl"
-                )
+                ckpt_fn = path_to_save + f"/checkpoint_{exp_tag}_{add_tag}.pkl"
 
                 # Инициализация/загрузка прогресса
                 next_ind = 0
@@ -248,6 +260,9 @@ def run(
                         and ckpt.get("count_trj") == count_trj
                         and np.allclose(ckpt.get("prob"), prob_grid)
                     ):
+                        prob_est_k = ckpt["prob_est_k"]
+                        matrix_est_k = ckpt["matrix_est_k"]
+                        hybrid_est_k = ckpt["hybrid_est_k"]
                         ar_matrix_error = ckpt["ar_matrix_error"]
                         ar_prob_error = ckpt["ar_prob_error"]
                         ar_hybrid_error = ckpt["ar_hybrid_error"]
@@ -257,13 +272,16 @@ def run(
                         kprint(
                             f"[RESUME] k={k}: checkpoint params mismatch, starting from scratch"
                         )
-                        ar_matrix_error = np.zeros(shape=(len(prob_grid), count_trj))
-                        ar_prob_error = np.zeros(shape=(len(prob_grid), count_trj))
-                        ar_hybrid_error = np.zeros(shape=(len(prob_grid), count_trj))
+                        ar_matrix_error = np.zeros(shape=result_shape)
+                        ar_prob_error = np.zeros(shape=result_shape)
+                        ar_hybrid_error = np.zeros(shape=result_shape)
                 else:
-                    ar_matrix_error = np.zeros(shape=(len(prob_grid), count_trj))
-                    ar_prob_error = np.zeros(shape=(len(prob_grid), count_trj))
-                    ar_hybrid_error = np.zeros(shape=(len(prob_grid), count_trj))
+                    prob_est_k = 0
+                    matrix_est_k = 0
+                    hybrid_est_k = 0
+                    ar_matrix_error = np.zeros(shape=result_shape)
+                    ar_prob_error = np.zeros(shape=result_shape)
+                    ar_hybrid_error = np.zeros(shape=result_shape)
 
                 total_jobs_k = _calc_total_jobs(count_trj, prob_grid)
 
@@ -280,27 +298,63 @@ def run(
                         p = float(prob_grid[j])
 
                         start_time = time.time()
-                        simulator = KerogenWalkSimulator(bs_psd, bs_ps, bs_ptl, k, p)
+                        simulator = KerogenWalkSimulator(
+                            bs_psd, bs_ps, bs_ptl, k, p
+                        )
 
                         traj = simulator.run(count_steps)
+                        delta_time = traj.delta_time * 1e-12  # picoseconds
                         real_traps = traj.traps.copy().astype(np.int32)
 
-                        matrix_traps_result = matrix_analyzer.run(traj).astype(np.int32)
-                        prob_traps_result = prob_analizer.run(traj).astype(np.int32)
+                        matrix_traps_result = matrix_analyzer.run(traj).astype(
+                            np.int32
+                        )
+                        seq = TrapExtractor.get_trap_seq(
+                            matrix_traps_result[1:], delta_time
+                        )
+                        matrix_est_k_i = (
+                            TrapExtractor.get_zero_trap_probability(seq)
+                        )
+
+                        prob_traps_result = prob_analizer.run(traj).astype(
+                            np.int32
+                        )
+                        seq = TrapExtractor.get_trap_seq(
+                            prob_traps_result, delta_time
+                        )
+                        prob_est_k_i = TrapExtractor.get_zero_trap_probability(
+                            seq
+                        )
 
                         hybrid_analizer.set_trap_approx(matrix_traps_result)
-                        hybrid_traps_result = hybrid_analizer.run(traj).astype(np.int32)
-
-                        matrix_error = min(
-                            np.sum(np.abs(real_traps - matrix_traps_result[:-1])),
-                            np.sum(np.abs(real_traps - matrix_traps_result[1:])),
+                        hybrid_traps_result = hybrid_analizer.run(traj).astype(
+                            np.int32
                         )
-                        prob_error = np.sum(np.abs(real_traps - prob_traps_result))
-                        hybrid_error = np.sum(np.abs(real_traps - hybrid_traps_result))
+                        seq = TrapExtractor.get_trap_seq(
+                            hybrid_traps_result, delta_time
+                        )
+                        hybrid_est_k_i = (
+                            TrapExtractor.get_zero_trap_probability(seq)
+                        )
+
+                        matrix_error = np.sum(
+                            np.abs(real_traps - matrix_traps_result[1:])
+                        )
+
+                        prob_error = np.sum(
+                            np.abs(real_traps - prob_traps_result)
+                        )
+                        hybrid_error = np.sum(
+                            np.abs(real_traps - hybrid_traps_result)
+                        )
 
                         ar_prob_error[j, i] = prob_error
                         ar_matrix_error[j, i] = matrix_error
                         ar_hybrid_error[j, i] = hybrid_error
+
+                        prob_est_k += prob_est_k_i
+                        matrix_est_k += matrix_est_k_i
+                        hybrid_est_k += hybrid_est_k_i
 
                         # глобальный ind (как у тебя в логе) — сделаем совместимым по смыслу:
                         # ind считает все k подряд, но у нас checkpoint на k.
@@ -308,12 +362,15 @@ def run(
                         local_ind_1based = flat + 1
 
                         kprint(
-                            f"Ready {local_ind_1based} from {total_jobs_k}, trajectory num={i+1}, p={p}, k (non trap prob) = {k}, time = {time.time() - start_time}s "
+                            f"Ready {local_ind_1based} from {total_jobs_k}, trajectory num={i+1}, p={p}, k (non trap prob) = {k}, time = {(time.time() - start_time):.3f}s "
                         )
 
                         # checkpoint после каждой траектории (можно реже — см. ниже)
                         ckpt = {
                             "k": k,
+                            "matrix_est_k": matrix_est_k,
+                            "prob_est_k": prob_est_k,
+                            "hybrid_est_k": hybrid_est_k,
                             "count_steps": count_steps,
                             "count_trj": count_trj,
                             "prob": prob_grid,
@@ -324,25 +381,40 @@ def run(
                         }
                         _atomic_pickle_dump(ckpt, ckpt_fn)
 
-                    # после завершения k — сохраняем итоговые npy атомарно
-                if not (Path(matrix_er_fn).is_file() and Path(prob_er_fn).is_file() and Path(hybrid_er_fn).is_file()):
+                # после завершения k — сохраняем итоговые npy атомарно
+                if not (
+                    Path(matrix_er_fn).is_file()
+                    and Path(prob_er_fn).is_file()
+                    and Path(hybrid_er_fn).is_file()
+                ):
                     _atomic_npy_save(matrix_er_fn, ar_matrix_error)
                     _atomic_npy_save(prob_er_fn, ar_prob_error)
                     _atomic_npy_save(hybrid_er_fn, ar_hybrid_error)
 
                     # checkpoint можно удалить, если хочешь
                     # Path(ckpt_fn).unlink(missing_ok=True)
-    
+
                 # нормализация
                 ar_struct_n = ar_matrix_error / count_steps
-                ar_prob_n   = ar_prob_error / count_steps
+                ar_prob_n = ar_prob_error / count_steps
                 ar_hybrid_n = ar_hybrid_error / count_steps
+
+                prob_est_k = prob_est_k / total_jobs_k
+                matrix_est_k = matrix_est_k / total_jobs_k
+                hybrid_est_k = hybrid_est_k / total_jobs_k
 
                 # df_hybrid_long["Erorr"] = df_hybrid_long["Error"] / count_steps
                 # df_prob_long["Erorr"] = df_prob_long["Error"] / count_steps
                 # df_matrix_long["Erorr"] = df_matrix_long["Error"] / count_steps
-                plots_dir = join(path_to_save, "plots", f"ps={ps_type}", f"mean={mean_count_steps}")
-                png_name = f"errors__k={k}__trj={count_trj}__steps={count_steps}.png"
+                plots_dir = join(
+                    path_to_save,
+                    "plots",
+                    f"ps={ps_type}",
+                    f"mean={mean_count_steps}",
+                )
+                png_name = (
+                    f"errors__k={k}__trj={count_trj}__steps={count_steps}.png"
+                )
                 title = f"Errors | ps={ps_type} mean={mean_count_steps} | k={k} | trj={count_trj} steps={count_steps}"
 
                 save_error_corridor_png(
@@ -353,17 +425,21 @@ def run(
                     ar_hybrid_error=ar_hybrid_n,
                     ar_struct_error=ar_struct_n,
                     title=title,
-                    q_low=0.1,
-                    q_high=0.9,
-                    center="median",   # или "mean"
+                    q_low=0.2,
+                    q_high=0.8,
+                    center="median",  # или "mean"
                 )
+                kprint(
+                    f"For k={k}: probability estimation k={prob_est_k:.3f} | hybrid estimation k={hybrid_est_k:.3f} | matrix estimation k={matrix_est_k:.3f}"
+                )
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--path_to_main',
         type=str,
-        default="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/h2/",
+        default="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/",
     )
     args = parser.parse_args()
 

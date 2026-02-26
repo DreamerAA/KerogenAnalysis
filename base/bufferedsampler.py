@@ -2,6 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol, Optional
 from utils.types import NPFArray, f32
+from utils.utils import kprint
 
 
 class RandomVariate(Protocol):
