@@ -39,7 +39,6 @@ class ProbabilityTrajectoryAnalizer(TrajectoryAnalyzer):
         self.trapped_step_fitter: Optional[GammaFitter] = None
 
     @cached_property
-    @abstractmethod
     def name(self) -> str:
         return "probability"
 

@@ -93,11 +93,17 @@ def save_error_corridor_png(
         label=f"Structural ({center}, {int(q_low*100)}–{int(q_high*100)}%)",
     )
 
-    plt.grid(True)
-    plt.xlabel("Probability move to next trap")
-    plt.ylabel("Average error / Count steps")  # или как у тебя подписано
-    plt.title(title)
-    plt.legend(frameon=False)
+    # plt.grid(True)
+
+    plt.xlabel(r"Probability move to new trap, $p$", fontsize=14)
+    plt.ylabel(
+        "Average error / Count steps", fontsize=14
+    )  # или как у тебя подписано
+    plt.title(title, fontsize=16)
+
+    plt.yticks(fontsize=12)
+    plt.xticks(fontsize=12)
+    plt.legend(frameon=False, prop={'size': 12})
 
     fig.savefig(join(out_dir, filename), dpi=200, bbox_inches="tight")
     plt.close(fig)
@@ -415,7 +421,8 @@ def run(
                 png_name = (
                     f"errors__k={k}__trj={count_trj}__steps={count_steps}.png"
                 )
-                title = f"Errors | ps={ps_type} mean={mean_count_steps} | k={k} | trj={count_trj} steps={count_steps}"
+                # title = f"Errors | ps={ps_type} | mean={mean_count_steps} | k={k} | count trajectories={count_trj} | trajectory steps={count_steps}"
+                title = str(r"Errors for $k$=") + str(f"{k}")
 
                 save_error_corridor_png(
                     out_dir=plots_dir,

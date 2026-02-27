@@ -28,7 +28,3 @@ class TrapExtractor:
         traps = np.array([d[1] for d in data])
 
         return TrapSequence(traps, times)
-
-    @staticmethod
-    def get_zero_trap_probability(seq: TrapSequence):
-        return np.count_nonzero(seq.times == 0) / len(seq.times)

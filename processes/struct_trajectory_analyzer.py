@@ -151,7 +151,7 @@ class StructTrajectoryAnalizer(TrajectoryAnalyzer):
         method = self.params.traj_type + "_3D"
         self.list_threshold = mat["list_threshold"][method]
 
-    @property
+    @cached_property
     def name(self) -> str:
         return "struct"
 

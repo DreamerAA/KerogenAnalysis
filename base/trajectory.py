@@ -5,18 +5,19 @@ import numpy as np
 import numpy.typing as npt
 from functools import cached_property
 from base.boundingbox import BoundingBox, Range
+from utils.types import NPFArray, NPBArray
 
 
 @dataclass
 class Trajectory:
-    points: npt.NDArray[np.float32]
-    times: npt.NDArray[np.float32]
+    points: NPFArray
+    times: NPFArray
     box: BoundingBox
     atom_size: float = 0.19
-    traps: Optional[npt.NDArray[np.bool_]] = None
+    traps: Optional[NPBArray] = None
     # non_periodic_points: Optional[npt.NDArray[np.float64]] = None
 
-    def dists(self) -> npt.NDArray[np.float32]:
+    def dists(self) -> NPFArray:
         return Trajectory.extractDists(self.points_without_periodic)
 
     def is_intersect_borders(self) -> np.bool_:
@@ -41,8 +42,8 @@ class Trajectory:
 
     @staticmethod
     def extractDists(
-        points: npt.NDArray[np.float32],
-    ) -> npt.NDArray[np.float32]:
+        points: NPFArray,
+    ) -> NPFArray:
         diff = points[1:,] - points[:-1,]
         sq_diff = diff * diff
         sq_dist = np.sum(sq_diff, axis=1)
@@ -84,6 +85,16 @@ class Trajectory:
         """
         assert len(self.times) >= 2
         return self.times[1] - self.times[0]
+
+    @cached_property
+    def delta_time_sec(self) -> float:
+        """time step
+
+        Returns:
+            float: seconds
+        """
+        assert len(self.times) >= 2
+        return self.delta_time * 1e-12
 
     @staticmethod
     def read_trajectoryes(file_name: str) -> List['Trajectory']:

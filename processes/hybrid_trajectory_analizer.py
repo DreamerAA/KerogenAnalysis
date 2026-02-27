@@ -43,7 +43,6 @@ class HybridTrajectoryAnalizer(TrajectoryAnalyzer):
         self.trap_approx: Optional[NPBArray] = None
 
     @cached_property
-    @abstractmethod
     def name(self) -> str:
         return "hybrid"
 
