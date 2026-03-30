@@ -2,18 +2,12 @@ import argparse
 import os
 import pickle
 import sys
-import time
 from os.path import realpath, join, isfile
 from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-import seaborn as sns
-import json
-from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 from base.discretecdf import DiscreteCDF
-from base.trap_sequence import TrapSequence
 from processes.trap_extractor import TrapExtractor
 
 path = Path(realpath(__file__))
@@ -42,6 +36,10 @@ from processes.neumann_pearson_analizer import (
     NeumannPearsonTrajectoryAnalizer,
     NeumannPearsonAnalizerParams,
 )
+from processes.prob_np_analizer import (
+    ProbabilityNPTrajectoryAnalizer,
+    ProbabilityNPTrajectoryAnalizerParams,
+)
 
 
 def save_or_load(error_fn, k_fn, error_arr, k_value):
@@ -63,14 +61,7 @@ def save_error_corridor_png(
     out_dir: str,
     filename: str,
     prob_grid: np.ndarray,
-    ar_prob_error: np.ndarray,  # shape: (P, T)
-    ar_hybrid_error: np.ndarray,  # shape: (P, T)
-    ar_struct_error: np.ndarray,  # shape: (P, T)
-    ar_neumann_pearson_error: np.ndarray,  # shape: (P, T)
-    k_est_prob: float,
-    k_est_hybrid: float,
-    k_est_struct: float,
-    k_est_neumann_pearson: float,
+    data: dict[str, tuple(np.ndarray, np.ndarray)],  # shape: (P, T)
     title: str,
     q_low: float = 0.1,  # 10%
     q_high: float = 0.9,  # 90%
@@ -88,32 +79,18 @@ def save_error_corridor_png(
         hi = np.quantile(arr, q_high, axis=1)
         return lo, c, hi
 
-    p_lo, p_c, p_hi = band(ar_prob_error)
-    h_lo, h_c, h_hi = band(ar_hybrid_error)
-    s_lo, s_c, s_hi = band(ar_struct_error)
-    n_lo, n_c, n_hi = band(ar_neumann_pearson_error)
-
     fig = plt.figure()
 
-    def plot_error(name, k_est, lo, hi, c):
+    def plot_error(name, error, k_est):
+        lo, c, hi = band(error)
         lbl = name + str(f" ({center}, {int(q_low*100)}–{int(q_high*100)}%)")
+
         lbl += str(r", $k_{est}=$") + str(f"{k_est:.3f}")
         plt.fill_between(prob_grid, lo, hi, alpha=0.2)
         plt.plot(prob_grid, c, label=lbl)
 
-    # Probabilistic
-    plot_error("Prob", k_est_prob, p_lo, p_hi, p_c)
-
-    # Hybrid
-    plot_error("Hybrid", k_est_hybrid, h_lo, h_hi, h_c)
-
-    # Structural
-    plot_error("Struct", k_est_struct, s_lo, s_hi, s_c)
-
-    # Neumann Pearson
-    plot_error("Neumann Pearson", k_est_neumann_pearson, n_lo, n_hi, n_c)
-
-    # plt.grid(True)
+    for name, (error, k_est) in data.items():
+        plot_error(name, error, k_est)
 
     plt.xlabel(r"Probability move to new trap, $p$", fontsize=14)
     plt.ylabel(
@@ -130,7 +107,7 @@ def save_error_corridor_png(
 
 
 def _atomic_pickle_dump(obj: Any, path: str) -> None:
-    tmp = path + ".tmp"
+    tmp = path
     with open(tmp, "wb") as f:
         pickle.dump(obj, f, protocol=pickle.HIGHEST_PROTOCOL)
         f.flush()
@@ -138,26 +115,42 @@ def _atomic_pickle_dump(obj: Any, path: str) -> None:
     os.replace(tmp, path)
 
 
-def _atomic_npy_save(path: str, arr: np.ndarray) -> None:
-    final_path = path if path.endswith(".npy") else path + ".npy"
-    tmp_path = final_path + ".tmp"
+def trajectories_simulation(
+    path_to_save: str,
+    count_trj: int,
+    k: float,
+    probs_grid: NPFArray,
+    count_steps: int,
+    bs_psd: BufferedSampler,
+    bs_ps: BufferedSampler,
+    bs_ptl: BufferedSampler,
+):
+    path_to_save_trj = join(path_to_save, "trajectories")
+    Path(path_to_save_trj).mkdir(parents=True, exist_ok=True)
 
-    with open(tmp_path, "wb") as f:
-        np.save(f, arr)
-        f.flush()
-        os.fsync(f.fileno())
+    trajectories = {}
+    for p in probs_grid:
+        filename_trajectories = join(path_to_save_trj, f"k={k}_p={p}.pkl")
+        if not isfile(filename_trajectories):
+            trjs = []
+            for i in range(count_trj):
+                simulator = KerogenWalkSimulator(bs_psd, bs_ps, bs_ptl, k, p)
 
-    os.replace(tmp_path, final_path)
+                traj = simulator.run(count_steps + 1)
+                trjs.append(traj)
+            with open(filename_trajectories, "wb") as f:
+                pickle.dump(trjs, f)
 
-
-def _calc_total_jobs(count_trj: int, prob: np.ndarray) -> int:
-    return count_trj * len(prob)
+        with open(filename_trajectories, "rb") as f:
+            trjs = pickle.load(f)
+        trajectories[(k, p)] = trjs
+    return trajectories
 
 
 def run(
     path_to_main: str,
-    count_trj=100,
-    count_steps=3000,
+    count_trj=10,
+    count_steps=1500,
 ):
     path_to_save: str = join(path_to_main, "errors")
     path_to_pil_gf: str = join(path_to_main, "pi_l_gamma_fitter.pkl")
@@ -208,16 +201,23 @@ def run(
         )
         for k in [0.1, 0.5, 0.9]
     }
-    params_np_set = {k: NeumannPearsonAnalizerParams() for k in [0.1, 0.5, 0.9]}
+    params_np_set = {
+        k: NeumannPearsonAnalizerParams(0.01) for k in [0.1, 0.5, 0.9]
+    }
+    params_pnp_set = {
+        k: ProbabilityNPTrajectoryAnalizerParams(1e-3, 0.01)
+        for k in [0.1, 0.5, 0.9]
+    }
+
     pset = {
         k: {
-            "hybrid": params_hybrid_set[k],
-            "struct": params_struct_set[k],
-            "prob": params_prob_set[k],
-            "neumann_pearson": params_np_set[k],
+            HybridTrajectoryAnalizer.name(): params_hybrid_set[k],
+            StructTrajectoryAnalizer.name(): params_struct_set[k],
+            ProbabilityTrajectoryAnalizer.name(): params_prob_set[k],
+            NeumannPearsonTrajectoryAnalizer.name(): params_np_set[k],
+            ProbabilityNPTrajectoryAnalizer.name(): params_pnp_set[k],
         }
         for k in [0.1, 0.5, 0.9]
-        # for k in [0.5]
     }
     prob_grid = np.arange(0.0, 1.05, 0.05)
 
@@ -242,277 +242,217 @@ def run(
     bs_psd = BufferedSampler(EmpiricalCDF(psd), "psd", size=10_000)
     bs_ptl = BufferedSampler(throat_lengths_weibull_fitter, "ptl", size=10_000)
 
-    # for ps_type in ["poisson", "uniform"]:
-    for ps_type in ["uniform"]:
-        for mean_count_steps in [100]:
-            # for mean_count_steps in [20, 50]:
+    ps_type = 'uniform'
+    mean_count_steps = 100
 
-            ps = ps_generate(ps_type, mean_count=mean_count_steps)
-            bs_ps = BufferedSampler(DiscreteCDF(ps), "ps", size=10_000)
+    ps = ps_generate(ps_type, mean_count=mean_count_steps)
+    bs_ps = BufferedSampler(DiscreteCDF(ps), "ps", size=10_000)
 
-            for k, params in pset.items():
-                result_shape = (len(prob_grid), count_trj)
+    header = f"count_steps={count_steps}"
+    for k, params in pset.items():
+        result_shape = (len(prob_grid), count_trj)
 
-                matrix_analyzer = StructTrajectoryAnalizer(params["struct"])
-                prob_analizer = ProbabilityTrajectoryAnalizer(
-                    params["prob"],
-                    pil_gamma_fitter,
-                    throat_lengths_weibull_fitter,
-                )
+        matrix_analyzer = StructTrajectoryAnalizer(
+            params[StructTrajectoryAnalizer.name()]
+        )
 
-                hybrid_analizer = HybridTrajectoryAnalizer(
-                    params["hybrid"],
-                    pil_gamma_fitter,
-                    throat_lengths_weibull_fitter,
-                )
+        neumann_pearson_analizer = NeumannPearsonTrajectoryAnalizer(
+            params[NeumannPearsonTrajectoryAnalizer.name()],
+            pil_gamma_fitter,
+            throat_lengths_weibull_fitter,
+        )
 
-                neumann_pearson_analizer = NeumannPearsonTrajectoryAnalizer(
-                    params["neumann_pearson"],
-                    pil_gamma_fitter,
-                    throat_lengths_weibull_fitter,
-                )
+        prob_analizer = ProbabilityTrajectoryAnalizer(
+            params[ProbabilityTrajectoryAnalizer.name()],
+            pil_gamma_fitter,
+            throat_lengths_weibull_fitter,
+        )
 
-                exp_tag = f"ps={ps_type}_mean={mean_count_steps}_count_steps={count_steps}"
-                add_tag = f"k={k}_count_trj={count_trj}"
-                header = exp_tag + f"_{add_tag}.npy"
-                k_est_header = exp_tag + f"_{add_tag}_k.pkl"
-                matrix_er_fn = join(path_to_save, "matrix_" + header)
-                prob_er_fn = join(path_to_save, "prob_" + header)
-                hybrid_er_fn = join(path_to_save, "hybrid_" + header)
-                neumann_pearson_er_fn = join(path_to_save, "np_" + header)
+        hybrid_analizer = HybridTrajectoryAnalizer(
+            params[HybridTrajectoryAnalizer.name()],
+            pil_gamma_fitter,
+            throat_lengths_weibull_fitter,
+        )
+        prob_np_analizer = ProbabilityNPTrajectoryAnalizer(
+            params[ProbabilityNPTrajectoryAnalizer.name()],
+            pil_gamma_fitter,
+            throat_lengths_weibull_fitter,
+        )
 
-                k_matrix_fn = join(path_to_save, "matrix_" + k_est_header)
-                k_prob_fn = join(path_to_save, "prob_" + k_est_header)
-                k_hybrid_fn = join(path_to_save, "hybrid_" + k_est_header)
-                k_neumann_pearson_fn = join(path_to_save, "np_" + k_est_header)
+        # total_jobs_k = _calc_total_jobs(count_trj, prob_grid)
 
-                ckpt_fn = path_to_save + f"/checkpoint_{exp_tag}_{add_tag}.pkl"
+        trajectories = trajectories_simulation(
+            path_to_save,
+            count_trj,
+            k,
+            prob_grid,
+            count_steps,
+            bs_psd,
+            bs_ps,
+            bs_ptl,
+        )
 
-                # Инициализация/загрузка прогресса
-                next_ind = 0
-                if Path(ckpt_fn).is_file():
-                    with open(ckpt_fn, "rb") as f:
-                        ckpt = pickle.load(f)
+        currect_state = {}
 
-                    # простая валидация, чтобы случайно не продолжить "чужой" прогресс
-                    if (
-                        ckpt.get("k") == k
-                        and ckpt.get("count_steps") == count_steps
-                        and ckpt.get("count_trj") == count_trj
-                        and np.allclose(ckpt.get("prob"), prob_grid)
-                    ):
-                        prob_est_k = ckpt["prob_est_k"]
-                        matrix_est_k = ckpt["matrix_est_k"]
-                        hybrid_est_k = ckpt["hybrid_est_k"]
-                        neumann_pearson_est_k = ckpt["neumann_pearson_est_k"]
-                        ar_matrix_error = ckpt["ar_matrix_error"]
-                        ar_prob_error = ckpt["ar_prob_error"]
-                        ar_hybrid_error = ckpt["ar_hybrid_error"]
-                        ar_neumann_pearson_error = ckpt[
-                            "ar_neumann_pearson_error"
-                        ]
-                        next_ind = int(ckpt["next_ind"])
-                        kprint(f"[RESUME] k={k}: continue from ind={next_ind}")
-                    else:
-                        kprint(
-                            f"[RESUME] k={k}: checkpoint params mismatch, starting from scratch"
-                        )
-                        ar_matrix_error = np.zeros(shape=result_shape)
-                        ar_prob_error = np.zeros(shape=result_shape)
-                        ar_hybrid_error = np.zeros(shape=result_shape)
-                        ar_neumann_pearson_error = np.zeros(shape=result_shape)
+        def set_approx_traps(analizer, pi, ti, name):
+            results = currect_state[name].get("results")
+            traps = results[pi, ti]
+            analizer.set_trap_approx(traps)
+
+        def set_approx_struct_traps(analizer, pi, ti):
+            set_approx_traps(analizer, pi, ti, StructTrajectoryAnalizer.name())
+
+        # def set_approx_np_traps(analizer, pi, ti):
+        #     set_approx_traps(
+        #         analizer, pi, ti, NeumannPearsonTrajectoryAnalizer.name()
+        #     )
+
+        def empty_func(analizer, pi, ti):
+            pass
+
+        def empty_init():
+            k_est = np.zeros(shape=result_shape)
+            errors = np.zeros(shape=result_shape)
+            results = np.zeros(shape=(*result_shape, count_steps))
+            return k_est, errors, results
+
+        for analizer, approx_func in [
+            (matrix_analyzer, empty_func),
+            (neumann_pearson_analizer, empty_func),
+            (prob_analizer, empty_func),
+            (prob_np_analizer, empty_func),
+            (hybrid_analizer, set_approx_struct_traps),
+        ]:
+            exp_tag = (
+                f"name={analizer.name()}_k={k}_count_trj={count_trj}_" + header
+            )
+            # fn = join(path_to_save, header)
+            ckpt_fn = join(path_to_save, f"checkpoint_{exp_tag}.pkl")
+
+            # Инициализация/загрузка прогресса
+            flat_ind = 0
+            if Path(ckpt_fn).is_file():
+                with open(ckpt_fn, "rb") as f:
+                    ckpt = pickle.load(f)
+
+                # простая валидация, чтобы случайно не продолжить "чужой" прогресс
+                if (
+                    ckpt.get("k") == k
+                    and ckpt.get("count_steps") == count_steps
+                    and ckpt.get("count_trj") == count_trj
+                    and np.allclose(ckpt.get("prob_grid"), prob_grid)
+                ):
+                    k_est = ckpt.get("k_est")
+                    errors = ckpt.get("errors")
+                    results = ckpt.get("results")
+                    flat_ind = ckpt.get("flat_ind")
+
+                    kprint(f"Restart for k={k} with flat_ind={flat_ind}")
                 else:
-                    prob_est_k = 0
-                    matrix_est_k = 0
-                    hybrid_est_k = 0
-                    neumann_pearson_est_k = 0
-                    ar_matrix_error = np.zeros(shape=result_shape)
-                    ar_prob_error = np.zeros(shape=result_shape)
-                    ar_hybrid_error = np.zeros(shape=result_shape)
-                    ar_neumann_pearson_error = np.zeros(shape=result_shape)
+                    k_est, errors, results = empty_init()
+            else:
+                k_est, errors, results = empty_init()
 
-                total_jobs_k = _calc_total_jobs(count_trj, prob_grid)
+            for ind in range(flat_ind, len(prob_grid) * count_trj):
+                pi = ind // count_trj
+                ti = ind % count_trj
 
-                # если по этому k уже всё посчитано, то можно сразу сохранить итоговые npy и идти дальше
-                if next_ind >= total_jobs_k:
-                    kprint(
-                        f"[SKIP] k={k}: already finished ({next_ind}/{total_jobs_k})"
-                    )
-                else:
-                    # основной цикл: плоский индекс -> (j, i)
-                    for flat in range(next_ind, total_jobs_k):
-                        j = flat // count_trj
-                        i = flat % count_trj
-                        p = float(prob_grid[j])
+                p = prob_grid[pi]
+                trjs = trajectories[(k, p)]
+                trj = trjs[ti]
 
-                        start_time = time.time()
-                        simulator = KerogenWalkSimulator(
-                            bs_psd, bs_ps, bs_ptl, k, p
-                        )
+                approx_func(analizer, pi, ti)
+                result = analizer.run(trj).astype(np.int32)
 
-                        traj = simulator.run(count_steps)
-                        delta_time = traj.delta_time * 1e-12  # picoseconds
-                        real_traps = traj.traps.copy().astype(np.int32)
+                delta_time = trj.delta_time * 1e-12  # picoseconds
+                seq = TrapExtractor.get_trap_seq(result, delta_time)
 
-                        matrix_traps_result = matrix_analyzer.run(traj).astype(
-                            np.int32
-                        )
-                        seq = TrapExtractor.get_trap_seq(
-                            matrix_traps_result[1:], delta_time
-                        )
-                        matrix_est_k_i = seq.get_zero_trap_probability()
+                real_traps = trj.traps.copy().astype(np.int32)
+                errors[pi, ti] = np.sum(np.abs(real_traps - result))
+                k_est[pi, ti] = seq.get_zero_trap_probability()
+                results[pi, ti] = result
 
-                        prob_traps_result = prob_analizer.run(traj).astype(
-                            np.int32
-                        )
-                        seq = TrapExtractor.get_trap_seq(
-                            prob_traps_result, delta_time
-                        )
-                        prob_est_k_i = seq.get_zero_trap_probability()
+                if (ind + 1) % 10 == 0 and ind != 0:
+                    ckpt = {
+                        "k": k,
+                        "prob_grid": prob_grid,
+                        "count_steps": count_steps,
+                        "count_trj": count_trj,
+                        "flat_ind": ind,
+                        "k_est": k_est,
+                        "results": results,
+                        "errors": errors,
+                    }
+                    _atomic_pickle_dump(ckpt, ckpt_fn)
 
-                        hybrid_analizer.set_trap_approx(matrix_traps_result)
-                        hybrid_traps_result = hybrid_analizer.run(traj).astype(
-                            np.int32
-                        )
-                        seq = TrapExtractor.get_trap_seq(
-                            hybrid_traps_result, delta_time
-                        )
-                        hybrid_est_k_i = seq.get_zero_trap_probability()
+                if (ind + 1) % count_trj == 0:
+                    kprint(f"Ready with {analizer.name()} k={k} p={p}")
+            kprint(f"Ready with {analizer.name()} k={k}")
+            currect_state[analizer.name()] = {
+                "k": k,
+                "prob_grid": prob_grid,
+                "count_steps": count_steps,
+                "count_trj": count_trj,
+                "k_est": k_est,
+                "results": results,
+                "errors": errors,
+            }
 
-                        neumann_pearson_result = neumann_pearson_analizer.run(
-                            traj
-                        ).astype(np.int32)
-                        seq = TrapExtractor.get_trap_seq(
-                            neumann_pearson_result, delta_time
-                        )
-                        neumann_pearson_est_k_i = (
-                            seq.get_zero_trap_probability()
-                        )
+        def get_norm_errors_k_est(name):
+            errors = currect_state[name].get("errors")
+            error = errors / count_steps
+            k_est = currect_state[name].get("k_est")
+            k_est = np.sum(k_est) / np.size(k_est)
+            return error, k_est
 
-                        # matrix_error = 0
-                        # prob_error = 0
-                        # hybrid_error = 0
+        np_errors, np_k_est = get_norm_errors_k_est(
+            NeumannPearsonTrajectoryAnalizer.name()
+        )
+        struct_errors, struct_k_est = get_norm_errors_k_est(
+            StructTrajectoryAnalizer.name()
+        )
+        prob_errors, prob_k_est = get_norm_errors_k_est(
+            ProbabilityTrajectoryAnalizer.name()
+        )
+        hybrid_errors, hybrid_k_est = get_norm_errors_k_est(
+            HybridTrajectoryAnalizer.name()
+        )
+        prob_np_errors, prob_np_k_est = get_norm_errors_k_est(
+            ProbabilityNPTrajectoryAnalizer.name()
+        )
 
-                        matrix_error = np.sum(
-                            np.abs(real_traps - matrix_traps_result[1:])
-                        )
+        plots_dir = join(
+            path_to_save,
+            "plots",
+        )
+        png_name = f"errors_k={k}_trj={count_trj}_steps={count_steps}.png"
+        title = str(r"Errors for $k$=") + str(f"{k}")
 
-                        prob_error = np.sum(
-                            np.abs(real_traps - prob_traps_result)
-                        )
-                        hybrid_error = np.sum(
-                            np.abs(real_traps - hybrid_traps_result)
-                        )
+        save_error_corridor_png(
+            out_dir=plots_dir,
+            filename=png_name,
+            prob_grid=prob_grid,
+            data={
+                "Prob": (prob_errors, prob_k_est),
+                "Hybrid": (hybrid_errors, hybrid_k_est),
+                "Struct": (struct_errors, struct_k_est),
+                "Neumann-Pearson": (np_errors, np_k_est),
+                "Prob+Neumann-Pearson": (prob_np_errors, prob_np_k_est),
+            },
+            title=title,
+            q_low=0.2,
+            q_high=0.8,
+            center="median",  # или "mean"
+        )
 
-                        neumann_pearson_error = np.sum(
-                            np.abs(real_traps - neumann_pearson_result)
-                        )
-
-                        ar_prob_error[j, i] = prob_error
-                        ar_matrix_error[j, i] = matrix_error
-                        ar_hybrid_error[j, i] = hybrid_error
-                        ar_neumann_pearson_error[j, i] = neumann_pearson_error
-
-                        prob_est_k += prob_est_k_i
-                        matrix_est_k += matrix_est_k_i
-                        hybrid_est_k += hybrid_est_k_i
-                        neumann_pearson_est_k += neumann_pearson_est_k_i
-
-                        # глобальный ind (как у тебя в логе) — сделаем совместимым по смыслу:
-                        # ind считает все k подряд, но у нас checkpoint на k.
-                        # Для печати оставим "локальный" ind внутри k (1..total_jobs_k).
-                        local_ind_1based = flat + 1
-
-                        kprint(
-                            f"Ready {local_ind_1based} from {total_jobs_k}, trajectory num={i+1}, p={p}, k (non trap prob) = {k}, time = {(time.time() - start_time):.3f}s "
-                        )
-
-                        # checkpoint после каждой траектории (можно реже — см. ниже)
-                        ckpt = {
-                            "k": k,
-                            "matrix_est_k": matrix_est_k,
-                            "prob_est_k": prob_est_k,
-                            "hybrid_est_k": hybrid_est_k,
-                            "neumann_pearson_est_k": neumann_pearson_est_k,
-                            "count_steps": count_steps,
-                            "count_trj": count_trj,
-                            "prob": prob_grid,
-                            "next_ind": flat + 1,
-                            "ar_matrix_error": ar_matrix_error,
-                            "ar_prob_error": ar_prob_error,
-                            "ar_hybrid_error": ar_hybrid_error,
-                            "ar_neumann_pearson_error": ar_neumann_pearson_error,
-                        }
-                        _atomic_pickle_dump(ckpt, ckpt_fn)
-
-                # после завершения k — сохраняем итоговые npy атомарно
-                ar_matrix_error, matrix_est_k = save_or_load(
-                    matrix_er_fn, k_matrix_fn, ar_matrix_error, matrix_est_k
-                )
-
-                ar_prob_error, prob_est_k = save_or_load(
-                    prob_er_fn, k_prob_fn, ar_prob_error, prob_est_k
-                )
-
-                ar_hybrid_error, hybrid_est_k = save_or_load(
-                    hybrid_er_fn, k_hybrid_fn, ar_hybrid_error, hybrid_est_k
-                )
-
-                ar_neumann_pearson_error, neumann_pearson_est_k = save_or_load(
-                    neumann_pearson_er_fn,
-                    k_neumann_pearson_fn,
-                    ar_neumann_pearson_error,
-                    neumann_pearson_est_k,
-                )
-
-                Path(ckpt_fn).unlink(missing_ok=True)
-
-                # нормализация
-                ar_struct_n = ar_matrix_error / count_steps
-                ar_prob_n = ar_prob_error / count_steps
-                ar_hybrid_n = ar_hybrid_error / count_steps
-                ar_neumann_pearson_n = ar_neumann_pearson_error / count_steps
-
-                prob_est_k = prob_est_k / total_jobs_k
-                matrix_est_k = matrix_est_k / total_jobs_k
-                hybrid_est_k = hybrid_est_k / total_jobs_k
-                neumann_pearson_est_k = neumann_pearson_est_k / total_jobs_k
-
-                # df_hybrid_long["Erorr"] = df_hybrid_long["Error"] / count_steps
-                # df_prob_long["Erorr"] = df_prob_long["Error"] / count_steps
-                # df_matrix_long["Erorr"] = df_matrix_long["Error"] / count_steps
-                plots_dir = join(
-                    path_to_save,
-                    "plots",
-                    f"ps={ps_type}",
-                    f"mean={mean_count_steps}",
-                )
-                png_name = (
-                    f"errors__k={k}__trj={count_trj}__steps={count_steps}.png"
-                )
-                # title = f"Errors | ps={ps_type} | mean={mean_count_steps} | k={k} | count trajectories={count_trj} | trajectory steps={count_steps}"
-                title = str(r"Errors for $k$=") + str(f"{k}")
-
-                save_error_corridor_png(
-                    out_dir=plots_dir,
-                    filename=png_name,
-                    prob_grid=prob_grid,
-                    ar_prob_error=ar_prob_n,
-                    ar_hybrid_error=ar_hybrid_n,
-                    ar_struct_error=ar_struct_n,
-                    ar_neumann_pearson_error=ar_neumann_pearson_n,
-                    k_est_prob=prob_est_k,
-                    k_est_hybrid=hybrid_est_k,
-                    k_est_struct=matrix_est_k,
-                    k_est_neumann_pearson=neumann_pearson_est_k,
-                    title=title,
-                    q_low=0.2,
-                    q_high=0.8,
-                    center="median",  # или "mean"
-                )
-                kprint(
-                    f"For k={k}: probability estimation k={prob_est_k:.3f} | hybrid estimation k={hybrid_est_k:.3f} | matrix estimation k={matrix_est_k:.3f}"
-                )
+        kprint(
+            f"For k={k}: "
+            f"probability estimation k={prob_k_est:.3f} | "
+            f"probability + neumann pearson estimation k={prob_np_k_est:.3f} | "
+            f"hybrid estimation k={hybrid_k_est:.3f} | "
+            f"struct estimation k={struct_k_est:.3f} | "
+            f"neumann pearson estimation k={np_k_est:.3f} |"
+        )
 
 
 if __name__ == '__main__':

@@ -42,8 +42,8 @@ class HybridTrajectoryAnalizer(TrajectoryAnalyzer):
         self.pi_l_gf: GammaFitter = pi_l_gf
         self.trap_approx: Optional[NPBArray] = None
 
-    @cached_property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         return "hybrid"
 
     def set_trap_approx(self, trap_approx: NPBArray):
@@ -71,7 +71,7 @@ class HybridTrajectoryAnalizer(TrajectoryAnalyzer):
         )
         result = probabilityies > 0.5
         struct_mask = np.abs(probabilityies - 0.5) < self.params.prob_diff
-        result[struct_mask] = trap_approx[1:][struct_mask]
+        result[struct_mask] = trap_approx[struct_mask]
         assert not np.any(result == -1)
         return result
 

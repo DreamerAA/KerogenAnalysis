@@ -33,8 +33,8 @@ class ProbabilityTrajectoryAnalizer(TrajectoryAnalyzer):
         self.transition_step_fitter: Optional[WeibullFitter] = None
         self.trapped_step_fitter: Optional[GammaFitter] = None
 
-    @cached_property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         return "probability"
 
     def run(
@@ -56,6 +56,7 @@ class ProbabilityTrajectoryAnalizer(TrajectoryAnalyzer):
         transition_step_fitter: WeibullFitter,
         trapped_step_fitter: GammaFitter,
         critical_probability: float,
+        p_trap: float = 0.5,
     ) -> Tuple[float, NPFArray]:
         points = trj.points_without_periodic
         distances = pdistances(points)
@@ -69,7 +70,6 @@ class ProbabilityTrajectoryAnalizer(TrajectoryAnalyzer):
         L_T = np.maximum(L_T, eps)
         L_C = np.maximum(L_C, eps)
 
-        p_trap = 0.5
         prev = np.inf
         iterations = 0
         while np.abs(p_trap - prev) > critical_probability:

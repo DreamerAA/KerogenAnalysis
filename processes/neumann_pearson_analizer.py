@@ -38,9 +38,9 @@ class NeumannPearsonTrajectoryAnalizer(TrajectoryAnalyzer):
             self.pi_l_gf, self.throat_lengthes_wf, self.params.error
         )
 
-    @cached_property
-    def name(self) -> str:
-        return "NeumannPearson"
+    @staticmethod
+    def name() -> str:
+        return "meumann_pearson"
 
     def run(
         self,
@@ -51,7 +51,7 @@ class NeumannPearsonTrajectoryAnalizer(TrajectoryAnalyzer):
             self.throat_lengthes_wf,
             self.pi_l_gf,
         )
-        result = (likelihood < self.threshold).astype(i32)
+        result = likelihood < self.threshold
         return result
 
     @staticmethod

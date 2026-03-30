@@ -151,8 +151,8 @@ class StructTrajectoryAnalizer(TrajectoryAnalyzer):
         method = self.params.traj_type + "_3D"
         self.list_threshold = mat["list_threshold"][method]
 
-    @cached_property
-    def name(self) -> str:
+    @staticmethod
+    def name() -> str:
         return "struct"
 
     def run(self, trj: Trajectory) -> npt.NDArray[np.bool_]:
@@ -174,7 +174,7 @@ class StructTrajectoryAnalizer(TrajectoryAnalyzer):
         for flag, result in results:
             if flag:
                 list_trapped |= result
-        return list_trapped
+        return list_trapped[1:]
 
     def analyse_by_mu(
         self,
