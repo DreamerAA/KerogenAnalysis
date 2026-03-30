@@ -19,12 +19,14 @@ def create_empirical_cdf(vals, n=30):
     return np.hstack((x, pn))
 
 
+def pdistances(points: NPFArray) -> NPFArray:
+    dxyz = points[:-1, :] - points[1:, :]
+    result: NPFArray = np.sqrt(np.sum(dxyz**2, axis=1))
+    return result
 
 
-def ps_generate(
-    type: str, mean_count: int = 50
-) -> npt.NDArray[np.float32]:
-    steps = np.arange(0, 2*mean_count, dtype=np.float32)
+def ps_generate(type: str, mean_count: int = 50) -> npt.NDArray[np.float32]:
+    steps = np.arange(0, 2 * mean_count, dtype=np.float32)
 
     ps = np.zeros((len(steps), 2), dtype=np.float32)
     ps[:, 0] = steps

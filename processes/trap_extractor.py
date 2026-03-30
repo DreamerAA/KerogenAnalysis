@@ -1,4 +1,3 @@
-from base.trajectory import Trajectory
 from base.trap_sequence import TrapSequence
 import numpy as np
 

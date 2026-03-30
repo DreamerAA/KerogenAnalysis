@@ -13,6 +13,7 @@ import json
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
 from base.discretecdf import DiscreteCDF
+from base.trap_sequence import TrapSequence
 from processes.trap_extractor import TrapExtractor
 
 path = Path(realpath(__file__))
@@ -37,6 +38,25 @@ from processes.probability_trajectory_analizer import (
     ProbabilityTrajectoryAnalizer,
     ProbabilityAnalizerParams,
 )
+from processes.neumann_pearson_analizer import (
+    NeumannPearsonTrajectoryAnalizer,
+    NeumannPearsonAnalizerParams,
+)
+
+
+def save_or_load(error_fn, k_fn, error_arr, k_value):
+    if not Path(error_fn).is_file():
+        _atomic_npy_save(error_fn, error_arr)
+        with open(k_fn, "wb") as f:
+            pickle.dump(k_value, f)
+        return error_arr, k_value
+
+    if k_value == 0:
+        error_arr = np.load(error_fn)
+        with open(k_fn, "rb") as f:
+            k_value = pickle.load(f)
+
+    return error_arr, k_value
 
 
 def save_error_corridor_png(
@@ -46,6 +66,11 @@ def save_error_corridor_png(
     ar_prob_error: np.ndarray,  # shape: (P, T)
     ar_hybrid_error: np.ndarray,  # shape: (P, T)
     ar_struct_error: np.ndarray,  # shape: (P, T)
+    ar_neumann_pearson_error: np.ndarray,  # shape: (P, T)
+    k_est_prob: float,
+    k_est_hybrid: float,
+    k_est_struct: float,
+    k_est_neumann_pearson: float,
     title: str,
     q_low: float = 0.1,  # 10%
     q_high: float = 0.9,  # 90%
@@ -66,32 +91,27 @@ def save_error_corridor_png(
     p_lo, p_c, p_hi = band(ar_prob_error)
     h_lo, h_c, h_hi = band(ar_hybrid_error)
     s_lo, s_c, s_hi = band(ar_struct_error)
+    n_lo, n_c, n_hi = band(ar_neumann_pearson_error)
 
     fig = plt.figure()
 
+    def plot_error(name, k_est, lo, hi, c):
+        lbl = name + str(f" ({center}, {int(q_low*100)}–{int(q_high*100)}%)")
+        lbl += str(r", $k_{est}=$") + str(f"{k_est:.3f}")
+        plt.fill_between(prob_grid, lo, hi, alpha=0.2)
+        plt.plot(prob_grid, c, label=lbl)
+
     # Probabilistic
-    plt.fill_between(prob_grid, p_lo, p_hi, alpha=0.2)
-    plt.plot(
-        prob_grid,
-        p_c,
-        label=f"Prob ({center}, {int(q_low*100)}–{int(q_high*100)}%)",
-    )
+    plot_error("Prob", k_est_prob, p_lo, p_hi, p_c)
 
     # Hybrid
-    plt.fill_between(prob_grid, h_lo, h_hi, alpha=0.2)
-    plt.plot(
-        prob_grid,
-        h_c,
-        label=f"Hybrid ({center}, {int(q_low*100)}–{int(q_high*100)}%)",
-    )
+    plot_error("Hybrid", k_est_hybrid, h_lo, h_hi, h_c)
 
     # Structural
-    plt.fill_between(prob_grid, s_lo, s_hi, alpha=0.2)
-    plt.plot(
-        prob_grid,
-        s_c,
-        label=f"Structural ({center}, {int(q_low*100)}–{int(q_high*100)}%)",
-    )
+    plot_error("Struct", k_est_struct, s_lo, s_hi, s_c)
+
+    # Neumann Pearson
+    plot_error("Neumann Pearson", k_est_neumann_pearson, n_lo, n_hi, n_c)
 
     # plt.grid(True)
 
@@ -188,11 +208,13 @@ def run(
         )
         for k in [0.1, 0.5, 0.9]
     }
+    params_np_set = {k: NeumannPearsonAnalizerParams() for k in [0.1, 0.5, 0.9]}
     pset = {
         k: {
             "hybrid": params_hybrid_set[k],
             "struct": params_struct_set[k],
             "prob": params_prob_set[k],
+            "neumann_pearson": params_np_set[k],
         }
         for k in [0.1, 0.5, 0.9]
         # for k in [0.5]
@@ -244,12 +266,25 @@ def run(
                     throat_lengths_weibull_fitter,
                 )
 
+                neumann_pearson_analizer = NeumannPearsonTrajectoryAnalizer(
+                    params["neumann_pearson"],
+                    pil_gamma_fitter,
+                    throat_lengths_weibull_fitter,
+                )
+
                 exp_tag = f"ps={ps_type}_mean={mean_count_steps}_count_steps={count_steps}"
                 add_tag = f"k={k}_count_trj={count_trj}"
                 header = exp_tag + f"_{add_tag}.npy"
+                k_est_header = exp_tag + f"_{add_tag}_k.pkl"
                 matrix_er_fn = join(path_to_save, "matrix_" + header)
                 prob_er_fn = join(path_to_save, "prob_" + header)
                 hybrid_er_fn = join(path_to_save, "hybrid_" + header)
+                neumann_pearson_er_fn = join(path_to_save, "np_" + header)
+
+                k_matrix_fn = join(path_to_save, "matrix_" + k_est_header)
+                k_prob_fn = join(path_to_save, "prob_" + k_est_header)
+                k_hybrid_fn = join(path_to_save, "hybrid_" + k_est_header)
+                k_neumann_pearson_fn = join(path_to_save, "np_" + k_est_header)
 
                 ckpt_fn = path_to_save + f"/checkpoint_{exp_tag}_{add_tag}.pkl"
 
@@ -269,9 +304,13 @@ def run(
                         prob_est_k = ckpt["prob_est_k"]
                         matrix_est_k = ckpt["matrix_est_k"]
                         hybrid_est_k = ckpt["hybrid_est_k"]
+                        neumann_pearson_est_k = ckpt["neumann_pearson_est_k"]
                         ar_matrix_error = ckpt["ar_matrix_error"]
                         ar_prob_error = ckpt["ar_prob_error"]
                         ar_hybrid_error = ckpt["ar_hybrid_error"]
+                        ar_neumann_pearson_error = ckpt[
+                            "ar_neumann_pearson_error"
+                        ]
                         next_ind = int(ckpt["next_ind"])
                         kprint(f"[RESUME] k={k}: continue from ind={next_ind}")
                     else:
@@ -281,13 +320,16 @@ def run(
                         ar_matrix_error = np.zeros(shape=result_shape)
                         ar_prob_error = np.zeros(shape=result_shape)
                         ar_hybrid_error = np.zeros(shape=result_shape)
+                        ar_neumann_pearson_error = np.zeros(shape=result_shape)
                 else:
                     prob_est_k = 0
                     matrix_est_k = 0
                     hybrid_est_k = 0
+                    neumann_pearson_est_k = 0
                     ar_matrix_error = np.zeros(shape=result_shape)
                     ar_prob_error = np.zeros(shape=result_shape)
                     ar_hybrid_error = np.zeros(shape=result_shape)
+                    ar_neumann_pearson_error = np.zeros(shape=result_shape)
 
                 total_jobs_k = _calc_total_jobs(count_trj, prob_grid)
 
@@ -318,9 +360,7 @@ def run(
                         seq = TrapExtractor.get_trap_seq(
                             matrix_traps_result[1:], delta_time
                         )
-                        matrix_est_k_i = (
-                            TrapExtractor.get_zero_trap_probability(seq)
-                        )
+                        matrix_est_k_i = seq.get_zero_trap_probability()
 
                         prob_traps_result = prob_analizer.run(traj).astype(
                             np.int32
@@ -328,9 +368,7 @@ def run(
                         seq = TrapExtractor.get_trap_seq(
                             prob_traps_result, delta_time
                         )
-                        prob_est_k_i = TrapExtractor.get_zero_trap_probability(
-                            seq
-                        )
+                        prob_est_k_i = seq.get_zero_trap_probability()
 
                         hybrid_analizer.set_trap_approx(matrix_traps_result)
                         hybrid_traps_result = hybrid_analizer.run(traj).astype(
@@ -339,9 +377,21 @@ def run(
                         seq = TrapExtractor.get_trap_seq(
                             hybrid_traps_result, delta_time
                         )
-                        hybrid_est_k_i = (
-                            TrapExtractor.get_zero_trap_probability(seq)
+                        hybrid_est_k_i = seq.get_zero_trap_probability()
+
+                        neumann_pearson_result = neumann_pearson_analizer.run(
+                            traj
+                        ).astype(np.int32)
+                        seq = TrapExtractor.get_trap_seq(
+                            neumann_pearson_result, delta_time
                         )
+                        neumann_pearson_est_k_i = (
+                            seq.get_zero_trap_probability()
+                        )
+
+                        # matrix_error = 0
+                        # prob_error = 0
+                        # hybrid_error = 0
 
                         matrix_error = np.sum(
                             np.abs(real_traps - matrix_traps_result[1:])
@@ -354,13 +404,19 @@ def run(
                             np.abs(real_traps - hybrid_traps_result)
                         )
 
+                        neumann_pearson_error = np.sum(
+                            np.abs(real_traps - neumann_pearson_result)
+                        )
+
                         ar_prob_error[j, i] = prob_error
                         ar_matrix_error[j, i] = matrix_error
                         ar_hybrid_error[j, i] = hybrid_error
+                        ar_neumann_pearson_error[j, i] = neumann_pearson_error
 
                         prob_est_k += prob_est_k_i
                         matrix_est_k += matrix_est_k_i
                         hybrid_est_k += hybrid_est_k_i
+                        neumann_pearson_est_k += neumann_pearson_est_k_i
 
                         # глобальный ind (как у тебя в логе) — сделаем совместимым по смыслу:
                         # ind считает все k подряд, но у нас checkpoint на k.
@@ -377,6 +433,7 @@ def run(
                             "matrix_est_k": matrix_est_k,
                             "prob_est_k": prob_est_k,
                             "hybrid_est_k": hybrid_est_k,
+                            "neumann_pearson_est_k": neumann_pearson_est_k,
                             "count_steps": count_steps,
                             "count_trj": count_trj,
                             "prob": prob_grid,
@@ -384,30 +441,42 @@ def run(
                             "ar_matrix_error": ar_matrix_error,
                             "ar_prob_error": ar_prob_error,
                             "ar_hybrid_error": ar_hybrid_error,
+                            "ar_neumann_pearson_error": ar_neumann_pearson_error,
                         }
                         _atomic_pickle_dump(ckpt, ckpt_fn)
 
                 # после завершения k — сохраняем итоговые npy атомарно
-                if not (
-                    Path(matrix_er_fn).is_file()
-                    and Path(prob_er_fn).is_file()
-                    and Path(hybrid_er_fn).is_file()
-                ):
-                    _atomic_npy_save(matrix_er_fn, ar_matrix_error)
-                    _atomic_npy_save(prob_er_fn, ar_prob_error)
-                    _atomic_npy_save(hybrid_er_fn, ar_hybrid_error)
+                ar_matrix_error, matrix_est_k = save_or_load(
+                    matrix_er_fn, k_matrix_fn, ar_matrix_error, matrix_est_k
+                )
 
-                    # checkpoint можно удалить, если хочешь
-                    # Path(ckpt_fn).unlink(missing_ok=True)
+                ar_prob_error, prob_est_k = save_or_load(
+                    prob_er_fn, k_prob_fn, ar_prob_error, prob_est_k
+                )
+
+                ar_hybrid_error, hybrid_est_k = save_or_load(
+                    hybrid_er_fn, k_hybrid_fn, ar_hybrid_error, hybrid_est_k
+                )
+
+                ar_neumann_pearson_error, neumann_pearson_est_k = save_or_load(
+                    neumann_pearson_er_fn,
+                    k_neumann_pearson_fn,
+                    ar_neumann_pearson_error,
+                    neumann_pearson_est_k,
+                )
+
+                Path(ckpt_fn).unlink(missing_ok=True)
 
                 # нормализация
                 ar_struct_n = ar_matrix_error / count_steps
                 ar_prob_n = ar_prob_error / count_steps
                 ar_hybrid_n = ar_hybrid_error / count_steps
+                ar_neumann_pearson_n = ar_neumann_pearson_error / count_steps
 
                 prob_est_k = prob_est_k / total_jobs_k
                 matrix_est_k = matrix_est_k / total_jobs_k
                 hybrid_est_k = hybrid_est_k / total_jobs_k
+                neumann_pearson_est_k = neumann_pearson_est_k / total_jobs_k
 
                 # df_hybrid_long["Erorr"] = df_hybrid_long["Error"] / count_steps
                 # df_prob_long["Erorr"] = df_prob_long["Error"] / count_steps
@@ -431,6 +500,11 @@ def run(
                     ar_prob_error=ar_prob_n,
                     ar_hybrid_error=ar_hybrid_n,
                     ar_struct_error=ar_struct_n,
+                    ar_neumann_pearson_error=ar_neumann_pearson_n,
+                    k_est_prob=prob_est_k,
+                    k_est_hybrid=hybrid_est_k,
+                    k_est_struct=matrix_est_k,
+                    k_est_neumann_pearson=neumann_pearson_est_k,
                     title=title,
                     q_low=0.2,
                     q_high=0.8,

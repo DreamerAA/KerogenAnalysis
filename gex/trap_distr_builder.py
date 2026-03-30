@@ -119,27 +119,18 @@ def plot_trap_tim_distr(
     time_trapings = np.concatenate(time_tuple)
     non_zero_tt = time_trapings[time_trapings != 0]
 
-    zero_time_steps = [seq.get_count_zero_steps() for seq in trap_list]
-    non_zero_time_steps = [seq.get_non_count_zero_steps() for seq in trap_list]
-    kprint(f"{prefix} - Count zero time steps: {np.sum(zero_time_steps)}")
-    kprint(
-        f"{prefix} - Count non zero time steps: {np.sum(non_zero_time_steps)}"
+    zero_time_traps = np.array([seq.get_zero_trap_count() for seq in trap_list])
+    non_zero_time_traps = np.array(
+        [seq.get_non_zero_trap_count() for seq in trap_list]
     )
-
-    kprint(f"{prefix} - Count zero time traps: {len(zero_time_steps)}")
-    kprint(f"{prefix} - Count non zero time traps: {len(non_zero_time_steps)}")
-
+    kprint(f"{prefix} - Count zero time steps: {zero_time_traps.mean():.3f}")
+    kprint(
+        f"{prefix} - Count non zero time steps: {non_zero_time_traps.mean():.3f}"
+    )
     zero_probability = np.array(
         [seq.get_zero_trap_probability() for seq in trap_list], dtype=f32
     )
     kprint(f"{prefix} - Zero Trap probability: {zero_probability.mean():.3f}")
-
-    kprint(f"non_zero_tt.min() = {non_zero_tt.min()}")
-    kprint(f"np.median(non_zero_tt) = {np.median(non_zero_tt)}")
-    kprint(f"non_zero_tt.max() = {non_zero_tt.max()}")
-
-    # non_zero_tt = non_zero_tt[non_zero_tt > t_min]
-    # non_zero_tt = non_zero_tt[non_zero_tt < t_max]
 
     plot_trapping_on_axis(ax1, non_zero_tt, t_min, t_max, prefix)
 
@@ -193,7 +184,7 @@ def run(path_to_main: str, gas: str, step: int, t_min_max, ax1, ax2):
         throat_lengths_weibull_fitter,
     )
     hybrid_analizer = HybridTrajectoryAnalizer(
-        HybridAnalizerParams(pap, struct_params, 0.3),
+        HybridAnalizerParams(pap, struct_params, 0.1),
         pil_gamma_fitter,
         throat_lengths_weibull_fitter,
     )
@@ -219,23 +210,23 @@ def run(path_to_main: str, gas: str, step: int, t_min_max, ax1, ax2):
             seq_file = Path(join(cur_pts, f"seq_{step * i}.pickle"))
             traps_file = Path(join(cur_pts, f"traps_{step * i}.pickle"))
 
-            if not seq_file.is_file():
-                start_time = time.time()
-                traps = analyzer.run(trj)
-                seq = TrapExtractor.get_trap_seq(traps, trj.delta_time_sec)
-                print(
-                    f" --- Analize trajectory {i} is ready for {prefix}! Time: {time.time() - start_time}"
-                )
-                with open(seq_file, 'wb') as handle:
-                    pickle.dump(seq, handle)
-                with open(traps_file, 'wb') as handle:
-                    pickle.dump(traps, handle)
-            else:
-                # print(f"load {i} {prefix}")
-                with open(seq_file, 'rb') as fp:
-                    seq = pickle.load(fp)
-                with open(traps_file, 'rb') as fp:
-                    traps = pickle.load(fp)
+            # if not seq_file.is_file():
+            start_time = time.time()
+            traps = analyzer.run(trj)
+            seq = TrapExtractor.get_trap_seq(traps, trj.delta_time_sec)
+            print(
+                f" --- Analize trajectory {i} is ready for {prefix}! Time: {time.time() - start_time}"
+            )
+            with open(seq_file, 'wb') as handle:
+                pickle.dump(seq, handle)
+            with open(traps_file, 'wb') as handle:
+                pickle.dump(traps, handle)
+            # else:
+            #     # print(f"load {i} {prefix}")
+            #     with open(seq_file, 'rb') as fp:
+            #         seq = pickle.load(fp)
+            #     with open(traps_file, 'rb') as fp:
+            #         traps = pickle.load(fp)
             results[(prefix, i)] = np.copy(traps)
 
             trap_list.append(seq)

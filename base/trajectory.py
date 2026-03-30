@@ -10,7 +10,7 @@ from utils.types import NPFArray, NPBArray
 
 @dataclass
 class Trajectory:
-    points: NPFArray
+    points: NPFArray  # coords of atom position Angstrom
     times: NPFArray
     box: BoundingBox
     atom_size: float = 0.19
