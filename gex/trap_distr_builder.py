@@ -19,61 +19,14 @@ from processes.probability_trajectory_analizer import (
     ProbabilityTrajectoryAnalizer,
     ProbabilityAnalizerParams,
 )
+from processes.prob_np_analizer import (
+    ProbabilityNPTrajectoryAnalizer,
+    ProbabilityNPTrajectoryAnalizerParams,
+)
 from processes.struct_trajectory_analyzer import StructAnalizerParams
 from processes.trap_extractor import TrapExtractor
 from utils.utils import kprint
 from scipy.stats import linregress
-
-
-def compute_survival_unique(times: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    times = np.asarray(times, dtype=float)
-    times = times[np.isfinite(times)]
-    times = times[times > 0]
-    if times.size == 0:
-        return np.array([]), np.array([])
-
-    # counts per unique time
-    t_unique, counts = np.unique(times, return_counts=True)
-    # survival: P(T > t)  (strictly greater)
-    n = counts.sum()
-    # number of samples with T > t_k equals cumulative counts after k
-    n_greater = np.cumsum(counts[::-1])[::-1] - counts  # after current bin
-    S = n_greater / n
-
-    # часто удобнее P(T >= t): тогда не будет нулей на последней точке
-    # n_ge = np.cumsum(counts[::-1])[::-1]
-    # S = n_ge / n
-
-    # убираем нули, чтобы log работал
-    mask = S > 0
-    return t_unique[mask], S[mask]
-
-
-def estimate_alpha_range(
-    times: np.ndarray,
-    t_min: float,
-    t_max: float,
-) -> tuple[
-    float, float, float, float, np.ndarray, np.ndarray, np.ndarray, np.ndarray
-]:
-    t, S = compute_survival_unique(times)
-    if t.size < 5:
-        return np.nan, np.nan, np.nan, np.nan, t, S, np.array([]), np.array([])
-
-    mask = (t >= t_min) & (t <= t_max)
-    t_fit = t[mask]
-    S_fit = S[mask]
-
-    if t_fit.size < 5:
-        return np.nan, np.nan, np.nan, np.nan, t, S, t_fit, S_fit
-
-    log_t = np.log(t_fit)
-    log_S = np.log(S_fit)
-
-    slope, intercept, r_value, p_value, std_err = linregress(log_t, log_S)
-    alpha = -slope
-    r2 = r_value**2
-    return alpha, slope, intercept, r2, t, S, t_fit, S_fit
 
 
 def plot_trapping_on_axis(
@@ -83,33 +36,43 @@ def plot_trapping_on_axis(
     t_max: float,
     label: str,
 ):
-    alpha, slope, intercept, r2, t, S, t_fit, S_fit = estimate_alpha_range(
-        times, t_min=t_min, t_max=t_max
-    )
+    Pt, bin_edges = np.histogram(times, bins=50, density=True)
+    t = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+
+    mask = (t >= t_min) & (t <= t_max) & (Pt > 0)
+    t_part = t[mask]
+    Pt_part = Pt[mask]
+    
+    log_t = np.log(t_part)
+    log_S = np.log(Pt_part)
+
+    slope, intercept, r_value, p_value, std_err = linregress(log_t, log_S)
+
+    alpha = -(slope + 1)
 
     # empirical
-    ax.loglog(
+    points = ax.loglog(
         t,
-        S,
+        Pt,
         marker="o",
         linestyle="none",
         alpha=0.35,
         label=f"{label}",
     )
+    color = points[0].get_color()
 
     # fit
-    if np.isfinite(alpha) and t_fit.size > 0:
-        t_line = np.logspace(np.log10(t_fit.min()), np.log10(t_fit.max()), 200)
+    if np.isfinite(alpha) and t_part.size > 0:
+        t_line = np.logspace(np.log10(t_part.min()), np.log10(t_part.max()), 200)
         S_line = np.exp(intercept) * (t_line**slope)
 
         ax.loglog(
             t_line,
             S_line,
             linewidth=2,
+            color=color,
             label=rf"{label} fit: $\alpha={alpha:.3f}$",
         )
-
-    return alpha, r2
 
 
 def plot_trap_tim_distr(
@@ -188,11 +151,18 @@ def run(path_to_main: str, gas: str, step: int, t_min_max, ax1, ax2):
         pil_gamma_fitter,
         throat_lengths_weibull_fitter,
     )
-    matrix_analyzer = StructTrajectoryAnalizer(struct_params)
+    struct_analyzer = StructTrajectoryAnalizer(struct_params)
+    prob_np_params = ProbabilityNPTrajectoryAnalizerParams(1e-3, 1e-2)
+    prob_np_analizer = ProbabilityNPTrajectoryAnalizer(
+        prob_np_params,
+        pil_gamma_fitter,
+        throat_lengths_weibull_fitter,
+    )
 
     results: Dict[Tuple[str, int], npt.NDArray[np.bool_]] = {}
     for analyzer, prefix in [
-        (matrix_analyzer, "Structural"),
+        (struct_analyzer, "Structural"),
+        (prob_np_analizer, "Probabilistic_Neamann-Pearson"),
         (prob_analizer, "Probabilistic"),
         (hybrid_analizer, "Hybrid"),
     ]:
@@ -210,23 +180,23 @@ def run(path_to_main: str, gas: str, step: int, t_min_max, ax1, ax2):
             seq_file = Path(join(cur_pts, f"seq_{step * i}.pickle"))
             traps_file = Path(join(cur_pts, f"traps_{step * i}.pickle"))
 
-            # if not seq_file.is_file():
-            start_time = time.time()
-            traps = analyzer.run(trj)
-            seq = TrapExtractor.get_trap_seq(traps, trj.delta_time_sec)
-            print(
-                f" --- Analize trajectory {i} is ready for {prefix}! Time: {time.time() - start_time}"
-            )
-            with open(seq_file, 'wb') as handle:
-                pickle.dump(seq, handle)
-            with open(traps_file, 'wb') as handle:
-                pickle.dump(traps, handle)
-            # else:
-            #     # print(f"load {i} {prefix}")
-            #     with open(seq_file, 'rb') as fp:
-            #         seq = pickle.load(fp)
-            #     with open(traps_file, 'rb') as fp:
-            #         traps = pickle.load(fp)
+            if not seq_file.is_file():
+                start_time = time.time()
+                traps = analyzer.run(trj)
+                seq = TrapExtractor.get_trap_seq(traps, trj.delta_time_sec)
+                print(
+                    f" --- Analize trajectory {i} is ready for {prefix}! Time: {time.time() - start_time}"
+                )
+                with open(seq_file, 'wb') as handle:
+                    pickle.dump(seq, handle)
+                with open(traps_file, 'wb') as handle:
+                    pickle.dump(traps, handle)
+            else:
+                # print(f"load {i} {prefix}")
+                with open(seq_file, 'rb') as fp:
+                    seq = pickle.load(fp)
+                with open(traps_file, 'rb') as fp:
+                    traps = pickle.load(fp)
             results[(prefix, i)] = np.copy(traps)
 
             trap_list.append(seq)
@@ -244,9 +214,10 @@ if __name__ == '__main__':
             "CH4",
             1,
             {
-                "Probabilistic": (5e-8, 2e-7),
-                "Hybrid": (5e-8, 2e-7),
-                "Structural": (5e-8, 5e-7),
+                "Probabilistic": (1e-12, 5e-7),
+                "Hybrid": (1e-12, 5e-7),
+                "Structural": (1e-12, 8e-7),
+                "Probabilistic_Neamann-Pearson": (1e-12, 5e-7),
             },
         ),
         (
@@ -254,9 +225,10 @@ if __name__ == '__main__':
             "H2",
             2,
             {
-                "Probabilistic": (5e-9, 3e-8),
-                "Hybrid": (5e-9, 3e-8),
-                "Structural": (1.5e-8, 8e-8),
+                "Probabilistic": (1e-12, 5e-8),
+                "Hybrid": (1e-12, 5e-8),
+                "Structural": (1e-12, 1.5e-7),
+                "Probabilistic_Neamann-Pearson": (1e-12, 5e-8),
             },
         ),
         # (path_to_data + "type1matrix/300K/ch4/", "type1-300K-CH4", 1),
@@ -278,7 +250,7 @@ if __name__ == '__main__':
         ax1.set_yscale("log")
 
         ax1.set_xlabel(r"$t, sec$", fontsize=16)
-        ax1.set_ylabel(r"$S(t) = P(\tau > t)$", fontsize=16)
+        ax1.set_ylabel(r"$P(t)$", fontsize=16)
 
         ax1.tick_params(axis="both", labelsize=14)
         # fig1.subplots_adjust(right=0.72)

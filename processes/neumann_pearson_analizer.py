@@ -40,7 +40,7 @@ class NeumannPearsonTrajectoryAnalizer(TrajectoryAnalyzer):
 
     @staticmethod
     def name() -> str:
-        return "meumann_pearson"
+        return "neumann_pearson"
 
     def run(
         self,

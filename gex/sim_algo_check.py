@@ -9,6 +9,7 @@ import numpy as np
 from typing import Any
 from base.discretecdf import DiscreteCDF
 from processes.trap_extractor import TrapExtractor
+from tqdm import tqdm
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
@@ -42,20 +43,6 @@ from processes.prob_np_analizer import (
 )
 
 
-def save_or_load(error_fn, k_fn, error_arr, k_value):
-    if not Path(error_fn).is_file():
-        _atomic_npy_save(error_fn, error_arr)
-        with open(k_fn, "wb") as f:
-            pickle.dump(k_value, f)
-        return error_arr, k_value
-
-    if k_value == 0:
-        error_arr = np.load(error_fn)
-        with open(k_fn, "rb") as f:
-            k_value = pickle.load(f)
-
-    return error_arr, k_value
-
 
 def save_error_corridor_png(
     out_dir: str,
@@ -81,9 +68,9 @@ def save_error_corridor_png(
 
     fig = plt.figure()
 
-    def plot_error(name, error, k_est):
+    def plot_error(lbl, error, k_est):
         lo, c, hi = band(error)
-        lbl = name + str(f" ({center}, {int(q_low*100)}–{int(q_high*100)}%)")
+        # lbl = str(f" ({center}, {int(q_low*100)}–{int(q_high*100)}%)")
 
         lbl += str(r", $k_{est}=$") + str(f"{k_est:.3f}")
         plt.fill_between(prob_grid, lo, hi, alpha=0.2)
@@ -94,13 +81,13 @@ def save_error_corridor_png(
 
     plt.xlabel(r"Probability move to new trap, $p$", fontsize=14)
     plt.ylabel(
-        "Average error / Count steps", fontsize=14
+        "Average error / Count steps", fontsize=12
     )  # или как у тебя подписано
-    plt.title(title, fontsize=16)
+    plt.title(title, fontsize=12)
 
-    plt.yticks(fontsize=12)
-    plt.xticks(fontsize=12)
-    plt.legend(frameon=False, prop={'size': 12})
+    plt.yticks(fontsize=10)
+    plt.xticks(fontsize=10)
+    plt.legend(frameon=False, prop={'size': 10})
 
     fig.savefig(join(out_dir, filename), dpi=200, bbox_inches="tight")
     plt.close(fig)
@@ -149,8 +136,8 @@ def trajectories_simulation(
 
 def run(
     path_to_main: str,
-    count_trj=10,
-    count_steps=1500,
+    count_trj=100,
+    count_steps=3000,
 ):
     path_to_save: str = join(path_to_main, "errors")
     path_to_pil_gf: str = join(path_to_main, "pi_l_gamma_fitter.pkl")
@@ -353,7 +340,12 @@ def run(
             else:
                 k_est, errors, results = empty_init()
 
-            for ind in range(flat_ind, len(prob_grid) * count_trj):
+            for ind in tqdm(
+                range(len(prob_grid) * count_trj),
+                desc=f"Analyze {analizer.name()} for k={k}",
+            ):
+                if ind < flat_ind:
+                    continue
                 pi = ind // count_trj
                 ti = ind % count_trj
 
@@ -384,10 +376,6 @@ def run(
                         "errors": errors,
                     }
                     _atomic_pickle_dump(ckpt, ckpt_fn)
-
-                if (ind + 1) % count_trj == 0:
-                    kprint(f"Ready with {analizer.name()} k={k} p={p}")
-            kprint(f"Ready with {analizer.name()} k={k}")
             currect_state[analizer.name()] = {
                 "k": k,
                 "prob_grid": prob_grid,

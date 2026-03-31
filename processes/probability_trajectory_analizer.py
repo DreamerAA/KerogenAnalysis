@@ -16,7 +16,7 @@ from utils.types import NPFArray, NPBArray
 
 @dataclass
 class ProbabilityAnalizerParams:
-    critical_probability: float = 0.5
+    critical_probability: float = 1e-3
 
 
 class ProbabilityTrajectoryAnalizer(TrajectoryAnalyzer):
