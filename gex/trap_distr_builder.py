@@ -42,7 +42,7 @@ def plot_trapping_on_axis(
     mask = (t >= t_min) & (t <= t_max) & (Pt > 0)
     t_part = t[mask]
     Pt_part = Pt[mask]
-    
+
     log_t = np.log(t_part)
     log_S = np.log(Pt_part)
 
@@ -57,13 +57,14 @@ def plot_trapping_on_axis(
         marker="o",
         linestyle="none",
         alpha=0.35,
-        label=f"{label}",
     )
     color = points[0].get_color()
 
     # fit
     if np.isfinite(alpha) and t_part.size > 0:
-        t_line = np.logspace(np.log10(t_part.min()), np.log10(t_part.max()), 200)
+        t_line = np.logspace(
+            np.log10(t_part.min()), np.log10(t_part.max()), 200
+        )
         S_line = np.exp(intercept) * (t_line**slope)
 
         ax.loglog(
@@ -76,7 +77,7 @@ def plot_trapping_on_axis(
 
 
 def plot_trap_tim_distr(
-    trap_list: list[TrapSequence], prefix, t_min, t_max, ax1, ax2
+    trap_list: list[TrapSequence], prefix, t_min, t_max, ax1
 ):
     time_tuple = tuple(trap.times for trap in trap_list)
     time_trapings = np.concatenate(time_tuple)
@@ -115,7 +116,7 @@ def get_struct_params(gas: str) -> StructAnalizerParams:
     )
 
 
-def run(path_to_main: str, gas: str, step: int, t_min_max, ax1, ax2):
+def run(path_to_main: str, gas: str, step: int, t_min_max, ax1):
     traj_path = join(path_to_main, "trj.gro")
     pts_trapping = join(path_to_main, "traps")
     path_to_pil_gf: str = join(path_to_main, "pi_l_gamma_fitter.pkl")
@@ -162,8 +163,8 @@ def run(path_to_main: str, gas: str, step: int, t_min_max, ax1, ax2):
     results: Dict[Tuple[str, int], npt.NDArray[np.bool_]] = {}
     for analyzer, prefix in [
         (struct_analyzer, "Structural"),
-        (prob_np_analizer, "Probabilistic_Neamann-Pearson"),
-        (prob_analizer, "Probabilistic"),
+        (prob_np_analizer, "Probabilistic"),
+        # (prob_analizer, "Probabilistic"),
         (hybrid_analizer, "Hybrid"),
     ]:
         cur_pts = join(pts_trapping, prefix)
@@ -201,9 +202,7 @@ def run(path_to_main: str, gas: str, step: int, t_min_max, ax1, ax2):
 
             trap_list.append(seq)
         t_min, t_max = t_min_max[prefix]
-        plot_trap_tim_distr(
-            trap_list, gas + " " + prefix, t_min, t_max, ax1, ax2
-        )
+        plot_trap_tim_distr(trap_list, gas + " " + prefix, t_min, t_max, ax1)
 
 
 if __name__ == '__main__':
@@ -239,31 +238,38 @@ if __name__ == '__main__':
         # (path_to_data + "type2matrix/300K/h2/", "type2-300K-H2", 2),
     ]
     for input in input_data:
-        fig1, ax1 = plt.subplots(figsize=(6, 5))
-        # fig2, ax2 = plt.subplots(figsize=(6, 5))
-        run(*input, ax1, None)
+        fig, ax = plt.subplots(figsize=(7, 5))
+        # fig2, ax2 = plt.subplots(figsize=(8, 5))
+        run(*input, ax)
 
         # ======================
         # Figure 1 — Survival
         # ======================
-        ax1.set_xscale("log")
-        ax1.set_yscale("log")
+        ax.set_xscale("log")
+        ax.set_yscale("log")
 
-        ax1.set_xlabel(r"$t, sec$", fontsize=16)
-        ax1.set_ylabel(r"$P(t)$", fontsize=16)
+        ax.set_xlabel(r"$t, sec$", fontsize=18)
+        ax.set_ylabel(r"$P(t)$", fontsize=18)
 
-        ax1.tick_params(axis="both", labelsize=14)
+        ax.tick_params(axis="both", labelsize=12)
         # fig1.subplots_adjust(right=0.72)
 
         # легенда вне графика справа
-        ax1.legend(
+        ax.legend(
             frameon=False,
-            fontsize=13,
+            fontsize=16,
             # loc="center left",
             # bbox_to_anchor=(1.02, 0.5),
         )
 
-        fig1.tight_layout()
+        fig.tight_layout()
+
+        fig.savefig(
+            join(input[0], "traps", "P(t)_loglog.svg"),
+            dpi=300,
+            bbox_inches="tight",
+        )
+        plt.close(fig)
 
         # output_path = join(input[0], "traps", f"{input[1]}.png")
         # fig1.savefig(output_path, dpi=300, bbox_inches="tight")

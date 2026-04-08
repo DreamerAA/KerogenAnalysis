@@ -41,7 +41,10 @@ from processes.prob_np_analizer import (
     ProbabilityNPTrajectoryAnalizer,
     ProbabilityNPTrajectoryAnalizerParams,
 )
-
+from processes.neumann_pearson_struct_analizer import (
+    NeumannPearsonStructTrajectoryAnalizer,
+    NeumannPearsonStructAnalizerParams,
+)
 
 
 def save_error_corridor_png(
@@ -89,7 +92,7 @@ def save_error_corridor_png(
     plt.xticks(fontsize=10)
     plt.legend(frameon=False, prop={'size': 10})
 
-    fig.savefig(join(out_dir, filename), dpi=200, bbox_inches="tight")
+    fig.savefig(join(out_dir, filename), dpi=300, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -195,6 +198,9 @@ def run(
         k: ProbabilityNPTrajectoryAnalizerParams(1e-3, 0.01)
         for k in [0.1, 0.5, 0.9]
     }
+    params_np_struct_set = {
+        k: NeumannPearsonStructAnalizerParams(0.01) for k in [0.1, 0.5, 0.9]
+    }
 
     pset = {
         k: {
@@ -203,6 +209,9 @@ def run(
             ProbabilityTrajectoryAnalizer.name(): params_prob_set[k],
             NeumannPearsonTrajectoryAnalizer.name(): params_np_set[k],
             ProbabilityNPTrajectoryAnalizer.name(): params_pnp_set[k],
+            NeumannPearsonStructTrajectoryAnalizer.name(): params_np_struct_set[
+                k
+            ],
         }
         for k in [0.1, 0.5, 0.9]
     }
@@ -266,6 +275,12 @@ def run(
             throat_lengths_weibull_fitter,
         )
 
+        np_struct_analizer = NeumannPearsonStructTrajectoryAnalizer(
+            params[NeumannPearsonStructTrajectoryAnalizer.name()],
+            pil_gamma_fitter,
+            throat_lengths_weibull_fitter,
+        )
+
         # total_jobs_k = _calc_total_jobs(count_trj, prob_grid)
 
         trajectories = trajectories_simulation(
@@ -309,6 +324,7 @@ def run(
             (prob_analizer, empty_func),
             (prob_np_analizer, empty_func),
             (hybrid_analizer, set_approx_struct_traps),
+            (np_struct_analizer, set_approx_struct_traps),
         ]:
             exp_tag = (
                 f"name={analizer.name()}_k={k}_count_trj={count_trj}_" + header
@@ -399,33 +415,40 @@ def run(
         struct_errors, struct_k_est = get_norm_errors_k_est(
             StructTrajectoryAnalizer.name()
         )
-        prob_errors, prob_k_est = get_norm_errors_k_est(
-            ProbabilityTrajectoryAnalizer.name()
-        )
+        # prob_errors, prob_k_est = get_norm_errors_k_est(
+        #     ProbabilityTrajectoryAnalizer.name()
+        # )
         hybrid_errors, hybrid_k_est = get_norm_errors_k_est(
             HybridTrajectoryAnalizer.name()
         )
         prob_np_errors, prob_np_k_est = get_norm_errors_k_est(
             ProbabilityNPTrajectoryAnalizer.name()
         )
+        # np_struct_errors, np_struct_k_est = get_norm_errors_k_est(
+        #     NeumannPearsonStructTrajectoryAnalizer.name()
+        # )
 
         plots_dir = join(
             path_to_save,
             "plots",
         )
-        png_name = f"errors_k={k}_trj={count_trj}_steps={count_steps}.png"
+        pdf_name = f"errors_k={k}_trj={count_trj}_steps={count_steps}.svg"
         title = str(r"Errors for $k$=") + str(f"{k}")
 
         save_error_corridor_png(
             out_dir=plots_dir,
-            filename=png_name,
+            filename=pdf_name,
             prob_grid=prob_grid,
             data={
-                "Prob": (prob_errors, prob_k_est),
-                "Hybrid": (hybrid_errors, hybrid_k_est),
-                "Struct": (struct_errors, struct_k_est),
+                "Structural": (struct_errors, struct_k_est),
                 "Neumann-Pearson": (np_errors, np_k_est),
-                "Prob+Neumann-Pearson": (prob_np_errors, prob_np_k_est),
+                "Neyman–Pearson + Bayes": (
+                    prob_np_errors,
+                    prob_np_k_est,
+                ),  # prob+np
+                # "Hybrid": (hybrid_errors, hybrid_k_est),
+                # "Prob": (prob_errors, prob_k_est),
+                # "Neumann-Pearson+Struct": (np_struct_errors, np_struct_k_est),
             },
             title=title,
             q_low=0.2,
@@ -435,11 +458,12 @@ def run(
 
         kprint(
             f"For k={k}: "
-            f"probability estimation k={prob_k_est:.3f} | "
+            # f"probability estimation k={prob_k_est:.3f} | "
             f"probability + neumann pearson estimation k={prob_np_k_est:.3f} | "
             f"hybrid estimation k={hybrid_k_est:.3f} | "
             f"struct estimation k={struct_k_est:.3f} | "
-            f"neumann pearson estimation k={np_k_est:.3f} |"
+            # f"neumann pearson estimation k={np_k_est:.3f} | "
+            # f"neumann pearson + struct estimation k={np_struct_k_est:.3f} | "
         )
 
 

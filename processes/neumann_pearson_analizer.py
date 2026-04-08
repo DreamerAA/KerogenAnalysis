@@ -57,8 +57,8 @@ class NeumannPearsonTrajectoryAnalizer(TrajectoryAnalyzer):
     @staticmethod
     def analyze(
         trj: Trajectory,
-        transition_step_fitter: WeibullFitter,
-        trapped_step_fitter: GammaFitter,
+        transition_step_fitter: WeibullFitter | GammaFitter,
+        trapped_step_fitter: GammaFitter | WeibullFitter,
     ) -> NPFArray:
         points = trj.points_without_periodic
         distances = pdistances(points)

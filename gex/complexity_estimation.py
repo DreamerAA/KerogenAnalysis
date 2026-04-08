@@ -119,9 +119,9 @@ if __name__ == '__main__':
     trj = simulator.run(1000)
 
     steps = [
-        (get_struct_analizer, 'r', "Structural", 0, 2),
-        (get_prob_analizer, 'g', "Probabilistic", 1, 1),
-        (get_hybrid_analizer, 'b', "Hybrid", 2, 2),
+        (get_struct_analizer, "Structural", 0, 2),
+        (get_prob_analizer, "Probabilistic", 1, 1),
+        (get_hybrid_analizer, "Hybrid", 2, 2),
     ]
 
     times_path = (
@@ -149,32 +149,55 @@ if __name__ == '__main__':
     times = times[1:, :]
     trj_lens = trj_lens[1:]
 
-    def add_plot(atime, color, name, fit_degree: int = 2):
-        errfunc = lambda p, x, y: fitfunc(p, x) - y
-        if fit_degree == 2:
+    def add_plot(atime, name, fit_degree: int = 2):
+
+        if fit_degree == 3:
+            fitfunc = lambda p, x: p[0] * x**3 + p[1] * x**2 + p[2] * x + p[3]
+            p0 = np.array(
+                [1.0, 2.35443285e-07, -2.05620996e-06, 8.41931635e-02],
+                dtype=np.float32,
+            )
+        elif fit_degree == 2:
             fitfunc = lambda p, x: p[0] * x**2 + p[1] * x + p[2]
-            p0 = np.array([1.0, 1.0, 0.0], dtype=np.float32)
-        else:
+            p0 = np.array(
+                [2.35443285e-07, -2.05620996e-06, 8.41931635e-02],
+                dtype=np.float32,
+            )
+        elif fit_degree == 1:
             fitfunc = lambda p, x: p[0] * x + p[1]
             p0 = np.array([1.0, 0.0], dtype=np.float32)
 
-        p2, success = optimize.leastsq(errfunc, p0[:], args=(trj_lens, atime))
-        print(f"p = {p2}")
-        plt.scatter(trj_lens, atime, s=20, marker='o', c=color)
+        # errfunc = lambda p, x, y: fitfunc(p, x) - y
+        # p2, success = optimize.leastsq(errfunc, p0[:], args=(trj_lens, atime))
+        #
+
+        logx = np.log(trj_lens)
+        logy = np.log(atime)
+        p = np.polyfit(logx, logy, deg=1)
+
+        print(f"p = {p}")
+        points = plt.scatter(trj_lens, atime, s=30, marker='o', alpha=0.35)
+        color = points.get_facecolor()[0]
         plt.plot(
             trj_lens,
-            fitfunc(p2, trj_lens),
-            color=color,
+            np.exp(p[1]) * trj_lens ** p[0],
             label=name,
+            color=color,
         )
 
-    for _, color, name, ind, fd in steps:
-        add_plot(times[:, ind], color, name, fd)
+    for _, name, ind, fd in steps:
+        add_plot(times[:, ind], name, fd)
 
     plt.xlabel('Trajectory length', fontsize=12)
     plt.ylabel('Execution Time, sec', fontsize=12)
+    plt.xscale('log')
     plt.yscale('log')
     plt.yticks(fontsize=12)
     plt.xticks(fontsize=12)
     plt.legend(frameon=False, fontsize=12)
-    plt.show()
+    plt.savefig(
+        "/media/andrey/Samsung_T5/PHD/Kerogen/complexity.pdf",
+        bbox_inches="tight",
+        pad_inches=0,
+    )
+    # plt.show()

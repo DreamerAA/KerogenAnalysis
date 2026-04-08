@@ -409,7 +409,8 @@ def plot_hist_overlay(
         if x.size < 2:
             continue
         c = color_map.get(i, None)
-        label = "t = " + str(int(times[i])) + " ps"
+        t = times[i] / 1e6
+        label = f"t = {t:.2f} us"
         ax.hist(
             x,
             bins=bins,
@@ -426,7 +427,7 @@ def plot_hist_overlay(
 
     ax.set_title(title)
     ax.set_xlabel(xname)
-    ax.legend(frameon=False, fontsize=9)
+    ax.legend(frameon=False, fontsize=LEGEND_FONTSIZE)
 
     _style_title(ax)
     _style_axes(ax)
@@ -492,11 +493,13 @@ def plot_ecdf_overlay(
             continue
         xs, ys = ecdf(x)
         c = color_map.get(i, None)
+        t = times[i] / 1e6
+        label = f"t = {t:.2f} us"
         ax.step(
             xs,
             ys,
             where="post",
-            label="t = " + str(int(times[i])) + " ps",
+            label=label,
             color=c,
         )
 
@@ -830,9 +833,6 @@ def analysis(main_path: str, pnm_dir: str, oputput_dir: str):
         )
 
 
-# -----------------------------
-# How you call it
-# -----------------------------
 if __name__ == "__main__":
 
     paths = ["/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/"]
