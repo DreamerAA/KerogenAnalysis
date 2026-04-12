@@ -21,7 +21,7 @@ from base.trajectory import Trajectory
 from utils.utils import create_box_mask
 from processes.segmentaion import Segmentator
 from visualizer.visualizer import Visualizer
-from examples.utils import write_binary_file
+from utils.utils import write_binary_file
 
 
 additional_radius = 0.0

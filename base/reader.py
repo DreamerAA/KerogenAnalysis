@@ -1,3 +1,4 @@
+import re
 from typing import IO, Any, Tuple, List
 import numpy.typing as npt
 import numpy as np
@@ -16,34 +17,34 @@ def skip_line(file: IO, count: int = 1) -> bool:  # type: ignore
 
 class StepsInfo:
     def __init__(self):
+        self.pattern = re.compile(
+            r"t=\s*([0-9]+(?:\.[0-9]+)?)\s+step=\s*([0-9]+)"
+        )
         self.steps = []
+        self.times = []  # ps
         self.delta = -1
 
-    def getStep(self, line: str) -> None:
-        els = (line[:-1]).split('=')
-        res = int(els[2])
-        if res < 0:
-            res = self.steps[-1] + self.delta
+    def get_step(self, line: str) -> None:
+        match = self.pattern.search(line)
+        assert match
 
-        self.steps.append(res)
-
-        if len(self.steps) == 2:
-            self.delta = self.steps[-1] - self.steps[-2]
-        elif len(self.steps) > 2:
-            assert self.delta == (self.steps[-1] - self.steps[-2])
+        t = int(float(match.group(1)))
+        step = int(match.group(2))
+        self.steps.append(step)
+        self.times.append(t)
 
 
 class Reader:
     @staticmethod
     def read_structures_by_num(
         path_to_structure: str, indexes: List[int]
-    ) -> List[Tuple[List[AtomData], Tuple[float, float, float]]]:
+    ) -> List[Tuple[int, int, List[AtomData], Tuple[float, float, float]]]:
         structures = []
         info = StepsInfo()
         with open(path_to_structure) as f:
             is_end = False
             while not is_end:
-                num = Reader.read_head_struct(f, info)
+                num, time = Reader.read_head_struct(f, info)
                 # print(f" -- Current num: {num}")
                 if num == -1:
                     is_end = True
@@ -55,7 +56,7 @@ class Reader:
                         break
                 else:
                     atoms, size = Reader.read_raw_struct_ff_main(f)
-                    structures.append((num, np.array(atoms), size))
+                    structures.append((num, time, np.array(atoms), size))
                     print(" -- Reading struct is ended!")
 
         return structures
@@ -144,19 +145,19 @@ class Reader:
         return atoms, size
 
     @staticmethod
-    def read_head_struct(f, info: StepsInfo = StepsInfo()) -> int:
+    def read_head_struct(f, info: StepsInfo = StepsInfo()) -> Tuple[int, int]:
         try:
             simul_num = str(next(f))
-            info.getStep(simul_num)
+            info.get_step(simul_num)
         except StopIteration:
-            return -1
-        return info.steps[-1]
+            return -1, -1
+        return info.steps[-1], info.times[-1]
 
     @staticmethod
     def read_raw_struct_ff(
         f: TextIOWrapper,
     ) -> Tuple[List[AtomData], Tuple[float, float, float], int]:
-        simul_num = Reader.read_head_struct(f)
+        simul_num, time = Reader.read_head_struct(f)
         if simul_num == -1:
             return None, None, simul_num
         atoms, size = Reader.read_raw_struct_ff_main(f)

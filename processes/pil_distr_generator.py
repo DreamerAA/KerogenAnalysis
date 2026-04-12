@@ -200,3 +200,29 @@ class PiLDistrGenerator:
         pi_l_save[:, 0] = new_l
         pi_l_save[:, 1] = pi_l
         return pi_l_save
+
+    def get_conditional_curves(self, pore_radiuses: np.ndarray, step:int = 10):
+        pore_radiuses = np.asarray(pore_radiuses, dtype=f32)
+        pore_radiuses = np.sort(pore_radiuses)
+
+        max_rad = float(pore_radiuses[-1])
+        max_length = np.sqrt(3.0 * ((1.5 * max_rad) ** 2))
+
+        cl = 100
+        nx_len = np.linspace(0.0, max_length, cl, dtype=f32)
+        dl = float(nx_len[1] - nx_len[0])
+
+        d_unit_sorted = self._prepare_unit_distances()
+        sample_rad = pore_radiuses[::step].astype(f32)
+
+        def sim(radius: float) -> np.ndarray:
+            edges_unit = (nx_len / radius).astype(f32)
+            idx = np.searchsorted(d_unit_sorted, edges_unit, side="right")
+            counts = np.diff(idx).astype(f32)
+            norm = float(np.sum(counts) * dl)
+            return (counts / norm) if norm != 0.0 else counts
+
+        pi_l_cond = np.vstack([sim(float(r)) for r in sample_rad])
+        l_centers = nx_len[:-1] + 0.5 * (nx_len[1:] - nx_len[:-1])
+
+        return sample_rad, l_centers, pi_l_cond

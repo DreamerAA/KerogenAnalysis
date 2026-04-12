@@ -1,10 +1,12 @@
+import re
 import sys
 import os
 from pathlib import Path
-from os.path import realpath
+from os.path import join, realpath
 import random
 import time
 from typing import IO, List, Tuple, Any
+from scipy import ndimage
 import seaborn as sns
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -237,7 +239,9 @@ def main_part_struct(path_to_structure: str, path_to_linklist: str):
     #     draw_kerogen_data(kerogen_data)
 
 
-def kerogen_struct_vis(path_to_structure: str, path_to_linklist: str, struct_number: int):
+def kerogen_struct_vis(
+    path_to_structure: str, path_to_linklist: str, struct_number: int
+):
     atoms, size, linked_list = Reader.read_struct_and_linked_list(
         path_to_structure, path_to_linklist
     )
@@ -251,7 +255,7 @@ def kerogen_struct_vis(path_to_structure: str, path_to_linklist: str, struct_num
         if a.struct_number == struct_number:
             cut_atoms.append(a)
             num_to_nn[i + 1] = len(num_to_nn)
-            
+
     graph = nx.Graph()
     graph.add_nodes_from(
         [
@@ -259,7 +263,16 @@ def kerogen_struct_vis(path_to_structure: str, path_to_linklist: str, struct_num
             for i, atom in enumerate(cut_atoms)
         ]
     )
-    graph.add_edges_from([(num_to_nn[n1], num_to_nn[n2]) for n1, n2 in linked_list if (atoms[n1 - 1].struct_number == struct_number and atoms[n2 - 1].struct_number == struct_number)])
+    graph.add_edges_from(
+        [
+            (num_to_nn[n1], num_to_nn[n2])
+            for n1, n2 in linked_list
+            if (
+                atoms[n1 - 1].struct_number == struct_number
+                and atoms[n2 - 1].struct_number == struct_number
+            )
+        ]
+    )
 
     kerogen_data = KerogenData(graph, cut_atoms, bbox)  # type: ignore
     # Periodizer.rm_long_edges(kerogen_data)
@@ -268,86 +281,136 @@ def kerogen_struct_vis(path_to_structure: str, path_to_linklist: str, struct_num
     draw_kerogen_data(kerogen_data)
 
 
-def voxelized_struct_and_traj_vis(path_to_structure: str, path_to_linklist: str, path_to_traj: str, num_trj: int, bbox: BoundingBox = None):
+def cut_image_by_image_size(
+    image: np.ndarray,
+    bbox: BoundingBox,
+    cut_params: tuple[tuple[int, int], tuple[int, int], tuple[int, int]],
+) -> tuple[np.ndarray, BoundingBox]:
+    cut_img = image[
+        cut_params[0][0] : cut_params[0][1],
+        cut_params[1][0] : cut_params[1][1],
+        cut_params[2][0] : cut_params[2][1],
+    ]
+    image_size = image.shape
+    bbox_size = np.array(bbox.size())
+    voxel_size = np.divide(bbox_size, image_size)
+
+    bbox_axes = [bbox.xb_, bbox.yb_, bbox.zb_]
+
+    cut_bbox = BoundingBox(
+        *(
+            Range(
+                *[ba.min_ + cut_params[i][j] * voxel_size[i] for j in range(2)]
+            )
+            for i, ba in enumerate(bbox_axes)
+        )
+    )
+
+    return cut_img, cut_bbox
+
+
+def voxelized_struct_and_traj_vis(
+    path_to_data: str,
+    num_trj: int,
+    resolution: float = 0.031154750,
+    real_size_full_cell: tuple[float, float, float] = (
+        6.23095,
+        7.41057,
+        13.01500,
+    ),
+    use_floating=False,
+):
+    prefix = path_to_data
+    path_to_traj: str = join(prefix, "trj.gro")
+    path_to_images: str = join(prefix, "images")
     trajectories = Trajectory.read_trajectoryes(path_to_traj)
 
     trj = trajectories[num_trj]
-    if bbox is None:
-        bbox = trj.trjbox(True)
-    
-    atoms, size, linked_list = Reader.read_struct_and_linked_list(
-        path_to_structure, path_to_linklist
-    )
 
-    print(f" --- Cell size: {size}")
-    print(bbox.xb_.min_, bbox.xb_.max_, bbox.yb_.min_, bbox.yb_.max_, bbox.zb_.min_, bbox.zb_.max_)
-    
-    # div = 2
-    # bbox = Segmentator.cut_cell(size, div)  # type: ignore
-    # bbox = BoundingBox(Range(11, 13), Range(5.0, 7.), Range(3.5, 5.5))
-    # bbox = BoundingBox(Range(3.5, 5.5), Range(5.0, 7.), Range(11, 13))
-     
-    print(f" --- Box size: {bbox.size()}")
+    if use_floating:
+        for file in os.listdir(path_to_images):
+            if not file.endswith(".npy") or not file.startswith("float"):
+                continue
 
-    removed_atoms, rm_mask = create_box_mask(atoms, bbox)
-    atoms = atoms[rm_mask]
-    old_to_new = np.cumsum(rm_mask.astype(np.int32)) - 1
-    linked_list = filter_linked_list(linked_list, removed_atoms)
-    linked_list = reset_atom_id(linked_list, old_to_new)
+            with open(join(path_to_images, file), 'rb') as f:  # type: ignore
+                start_img = np.load(f)  # type: ignore
 
-    graph = nx.Graph()
-    graph.add_nodes_from(
-        [
-            (i, {"color_id": atom.type_id, "scale_id": atom.type_id})
-            for i, atom in enumerate(atoms)
-        ]
-    )
-    graph.add_edges_from(linked_list)
+                pattern = re.compile(
+                    r"float_img_num=(?P<step>\d+)_cell=.*?_is=\((?P<nx>\d+),\s*(?P<ny>\d+),\s*(?P<nz>\d+)\)_ar=.*?_resolution=(?P<resolution>\d+(?:\.\d+)?)"
+                )
 
-    kerogen_data = KerogenData(graph, atoms, bbox)  # type: ignore
-    Periodizer.rm_long_edges(kerogen_data)
+                match = pattern.search(file)
+                if match is None:
+                    raise ValueError(
+                        "Строка не соответствует ожидаемому формату"
+                    )
 
-    ref_size = 100
-    resolution = bbox.size()[0] / ref_size
-    str_resolution = "{:.9f}".format(resolution)
-    file_name = (path_to_structure.split("/")[-1]).split(".")[0]
-    binarized_file_name = (
-        ""
-        # f"../data/Kerogen/result_img_{file_name}_rs={ref_size}_mr={methan_radius}_div={div}.npy"
-        f"../data/h2_result_img_{file_name}_rs={ref_size}_mr={additional_radius}_resolution={str_resolution}.npy"
-    )
+                step = int(match.group("step"))
+                resolution = float(match.group("resolution"))
+                print(step, resolution)
 
-    if os.path.isfile(binarized_file_name):
-        with open(binarized_file_name, 'rb') as f:  # type: ignore
-            img = np.load(f)  # type: ignore
+                img_shape = start_img.shape
+                img_real_size = np.array(img_shape) * resolution
+                center_img = np.array(real_size_full_cell) * 0.5
+                xyz_img_min = center_img - img_real_size * 0.5
+                xyz_img_max = center_img + img_real_size * 0.5
+                real_img_box = BoundingBox(
+                    *(
+                        Range(mmin, mmax)
+                        for mmin, mmax in zip(xyz_img_min, xyz_img_max)
+                    )
+                )
+                break
+
+        float_img = ndimage.gaussian_filter(start_img, 4)
+        float_img = np.pad(float_img, [(1, 1), (1, 1), (1, 1)], 'maximum')
+        float_img[:, (float_img.shape[1] // 2) :, :] = 10.0 * float_img.max()
+        Visualizer.draw_img_trj(
+            float_img, real_img_box, trj, False, isovalue=0.11
+        )
     else:
-        img_size = Segmentator.calc_image_size(
-            kerogen_data.box.size(), reference_size=ref_size, by_min=True
+        for file in os.listdir(path_to_images):
+            if (
+                not file.endswith(".npy")
+                or not file.startswith("result")
+                or "16275000" not in file
+            ):
+                continue
+
+            with open(join(path_to_images, file), 'rb') as f:  # type: ignore
+                start_img = np.load(f)  # type: ignore
+
+                pattern = re.compile(
+                    r"result_img_num=(?P<step>\d+)_cell=.*?_is=\((?P<nx>\d+),\s*(?P<ny>\d+),\s*(?P<nz>\d+)\)_ar=.*?_resolution=(?P<resolution>\d+(?:\.\d+)?)"
+                )
+
+                match = pattern.search(file)
+                if match is None:
+                    raise ValueError(
+                        "Строка не соответствует ожидаемому формату"
+                    )
+
+                step = int(match.group("step"))
+                resolution = float(match.group("resolution"))
+                print(step, resolution)
+
+                img_shape = start_img.shape
+                img_real_size = np.array(img_shape) * 4 * resolution
+                center_img = np.array(real_size_full_cell) * 0.5
+                xyz_img_min = center_img - img_real_size * 0.5
+                xyz_img_max = center_img + img_real_size * 0.5
+                real_img_box = BoundingBox(
+                    *(
+                        Range(mmin, mmax)
+                        for mmin, mmax in zip(xyz_img_min, xyz_img_max)
+                    )
+                )
+                break
+
+        img, bbox = cut_image_by_image_size(
+            start_img, real_img_box, tuple((200, 300) for i in range(3))
         )
-        segmentator = Segmentator(
-            kerogen_data,
-            img_size,
-            size_data=get_size,
-            radius_extention=get_ext_size,
-            partitioning=1,
-        )
-        img = segmentator.binarize()
-        with open(binarized_file_name, 'wb') as f:  # type: ignore
-            np.save(f, img)  # type: ignore
-
-        str_resolution = "{:.9f}".format(resolution)
-        raw_file_name = (
-            # f"../data/Kerogen/result_raw_img_{file_name}_is={img.shape}_mr={methan_radius}_div={div}.raw"
-            f"../data/h2_result_raw_img_{file_name}_is={img.shape}_mr={additional_radius}_resolution={str_resolution}nm.raw"
-        )
-        write_binary_file(img, raw_file_name)
-
-    print(f" --- Image size: {img.shape}")
-    
-    Visualizer.draw_img_trj(img, bbox, trj, True)
-
-
-
+        Visualizer.draw_img_trj(img, bbox, trj, True)
 
 
 if __name__ == '__main__':
@@ -356,15 +419,15 @@ if __name__ == '__main__':
     # kerogen_struct_vis(prefix + "kerogen_moleculas.gro", prefix + "ker.pdb")
 
     # voxelized_struct_and_traj_vis(
-    #     prefix + "kerogen_moleculas.gro", 
-    #     prefix + "ker.pdb", 
-    #     prefix + "trj.gro", 
+    #     prefix + "kerogen_moleculas.gro",
+    #     prefix + "ker.pdb",
+    #     prefix + "trj.gro",
     #     4
     # )
 
-    prefix = "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/h2/"
-    voxelized_struct_and_traj_vis(prefix + "type1.h2.1.gro", prefix + "ker.pdb", prefix + "trj.gro", 17, BoundingBox(Range(0, 6), Range(1.0, 7.), Range(3, 9)))
-    
+    path_data = "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/"
 
-
-    
+    voxelized_struct_and_traj_vis(
+        path_data,
+        17,
+    )

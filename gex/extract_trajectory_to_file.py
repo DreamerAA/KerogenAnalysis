@@ -20,7 +20,7 @@ def run(data_path: str, save_path: str) -> StepsInfo:
         info = StepsInfo()
         for i, line in enumerate(fdata):
             if "Kerogen " in line:
-                info.getStep(line)
+                info.get_step(line)
             if "KRG" not in line:
                 fsave.write(line)
     except Exception as e:

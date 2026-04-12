@@ -18,7 +18,7 @@ from base.periodizer import Periodizer
 from base.reader import Reader, StepsInfo
 from base.trajectory import Trajectory
 from utils.utils import create_box_mask
-from examples.utils import write_binary_file
+from utils.utils import write_binary_file
 from processes.segmentaion import Segmentator
 from visualizer.visualizer import Visualizer
 

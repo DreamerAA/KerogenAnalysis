@@ -12,10 +12,18 @@ from utils.types import NPFArray, NPBArray
 class Trajectory:
     points: NPFArray  # coords of atom position Angstrom
     times: NPFArray
-    box: BoundingBox
+    box: BoundingBox  # its box of cell
     atom_size: float = 0.19
     traps: Optional[NPBArray] = None
     # non_periodic_points: Optional[npt.NDArray[np.float64]] = None
+
+    def cut(self, start: int = 0, stop: int = None):
+        if stop is None:
+            stop = len(self.points)
+        self.points = self.points[start:stop]
+        self.times = self.times[start:stop]
+        if self.traps is not None:
+            self.traps = self.traps[start:stop]
 
     def dists(self) -> NPFArray:
         return Trajectory.extractDists(self.points_without_periodic)

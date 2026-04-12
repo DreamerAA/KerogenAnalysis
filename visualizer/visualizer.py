@@ -118,7 +118,6 @@ class vtkTimerCallbackActors:
 
 
 class Visualizer:
-    enumerate
 
     def critical_u(H):
         return H * np.exp(H + 1)
@@ -569,11 +568,13 @@ class Visualizer:
     @staticmethod
     def create_volume_img(image_data) -> vtk.vtkVolume:
         composite_opacity = vtk.vtkPiecewiseFunction()
-        composite_opacity.AddPoint(0, 0.1)
-        composite_opacity.AddPoint(1, 0.6)
+        composite_opacity.AddPoint(0.0, 0.3)
+        composite_opacity.AddPoint(0.98, 0.3)
+        composite_opacity.AddPoint(0.995, 0.5)
+        composite_opacity.AddPoint(1.0, 1)
 
         color_transfer_function = vtk.vtkColorTransferFunction()
-        color_transfer_function.AddRGBPoint(0, 0.26851, 0.009605, 0.335427)
+        color_transfer_function.AddRGBPoint(0.0, 0.0, 0.0, 0.0)
         color_transfer_function.AddRGBPoint(
             1, 205.0 / 255.0, 164.0 / 255.0, 52.0 / 255.0
         )
@@ -582,7 +583,8 @@ class Visualizer:
         volume_property.SetColor(color_transfer_function)
         volume_property.SetScalarOpacity(composite_opacity)
         volume_property.ShadeOff()
-        volume_property.SetInterpolationTypeToLinear()
+        # volume_property.SetInterpolationTypeToLinear()
+        volume_property.SetInterpolationTypeToNearest()
 
         volume_mapper = vtk.vtkSmartVolumeMapper()
         volume_mapper.SetInputData(image_data)
@@ -990,7 +992,7 @@ class Visualizer:
         actor = vtkActor()
         actor.SetMapper(mapper)
 
-        actor.GetProperty().SetOpacity(0.2)  # 0.1
+        actor.GetProperty().SetOpacity(0.8)  # 0.1
         actor.GetProperty().SetSpecular(0.1)
         actor.GetProperty().SetSpecularPower(80)
         actor.GetProperty().SetDiffuse(0.9)
@@ -1121,10 +1123,11 @@ class Visualizer:
         volume_mode,
         with_points: bool = True,
         radius: int = 0.05,
+        isovalue: float = 0.5,
     ) -> None:
         ren = vtkRenderer()
 
-        Visualizer.add_img_actor(ren, img, volume_mode, bbox)
+        Visualizer.add_img_actor(ren, img, volume_mode, bbox, isovalue=isovalue)
 
         actor = Visualizer.create_trajectory_actor(trj, False, 'dist', radius)
         ren.AddActor(actor)
