@@ -105,6 +105,11 @@ class Segmentator:
         )
 
     def binarize(self) -> npt.NDArray[np.int8]:
+        """
+        Rerurn 3D image where zero is atom
+        Returns:
+            npt.NDArray[np.int8]: binary image
+        """
         vox_sizes = [
             ker_s / float(img_s)
             for ker_s, img_s in zip(self.kerogen.box.size(), self.img_size)

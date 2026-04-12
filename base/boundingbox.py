@@ -16,6 +16,12 @@ class Range(object):
         self.min_ = float(np.finfo(float).max) if mmin == None else mmin
         self.max_ = float(np.finfo(float).min) if mmax == None else mmax
 
+    def __str__(self) -> str:
+        return f"Range(min={self.min_:.3f}_max={self.max_:.3 f})"
+
+    def _short_str(self) -> str:
+        return f"({self.min_:.3f}-{self.max_:.3f})"
+
     def update(self, v: float) -> None:
         self.min_ = min(v, self.min_)
         self.max_ = max(v, self.max_)
@@ -55,6 +61,12 @@ class BoundingBox(object):
             for b, v in zip([self.xb_, self.yb_, self.zb_], pos.flat)
         ]
         return np.all(m)
+
+    def __str__(self) -> str:
+        return f"BoundingBox(x={self.xb_}|y={self.yb_}|z={self.zb_})"
+
+    def _short_str(self) -> str:
+        return f"(x={self.xb_._short_str()}_y={self.yb_._short_str()}_z={self.zb_._short_str()})"
 
     def size(self) -> Tuple[float, float, float]:
         return (self.xb_.diff(), self.yb_.diff(), self.zb_.diff())

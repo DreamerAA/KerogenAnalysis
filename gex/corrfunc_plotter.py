@@ -58,24 +58,27 @@ def extanded_struct_extr(
 ) -> None:
     path_to_structure = join(path_to_data, struct_file_name)
     path_to_save = join(path_to_data, "images")
+    path_to_save
 
     start_time = time.time()
     structures = Reader.read_structures_by_num(path_to_structure, indexes)
     print(f" -- Count structures: {len(structures)}")
     print(f" -- Reading finished! Elapsed time: {time.time() - start_time}s")
 
+    image_infos: tuple[int, str] = []
     for num, time_ps, atoms, size in structures:
         start_time = time.time()
 
         bbox = Segmentator.cut_cell(size, 2)
         resolution = np.array([s for s in size]).min() / ref_size
         img_size = Segmentator.calc_image_size(
-            size, reference_size=ref_size, by_min=True
+            bbox.size(), reference_size=ref_size, by_min=True
         )
         binarized_file_name = join(
             path_to_save,
-            f"./result_img_num={num}|time_ps={time_ps}|size={img_size}|bbox={bbox}|resolution={resolution:.9f}.npy",
+            f"result-img-num={num}_time-ps={time_ps}_bbox={bbox._short_str()}_resolution={resolution:.9f}.npy",
         )
+        image_infos.append((time_ps, binarized_file_name))
 
         # print(f" --- Current num: {num}")
         # print(f" --- Box size: {bbox.size()}")
@@ -99,11 +102,23 @@ def extanded_struct_extr(
                 partitioning=1,
             )
             img = segmentator.binarize()
-            np.save(binarized_file_name, img)  # type: ignore
+            np.save(binarized_file_name, 1 - img)  # type: ignore
 
             kprint(
                 f"Binarization struct {num} is finished! Elapsed time: {time.time() - start_time}s"
             )
+    # start_info = image_infos[0]
+    # start_time_ps = start_info[0]
+    # first_step_img = np.load(start_info[1])
+    # image_size = float(first_step_img.size)
+    # dt = []
+    # C_t = []
+    # for info in image_infos:
+    #     time_ps, img_file_name = info
+    #     img_t = np.load(img_file_name)
+    #     C_ti = np.sum(first_step_img * img_t) / image_size
+    #     C_t.append(C_ti)
+    #     dt.append(img_t - start_time_ps)
 
 
 if __name__ == '__main__':
@@ -123,11 +138,30 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    indexes = [2500 + 25000 * i * 200 for i in range(50)] + [249977500]
+    start_step = 25000
+    full_count_steps = 6612
+    step_size = 250000
+    last_step = full_count_steps * step_size + start_step
+
+    count_slices = 2
+
+    mode = "all"
+    if mode == "all":
+        step = int(full_count_steps / count_slices)
+        indexes = [
+            start_step + step_size * i * step for i in range(count_slices)
+        ]
+        if last_step not in indexes:
+            indexes.append(last_step)
+    else:
+        step = 1
+        indexes = [
+            start_step + step_size * i * step for i in range(count_slices)
+        ]
 
     extanded_struct_extr(
         args.def_path,
         args.structure_file_name,
         indexes,
-        250,
+        100,
     )

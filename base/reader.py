@@ -34,6 +34,9 @@ class StepsInfo:
         self.times.append(t)
 
 
+_TYPE_MAP = {'c': 0, 'o': 1, 'n': 2, 'h': 3, 's': 4}
+
+
 class Reader:
     @staticmethod
     def read_structures_by_num(
@@ -41,23 +44,19 @@ class Reader:
     ) -> List[Tuple[int, int, List[AtomData], Tuple[float, float, float]]]:
         structures = []
         info = StepsInfo()
+        indexes_set = set(indexes)
         with open(path_to_structure) as f:
             is_end = False
             while not is_end:
                 num, time = Reader.read_head_struct(f, info)
-                # print(f" -- Current num: {num}")
                 if num == -1:
-                    is_end = True
-                    continue
+                    break
 
-                if num not in indexes:
+                if num not in indexes_set:
                     is_end = Reader.skip_struct_main_part(f)
-                    if is_end:
-                        break
                 else:
                     atoms, size = Reader.read_raw_struct_ff_main(f)
-                    structures.append((num, time, np.array(atoms), size))
-                    print(" -- Reading struct is ended!")
+                    structures.append((num, time, atoms, size))
 
         return structures
 
@@ -125,17 +124,7 @@ class Reader:
 
     @staticmethod
     def type_to_type_id(type: str) -> int:
-        if type[0].lower() == 'c':
-            return 0
-        elif type[0].lower() == 'o':
-            return 1
-        elif type[0].lower() == 'n':
-            return 2
-        elif type[0].lower() == 'h':
-            return 3
-        elif type[0].lower() == 's':
-            return 4
-        return -1
+        return _TYPE_MAP.get(type[0].lower(), -1)
 
     @staticmethod
     def read_raw_struct(path_to_structure: str) -> Tuple[Any]:
@@ -167,46 +156,36 @@ class Reader:
     def read_raw_struct_ff_main(
         f: TextIOWrapper,
     ) -> Tuple[List[AtomData], Tuple[float, float, float]]:
-        atoms = []
-
         count_atoms = int(next(f))
-        print(f" --- Count atoms: {count_atoms}")
-        for i in range(count_atoms):
-            line = next(f)
-            try:
-                struct_number = int(line[0:5])
-                struct_type = line[5:8]
+        lines = [next(f) for _ in range(count_atoms)]
 
-                atom_id: str = str(line[8:15])
-                atom_id = atom_id.replace(" ", "")
-                type_id = Reader.type_to_type_id(atom_id)
-                if type_id == -1:
-                    print(f"Error in line {i}: {line}, error: {e}")
-                    raise RuntimeError()
+        krg_lines = [l for l in lines if l[5:8] == 'KRG']
+        n = len(krg_lines)
 
-                x = float(line[20:28])
-                y = float(line[28:36])
-                z = float(line[36:44])
+        coords = np.empty((n, 3), dtype=np.float32)
+        struct_numbers = np.empty(n, dtype=np.int32)
+        struct_types: List[str] = []
+        atom_ids: List[str] = []
+        type_ids = np.empty(n, dtype=np.int8)
 
-                data = AtomData(
-                    struct_number,
-                    struct_type,
-                    atom_id,
-                    type_id,
-                    np.array([x, y, z]),
-                )
+        for i, l in enumerate(krg_lines):
+            struct_numbers[i] = int(l[0:5])
+            struct_types.append(l[5:8])
+            aid = l[8:15].strip()
+            atom_ids.append(aid)
+            type_ids[i] = Reader.type_to_type_id(aid)
+            coords[i, 0] = float(l[20:28])
+            coords[i, 1] = float(l[28:36])
+            coords[i, 2] = float(l[36:44])
 
-                if "KRG" in struct_type:
-                    atoms.append(data)
+        atoms = np.array([
+            AtomData(int(struct_numbers[i]), struct_types[i], atom_ids[i],
+                     int(type_ids[i]), coords[i])
+            for i in range(n)
+        ])
 
-            except Exception as e:
-                print(i, line)
-                print(f"Error in line {i}: {line}, error: {e}")
         cell_sizes = next(f)
-
-        str_size = list(filter(lambda x: x != '', cell_sizes.split(' ')))
-        size = tuple([float(e) for e in str_size])
-        atoms = np.array(atoms)
+        size = tuple(float(x) for x in cell_sizes.split() if x)
         return atoms, size
 
     @staticmethod
