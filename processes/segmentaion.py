@@ -1,6 +1,7 @@
 import math
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from os.path import realpath
 from pathlib import Path
@@ -9,11 +10,7 @@ from typing import Callable, List, Optional, Tuple
 import networkx as nx
 import numpy as np
 import numpy.typing as npt
-from joblib import Parallel, delayed
-
-path = Path(realpath(__file__))
-parent_dir = str(path.parent.parent.absolute())
-sys.path.append(parent_dir)
+from scipy.spatial.distance import cdist
 
 from base.boundingbox import KerogenBox, Range
 from base.kerogendata import AtomData, KerogenData
@@ -37,6 +34,13 @@ class Segmentator:
             for ker_s, img_s in zip(kerogen.box.size(), img_size)
         ]
 
+        # Precompute positions and sizes for all atoms as numpy arrays once
+        all_positions = np.array([a.pos for a in kerogen.atoms], dtype=np.float32)
+        sizes_arr = np.array(
+            [size_data(a.type_id) + radius_extention(a.type_id) for a in kerogen.atoms],
+            dtype=np.float32,
+        )
+
         steps = [ker_s / partitioning for ker_s in kerogen.box.size()]
         shifts = self.kerogen.box.min()
         self.bb: List[KerogenBox] = []
@@ -53,19 +57,19 @@ class Segmentator:
                             nums, steps, vox_sizes, shifts
                         )
                     ]
-                    self.bb.append(KerogenBox(*aranges))
-                    for ind, a in enumerate(kerogen.atoms):
-                        if self.bb[-1].is_inside(a.pos):
-                            self.bb[-1].add_atom(
-                                ind,
-                                size_data(a.type_id)
-                                + self.radius_extention(a.type_id),
-                                a.pos,  # type: ignore
-                            )
-        # print(f" --- Count Kerogen boxes: {len(self.bb)}")
-        for i, bb in enumerate(self.bb):
-            bb.commit()
-            # print(f" --- Finish commit kerogen box: {i}")
+                    bb = KerogenBox(*aranges)
+                    in_bb = (
+                        (all_positions[:, 0] >= bb.xb_.min_)
+                        & (all_positions[:, 0] <= bb.xb_.max_)
+                        & (all_positions[:, 1] >= bb.yb_.min_)
+                        & (all_positions[:, 1] <= bb.yb_.max_)
+                        & (all_positions[:, 2] >= bb.zb_.min_)
+                        & (all_positions[:, 2] <= bb.zb_.max_)
+                    )
+                    bb.atom_ids = np.where(in_bb)[0].astype(np.int32)
+                    bb.atom_sizes = sizes_arr[in_bb]
+                    bb.positions = all_positions[in_bb]
+                    self.bb.append(bb)
 
     @staticmethod
     def cut_cell(
@@ -104,47 +108,60 @@ class Segmentator:
             for cs in l_cell_size
         )
 
-    def binarize(self) -> npt.NDArray[np.int8]:
+    def binarize(self, num_workers: int = 15, atom_chunk: int = 1024) -> npt.NDArray[np.int8]:
         """
         Rerurn 3D image where zero is atom
         Returns:
             npt.NDArray[np.int8]: binary image
         """
-        vox_sizes = [
-            ker_s / float(img_s)
-            for ker_s, img_s in zip(self.kerogen.box.size(), self.img_size)
-        ]
-
-        def wrap(ix):
-            s_img = np.ones(
-                shape=(self.img_size[1], self.img_size[2]), dtype=np.int8
-            )
-
-            for iy in range(self.img_size[1]):
-                for iz in range(self.img_size[2]):
-                    pos = np.array(
-                        [
-                            mm + (float(i) + 0.5) * vs
-                            for i, vs, mm in zip(
-                                [ix, iy, iz], vox_sizes, self.kerogen.box.min()
-                            )
-                        ]
-                    ).reshape(1, 3)
-                    for bb in self.bb:
-                        if bb.is_inside(pos) and bb.is_intersect_atom(pos):
-                            s_img[iy, iz] = 0
-            print(f" --- Slice {ix}-x finished!")
-            return s_img
-
-        num_proc = 15
-        sim_results = Parallel(n_jobs=num_proc)(
-            delayed(wrap)(ix) for ix in range(self.img_size[0])
+        vox_sizes = np.array(
+            [
+                ker_s / float(img_s)
+                for ker_s, img_s in zip(self.kerogen.box.size(), self.img_size)
+            ],
+            dtype=np.float32,
         )
-        # sim_results = [wrap(ix) for ix in range(self.img_size[0])]
+        mins = self.kerogen.box.min()
 
-        img = np.ones(shape=self.img_size, dtype=np.int8)
-        for i, res in enumerate(sim_results):
-            img[i, :, :] = res
+        Ny, Nz = self.img_size[1], self.img_size[2]
+        gy = (mins[1] + (np.arange(Ny) + 0.5) * vox_sizes[1]).astype(np.float32)
+        gz = (mins[2] + (np.arange(Nz) + 0.5) * vox_sizes[2]).astype(np.float32)
+        yy, zz = np.meshgrid(gy, gz, indexing='ij')  # (Ny, Nz)
+        yz_flat = np.stack([yy.ravel(), zz.ravel()], axis=1)  # (Ny*Nz, 2)
+
+        img = np.ones(self.img_size, dtype=np.int8)
+
+        def process_slice(ix):
+            gx = float(mins[0] + (ix + 0.5) * vox_sizes[0])
+            x_col = np.full((Ny * Nz, 1), gx, dtype=np.float32)
+            pos = np.hstack([x_col, yz_flat])  # (Ny*Nz, 3)
+            atom_mask = np.zeros(Ny * Nz, dtype=bool)
+
+            for bb in self.bb:
+                in_bb = (
+                    (pos[:, 0] >= bb.xb_.min_)
+                    & (pos[:, 0] <= bb.xb_.max_)
+                    & (pos[:, 1] >= bb.yb_.min_)
+                    & (pos[:, 1] <= bb.yb_.max_)
+                    & (pos[:, 2] >= bb.zb_.min_)
+                    & (pos[:, 2] <= bb.zb_.max_)
+                )
+                if not in_bb.any() or len(bb.positions) == 0:
+                    continue
+                pos_in = pos[in_bb]
+                mask_in = np.zeros(int(in_bb.sum()), dtype=bool)
+                for a_start in range(0, len(bb.positions), atom_chunk):
+                    dists = cdist(pos_in, bb.positions[a_start:a_start + atom_chunk])
+                    mask_in |= (dists < bb.atom_sizes[a_start:a_start + atom_chunk]).any(axis=1)
+                atom_mask[in_bb] |= mask_in
+
+            return (~atom_mask).reshape(Ny, Nz).astype(np.int8)
+
+        n = min(num_workers, self.img_size[0])
+        with ThreadPoolExecutor(max_workers=n) as executor:
+            for ix, result in enumerate(executor.map(process_slice, range(self.img_size[0]))):
+                img[ix] = result
+                print(f" --- Slice {ix}-x finished!")
 
         return img
 

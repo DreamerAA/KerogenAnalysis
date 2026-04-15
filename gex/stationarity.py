@@ -38,6 +38,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import ks_2samp, gaussian_kde
 import matplotlib.cm as cm
 from base.reader import Reader
+from matplotlib.ticker import MultipleLocator, FuncFormatter
 
 
 Array1D = np.ndarray
@@ -410,7 +411,8 @@ def plot_hist_overlay(
             continue
         c = color_map.get(i, None)
         t = times[i] / 1e6
-        label = f"t = {t:.2f} us"
+        label = f"t = {t:.2f} "
+        label += r"$\mu$s"
         ax.hist(
             x,
             bins=bins,
@@ -494,7 +496,8 @@ def plot_ecdf_overlay(
         xs, ys = ecdf(x)
         c = color_map.get(i, None)
         t = times[i] / 1e6
-        label = f"t = {t:.2f} us"
+        label = f"t = {t:.2f} "
+        label += r"$\mu$s"
         ax.step(
             xs,
             ys,
@@ -561,44 +564,36 @@ def plot_ks_vs_time(
     fig = plt.figure()
     ax1 = fig.add_subplot(111)
 
-    # D line
-    l1 = ax1.plot(xs, res.D, marker="o", linestyle="-", label="KS statistic D")
+    ax1.plot(
+        xs * 1e-6,
+        res.D,
+        marker="o",
+        linestyle="-",
+        label="KS statistic D",
+    )
+
     ax1.set_title(title)
-    ax1.set_xlabel("Time, ps")
-    ax1.set_ylabel("KS statistic D")
+    ax1.set_xlabel(r"Time, $\mu$s")
+    ax1.set_ylabel(r"KS statistic $D$, $\times 10^{-2}$")
 
-    # second axis for p-values
-    # ax2 = ax1.twinx()
-    # label_p = (
-    #     "p-value (adj)"
-    #     if (use_adjusted_p and res.p_adj is not None)
-    #     else "p-value"
-    # )
-    # l2 = ax2.plot(xs, p, marker="x", linestyle="--", label=label_p)
-    # ax2.set_ylabel(label_p)
-    # ax2.set_ylim(0.8, 1.0)
+    # ---- форматирование Y-оси ----
+    dmax = np.nanmax(res.D)
 
-    # Styling
+    # Для мелких значений, как на P(h), шаг 0.005 -> подписи 0.5, 1.0, 1.5, ...
+    # Для более крупных, как на P(r), шаг 0.01 -> подписи 1.0, 2.0, 3.0, ...
+    if dmax <= 0.03:
+        major_step = 0.005
+    else:
+        major_step = 0.01
+
+    ax1.yaxis.set_major_locator(MultipleLocator(major_step))
+    ax1.yaxis.set_major_formatter(
+        FuncFormatter(lambda val, pos: f"{val * 100:.1f}")
+    )
+
     _style_title(ax1)
     _style_axes(ax1)
-    # _style_axes(ax2)
 
-    # Combined legend (handles from both axes)
-    # handles = l1 + l2
-    # labels = [h.get_label() for h in handles]
-
-    # Reserve space on the right for legend
-    fig.tight_layout(rect=[0.0, 0.0, 0.78, 1.0])
-
-    # ax1.legend(
-    #     handles,
-    #     labels,
-    #     frameon=False,
-    #     fontsize=LEGEND_FONTSIZE,
-    #     loc="upper left",
-    #     bbox_to_anchor=(1.02, 0.0),  # outside right
-    #     borderaxespad=0.0,
-    # )
     fig.tight_layout()
     fig.savefig(outpath, format=outpath.suffix.lstrip("."), bbox_inches="tight")
     plt.close(fig)
@@ -814,8 +809,8 @@ def analysis(main_path: str, pnm_dir: str, oputput_dir: str):
         run_stationarity_pipeline(
             samples_l,
             outdir,
-            label="P(l)",
-            xname="Throat length ($\AA$)",
+            label="P(h)",
+            xname=r"Throat length, $h$($\AA$)",
             alpha=0.05,
             transform=None,
             positive_only=False,
@@ -826,7 +821,7 @@ def analysis(main_path: str, pnm_dir: str, oputput_dir: str):
             samples_r,
             outdir,
             label="P(r)",
-            xname="Pore radius ($\AA$)",
+            xname=r"Pore radius, $r$($\AA$)",
             alpha=0.05,
             transform=None,
             positive_only=False,

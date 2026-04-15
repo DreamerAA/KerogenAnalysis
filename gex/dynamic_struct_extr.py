@@ -1,26 +1,17 @@
 import argparse
 import os
-import sys
 import time
-from os.path import realpath
-from pathlib import Path
-from typing import List, Tuple
+from os.path import join
+
+from typing import List
 
 import numpy as np
-
-path = Path(realpath(__file__))
-parent_dir = str(path.parent.parent.absolute())
-sys.path.append(parent_dir)
-
-from base.boundingbox import BoundingBox
-from base.kerogendata import AtomData, KerogenData
+from base.kerogendata import KerogenData
 from base.periodizer import Periodizer
-from base.reader import Reader, StepsInfo
-from base.trajectory import Trajectory
-from utils.utils import create_box_mask
+from base.reader import Reader
+from utils.utils import kprint
 from utils.utils import write_binary_file
 from processes.segmentaion import Segmentator
-from visualizer.visualizer import Visualizer
 
 additional_radius = 0.0
 
@@ -50,156 +41,64 @@ def get_ext_size(type_id: int) -> float:
     return ext_radius[type_id]
 
 
-def read_structures(
-    path_to_structure: str,
-) -> List[Tuple[List[AtomData], Tuple[float, float, float]]]:
-    structures = []
-
-    count_to_skip = 65
-    with open(path_to_structure) as f:
-        atoms, size, n = Reader.read_raw_struct_ff(f)
-        is_end = False
-        while not is_end:
-            structures.append((n, np.array(atoms), size))
-            atoms, size, n = Reader.read_raw_struct_ff(f)
-            print(" -- Reading struct is ended!")
-            for _ in range(count_to_skip):
-                is_end = Reader.skip_struct(f)
-                if is_end:
-                    break
-
-    return structures
-
-
-def dynamic_struct_extr(path_to_structure: str) -> None:
-    start_time = time.time()
-    structures = read_structures(path_to_structure)[:1]
-    print(f" -- Count structures: {len(structures)}")
-
-    print(f" -- Reading finished! Elapsed time: {time.time() - start_time}s")
-    for num, atoms, size in structures:
-        start_time = time.time()
-
-        div = 2
-        bbox = Segmentator.cut_cell(size, div)  # type: ignore
-
-        print(f" --- Box size: {bbox.size()}")
-
-        kerogen_data = KerogenData(None, atoms, bbox)  # type: ignore
-        # Periodizer.rm_long_edges(kerogen_data)
-        # Periodizer.periodize(kerogen_data)
-
-        ref_size = 500
-        resolution = bbox.size()[0] / ref_size
-        str_resolution = "{:.9f}".format(resolution)
-        binarized_file_name = (
-            ""
-            # f"../data/Kerogen/result_img_{file_name}_rs={ref_size}_mr={methan_radius}_div={div}.npy"
-            f"../data/Kerogen/tmp/result_img_num={num}_rs={ref_size}_ar={additional_radius}_resolution={str_resolution}.npy"
-        )
-
-        if os.path.isfile(binarized_file_name):
-            with open(binarized_file_name, 'rb') as f:  # type: ignore
-                img = np.load(f)  # type: ignore
-        else:
-            img_size = Segmentator.calc_image_size(
-                kerogen_data.box.size(), reference_size=ref_size, by_min=True
-            )
-            segmentator = Segmentator(
-                kerogen_data,
-                img_size,
-                size_data=get_size,
-                radius_extention=get_ext_size,
-                partitioning=1,
-            )
-            img = segmentator.binarize()
-            np.save(binarized_file_name, img)  # type: ignore
-
-        print(f" --- Image size: {img.shape}")
-        str_resolution = "{:.9f}".format(resolution)
-        raw_file_name = (
-            # f"../data/Kerogen/result_raw_img_{file_name}_is={img.shape}_mr={methan_radius}_div={div}.raw"
-            f"../data/Kerogen/tmp/result_raw_img_num={num}_is={img.shape}_mr={additional_radius}_resolution={str_resolution}nm.raw"
-        )
-
-        img = 1 - img
-        write_binary_file(img, raw_file_name)
-
-        print(
-            f" -- Binarization struct {num} is finished! Elapsed time: {time.time() - start_time}s"
-        )
-
-
 def extanded_struct_extr(
-    path_to_structure: str,
-    path_to_save: str,
+    path_to_data: str,
+    struct_file_name: str,
     indexes: List[int],
-    cut_cell: bool,
     ref_size: int,
 ) -> None:
+    path_to_structure = join(path_to_data, struct_file_name)
+    path_to_save_img = join(path_to_data, "images")
+
     start_time = time.time()
     structures = Reader.read_structures_by_num(path_to_structure, indexes)
-
     print(f" -- Count structures: {len(structures)}")
-    print(f" -- Count structures after filter: {len(structures)}")
-
     print(f" -- Reading finished! Elapsed time: {time.time() - start_time}s")
-    for num, atoms, size in structures:
+
+    image_infos: tuple[int, str] = []
+    for num, time_ps, atoms, size in structures:
         start_time = time.time()
 
-        bbox = Segmentator.cut_cell(size, 2) if cut_cell else Segmentator.full_cell(size)  # type: ignore
-
-        print(f" --- Current num: {num}")
-
-        print(f" --- Box size: {bbox.size()}")
-
-        kerogen_data = KerogenData(None, atoms, bbox)  # type: ignore
-        if not kerogen_data.checkPeriodization():
-            Periodizer.periodize(kerogen_data)
-            # Periodizer.rm_long_edges(kerogen_data)
-
+        bbox = Segmentator.cut_cell(size, 2)
         resolution = np.array([s for s in size]).min() / ref_size
-        str_resolution = "{:.9f}".format(resolution)
-
         img_size = Segmentator.calc_image_size(
-            kerogen_data.box.size(), reference_size=ref_size, by_min=True
+            bbox.size(), reference_size=ref_size, by_min=True
         )
-        prf_cell = "partcell" if cut_cell else "fullcell"
-        binarized_file_name = (
-            # f"../data/Kerogen/result_img_{file_name}_rs={ref_size}_mr={methan_radius}_div={div}.npy"
-            path_to_save
-            + f"./result_img_num={num}_cell={prf_cell}_is={img_size}_ar={additional_radius}_resolution={str_resolution}.npy"
+        binarized_file_name = join(
+            path_to_save_img,
+            f"result-img-num={num}_time-ps={time_ps}_bbox={bbox._short_str()}_resolution={resolution:.9f}.npy",
         )
+        raw_file_name = join(
+            path_to_save_img,
+            f"result-img-num={num}_time-ps={time_ps}_bbox={bbox._short_str()}_resolution={resolution:.9f}.raw",
+        )
+        image_infos.append((time_ps, binarized_file_name))
 
         if os.path.isfile(binarized_file_name):
+            kprint(f"Skip and load image with num={num}")
             with open(binarized_file_name, 'rb') as f:  # type: ignore
                 img = np.load(f)  # type: ignore
         else:
-            print(f" --- Image size for calculating: {img_size}")
+            kprint(f"Run segmentation for num={num}")
+            start_time = time.time()
+            kerogen_data = KerogenData(None, atoms, bbox)  # type: ignore
+            if not kerogen_data.checkPeriodization():
+                Periodizer.periodize(kerogen_data)
+
             segmentator = Segmentator(
                 kerogen_data,
                 img_size,
                 size_data=get_size,
                 radius_extention=get_ext_size,
-                partitioning=1,
+                partitioning=2,
             )
-            img = segmentator.binarize()
+            img = 1 - segmentator.binarize()
             np.save(binarized_file_name, img)  # type: ignore
+            write_binary_file(img, raw_file_name)
 
-        print(f" --- Image size: {img.shape}")
-        str_resolution = "{:.9f}".format(resolution)
-        raw_file_name = (
-            # f"../data/Kerogen/result_raw_img_{file_name}_is={img.shape}_mr={methan_radius}_div={div}.raw"
-            path_to_save
-            + f"./result_raw_img_num={num}_cell={prf_cell}_is={img.shape}_mr={additional_radius}_resolution={str_resolution}a.raw"
-        )
-
-        img = 1 - img
-        write_binary_file(img, raw_file_name)
-
-        print(
-            f" -- Binarization struct {num} is finished! Elapsed time: {time.time() - start_time}s"
-        )
+            kprint(
+                f"Binarization struct {num} is finished! Elapsed time: {time.time() - start_time}s"
+            )
 
 
 if __name__ == '__main__':
@@ -208,28 +107,41 @@ if __name__ == '__main__':
     parser.add_argument(
         '--def_path',
         type=str,
-        default="/media/andrey/Samsung_T5/PHD/Kerogen/type2matrix/300K/h2/",
+        default="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/h2/",
     )
 
     parser.add_argument(
-        '--structure_path',
+        '--structure_file_name',
         type=str,
-        default="./type2.h2.300.gro",
-    )
-    parser.add_argument(
-        '--save_path',
-        type=str,
-        default="./images/",
+        default="type1.h2.300.gro",
     )
 
     args = parser.parse_args()
 
-    indexes = [2500 + 25000 * i * 200 for i in range(50)] + [249977500]
+    start_step = 25000
+    full_count_steps = 6612
+    step_size = 250000
+    last_step = full_count_steps * step_size + start_step
+
+    count_slices = 200
+
+    mode = "all"
+    if mode == "all":
+        step = int(full_count_steps / count_slices)
+        indexes = [
+            start_step + step_size * i * step for i in range(count_slices)
+        ]
+        if last_step not in indexes:
+            indexes.append(last_step)
+    else:
+        step = 1
+        indexes = [
+            start_step + step_size * i * step for i in range(count_slices)
+        ]
 
     extanded_struct_extr(
-        args.def_path + args.structure_path,
-        args.def_path + args.save_path,
+        args.def_path,
+        args.structure_file_name,
         indexes,
-        True,
         250,
     )
