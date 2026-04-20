@@ -138,7 +138,7 @@ def run(
     count_trj=100,
     count_steps=3000,
 ):
-    path_to_save: str = join(path_to_main, "errors")
+    path_to_save: str = join(path_to_main, "art_errors")
     path_to_pil_gf: str = join(path_to_main, "pi_l_gamma_fitter.pkl")
     path_to_tl_wf: str = join(path_to_main, "throat_lengths_weibull_fitter.pkl")
     path_to_radiuses: str = join(path_to_main, "radiuses.npy")
@@ -246,13 +246,13 @@ def run(
             params[DistanceMatrixAnalyzer.name()]
         )
 
-        neumann_pearson_analyzer = NeymanPearsonAnalyzer(
+        np_analyzer = NeymanPearsonAnalyzer(
             params[NeymanPearsonAnalyzer.name()],
             pil_gamma_fitter,
             throat_lengths_weibull_fitter,
         )
 
-        prob_analyzer = StructureInformedBayesAnalyzer(
+        sib_analyzer = StructureInformedBayesAnalyzer(
             params[StructureInformedBayesAnalyzer.name()],
             pil_gamma_fitter,
             throat_lengths_weibull_fitter,
@@ -263,13 +263,13 @@ def run(
             pil_gamma_fitter,
             throat_lengths_weibull_fitter,
         )
-        prob_np_analyzer = StructureInformedBayesNeynamPearsonAnalyzer(
+        sib_np_analyzer = StructureInformedBayesNeynamPearsonAnalyzer(
             params[StructureInformedBayesNeynamPearsonAnalyzer.name()],
             pil_gamma_fitter,
             throat_lengths_weibull_fitter,
         )
 
-        np_struct_analyzer = NeymanPearsonDistanceMatrixAnalyzer(
+        np_dm_analyzer = NeymanPearsonDistanceMatrixAnalyzer(
             params[NeymanPearsonDistanceMatrixAnalyzer.name()],
             pil_gamma_fitter,
             throat_lengths_weibull_fitter,
@@ -312,11 +312,11 @@ def run(
 
         for analyzer, approx_func in [
             (matrix_analyzer, empty_func),
-            (neumann_pearson_analyzer, empty_func),
-            (prob_analyzer, empty_func),
-            (prob_np_analyzer, empty_func),
+            (np_analyzer, empty_func),
+            (sib_analyzer, empty_func),
+            (sib_np_analyzer, empty_func),
             (hybrid_analyzer, set_approx_struct_traps),
-            (np_struct_analyzer, set_approx_struct_traps),
+            (np_dm_analyzer, set_approx_struct_traps),
         ]:
             exp_tag = (
                 f"name={analyzer.name()}_k={k}_count_trj={count_trj}_" + header
@@ -407,16 +407,16 @@ def run(
         struct_errors, struct_k_est = get_norm_errors_k_est(
             DistanceMatrixAnalyzer.name()
         )
-        prob_errors, prob_k_est = get_norm_errors_k_est(
+        sib_errors, sib_k_est = get_norm_errors_k_est(
             StructureInformedBayesAnalyzer.name()
         )
         hybrid_errors, hybrid_k_est = get_norm_errors_k_est(
             HybridAnalyzer.name()
         )
-        prob_np_errors, prob_np_k_est = get_norm_errors_k_est(
+        sib_np_errors, sib_np_k_est = get_norm_errors_k_est(
             StructureInformedBayesNeynamPearsonAnalyzer.name()
         )
-        np_struct_errors, np_struct_k_est = get_norm_errors_k_est(
+        np_dm_errors, np_dm_k_est = get_norm_errors_k_est(
             NeymanPearsonDistanceMatrixAnalyzer.name()
         )
 
@@ -433,14 +433,13 @@ def run(
             prob_grid=prob_grid,
             data={
                 "Distance-matrix": (struct_errors, struct_k_est),
-                "Neyman-Pearson": (np_errors, np_k_est),
-                "Neyman–Pearson + Bayes": (
-                    prob_np_errors,
-                    prob_np_k_est,
-                ),  # prob+np
-                # "Hybrid": (hybrid_errors, hybrid_k_est),
-                # "Prob": (prob_errors, prob_k_est),
-                # "Neumann-Pearson+Struct": (np_struct_errors, np_struct_k_est),
+                # "Neyman-Pearson": (np_errors, np_k_est),
+                # "Neyman–Pearson + Bayes": (
+                #     prob_np_errors,
+                #     prob_np_k_est,
+                # ),
+                "SIB": (sib_np_errors, sib_np_k_est),
+                "Hybrid": (hybrid_errors, hybrid_k_est),
             },
             title=title,
             q_low=0.2,
@@ -451,11 +450,9 @@ def run(
         kprint(
             f"For k={k}: "
             # f"probability estimation k={prob_k_est:.3f} | "
-            f"Bayes + Neyman-pearson estimation k={prob_np_k_est:.3f} | "
+            f"Bayes + Neyman-pearson estimation k={sib_np_k_est:.3f} | "
             f"Hybrid estimation k={hybrid_k_est:.3f} | "
             f"Distance-matrix estimation k={struct_k_est:.3f} | "
-            # f"neumann pearson estimation k={np_k_est:.3f} | "
-            # f"neumann pearson + struct estimation k={np_struct_k_est:.3f} | "
         )
 
 

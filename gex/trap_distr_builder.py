@@ -58,6 +58,8 @@ def plot_trapping_on_axis(
     # alpha = -(slope + 1)
     alpha = slope
 
+    kprint(f"{label} - alpha: {alpha:.3f}")
+
     # empirical
     points = ax.loglog(
         t,

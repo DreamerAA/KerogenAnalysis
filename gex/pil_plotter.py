@@ -75,7 +75,7 @@ def plot_distributions(path_to_save: str):
     ax.text(
         float(sample_rad.max()),
         y_xlabel,
-        r"$r (\AA)$",
+        r"$r, h (\AA)$",
         fontsize=24,
         ha="right",
         va="top",

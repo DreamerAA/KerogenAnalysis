@@ -130,8 +130,18 @@ def build_3d_distributions(
             y_l,
             p_l,
             color=color_throat,
-            label=r"$P(l)$" if not label_added_pl else None,
+            label=r"$P(h)$" if not label_added_pl else None,
             linewidth=2.5,
+        )
+        ax.text(
+            x_l[-1] - 0.15,  # небольшой сдвиг вправо
+            y_l[-1],  # то же время
+            p_l[-1] + 0.5,  # конец кривой по z
+            rf"{time_us:.2f}",
+            color=color_throat,
+            fontsize=12,
+            ha="left",
+            va="center",
         )
         label_added_pl = True
 
@@ -187,11 +197,18 @@ def build_3d_distributions(
             linewidth=1.0,
         )
 
-    ax.set_xlabel(r"$r (\AA)$", fontsize=12, labelpad=-8)
-    ax.set_ylabel(r"Time ($\mu$s)", fontsize=12, labelpad=-10)
-    ax.set_zlabel("Density", fontsize=12, labelpad=-6)
+    ax.set_xlabel(r"$r, h (\AA)$", fontsize=16, labelpad=-8)
+    ax.set_ylabel(r"Time ($\mu$s)", fontsize=16, labelpad=-10)
+    ax.set_zlabel("Density", fontsize=16, labelpad=-6)
 
-    ax.set_xticklabels([])
+    xlabels = ax.get_xticklabels()
+    res_xlabels = []
+    for i, x in enumerate(xlabels):
+        if i % 2 != 1:
+            x._text = ""
+        res_xlabels.append(x)
+
+    ax.set_xticklabels(xlabels)
     ax.set_yticklabels([])
     ax.set_zticklabels([])
 
