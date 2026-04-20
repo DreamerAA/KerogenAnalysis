@@ -8,21 +8,21 @@ from processes.distribution_fitter import (
     GammaFitter,
     WeibullFitter,
 )
-from processes.trajectory_analyzer import TrajectoryAnalyzer
+from processes.trajectory_analyzer.trajectory_analyzer import TrajectoryAnalyzer
 
 from utils.utils import pdistances
 from utils.types import NPFArray, NPBArray
 
 
 @dataclass
-class ProbabilityAnalizerParams:
+class StructureInformedBayesParams:
     critical_probability: float = 1e-3
 
 
-class ProbabilityTrajectoryAnalizer(TrajectoryAnalyzer):
+class StructureInformedBayesAnalyzer(TrajectoryAnalyzer):
     def __init__(
         self,
-        params: ProbabilityAnalizerParams,
+        params: StructureInformedBayesParams,
         pi_l_gf: GammaFitter,
         throat_lengthes_wf: WeibullFitter,
     ):
@@ -35,7 +35,7 @@ class ProbabilityTrajectoryAnalizer(TrajectoryAnalyzer):
 
     @staticmethod
     def name() -> str:
-        return "probability"
+        return "sib"
 
     def run(
         self,

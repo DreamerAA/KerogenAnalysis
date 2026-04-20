@@ -9,21 +9,21 @@ from processes.distribution_fitter import (
     GammaFitter,
     WeibullFitter,
 )
-from processes.trajectory_analyzer import TrajectoryAnalyzer
+from processes.trajectory_analyzer.trajectory_analyzer import TrajectoryAnalyzer
 
 from utils.utils import pdistances
 from utils.types import NPFArray, NPBArray, i32
 
 
 @dataclass
-class NeumannPearsonAnalizerParams:
+class NeymanPearsonParams:
     error: float = 0.01
 
 
-class NeumannPearsonTrajectoryAnalizer(TrajectoryAnalyzer):
+class NeymanPearsonAnalyzer(TrajectoryAnalyzer):
     def __init__(
         self,
-        params: NeumannPearsonAnalizerParams,
+        params: NeymanPearsonParams,
         pi_l_gf: GammaFitter,
         throat_lengthes_wf: WeibullFitter,
     ):
@@ -34,13 +34,13 @@ class NeumannPearsonTrajectoryAnalizer(TrajectoryAnalyzer):
         self.transition_step_fitter: Optional[WeibullFitter] = None
         self.trapped_step_fitter: Optional[GammaFitter] = None
 
-        self.threshold = NeumannPearsonTrajectoryAnalizer.calculate_threshold(
+        self.threshold = NeymanPearsonAnalyzer.calculate_threshold(
             self.pi_l_gf, self.throat_lengthes_wf, self.params.error
         )
 
     @staticmethod
     def name() -> str:
-        return "neumann_pearson"
+        return "np"
 
     def run(
         self,

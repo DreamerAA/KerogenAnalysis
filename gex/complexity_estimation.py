@@ -12,24 +12,21 @@ from scipy import optimize
 from base.discretecdf import DiscreteCDF
 from base.empiricalcdf import EmpiricalCDF
 
-path = Path(realpath(__file__))
-parent_dir = str(path.parent.parent.absolute())
-sys.path.append(parent_dir)
 
 from utils.utils import create_empirical_cdf, kprint, ps_generate
 from base.bufferedsampler import BufferedSampler
 from processes.kerogen_walk_simulator import KerogenWalkSimulator
-from processes.hybrid_trajectory_analizer import (
-    HybridAnalizerParams,
-    HybridTrajectoryAnalizer,
+from processes.trajectory_analyzer.hybrid import (
+    HybridParams,
+    HybridAnalyzer,
 )
-from processes.struct_trajectory_analyzer import (
-    StructTrajectoryAnalizer,
-    StructAnalizerParams,
+from processes.trajectory_analyzer.dm import (
+    DistanceMatrixAnalyzer,
+    DistanceMatrixParams,
 )
-from processes.probability_trajectory_analizer import (
-    ProbabilityTrajectoryAnalizer,
-    ProbabilityAnalizerParams,
+from processes.trajectory_analyzer.sib import (
+    StructureInformedBayesParams,
+    StructureInformedBayesAnalyzer,
 )
 
 if __name__ == '__main__':
@@ -74,7 +71,7 @@ if __name__ == '__main__':
     print("Start estimation")
 
     def get_struct_params():
-        return StructAnalizerParams(
+        return DistanceMatrixParams(
             traj_type='fBm',
             nu=0.1,
             diag_percentile=10,
@@ -84,21 +81,21 @@ if __name__ == '__main__':
         )
 
     def get_prob_params():
-        return ProbabilityAnalizerParams(
+        return StructureInformedBayesParams(
             critical_probability=1e-3,
         )
 
-    def get_struct_analizer():
-        return StructTrajectoryAnalizer(get_struct_params())
+    def get_dm_analyzer():
+        return DistanceMatrixAnalyzer(get_struct_params())
 
-    def get_prob_analizer():
-        return ProbabilityTrajectoryAnalizer(
+    def get_sib_analyzer():
+        return StructureInformedBayesAnalyzer(
             get_prob_params(), pil_gamma_fitter, throat_lengths_weibull_fitter
         )
 
-    def get_hybrid_analizer():
-        return HybridTrajectoryAnalizer(
-            HybridAnalizerParams(
+    def get_hybrid_analyzer():
+        return HybridAnalyzer(
+            HybridParams(
                 get_prob_params(),
                 get_struct_params(),
                 0.1,
@@ -119,9 +116,9 @@ if __name__ == '__main__':
     trj = simulator.run(1000)
 
     steps = [
-        (get_struct_analizer, "Structural", 0, 2),
-        (get_prob_analizer, "Probabilistic", 1, 1),
-        (get_hybrid_analizer, "Hybrid", 2, 2),
+        (get_dm_analyzer, "Distance-matrix", 0),
+        (get_sib_analyzer, "SIB", 1),
+        (get_hybrid_analyzer, "Hybrid", 2),
     ]
 
     times_path = (
@@ -132,7 +129,7 @@ if __name__ == '__main__':
     else:
         times = np.zeros(shape=(len(trj_lens), 3), dtype=np.float32)
         for j, trj_len in enumerate(trj_lens):
-            for getter_analyzer, _, _, k, _ in steps:
+            for getter_analyzer, _, k in steps:
                 for i in range(count):
                     trajectory = simulator.run(trj_len)
                     start_time = time.time()
@@ -149,28 +146,7 @@ if __name__ == '__main__':
     times = times[1:, :]
     trj_lens = trj_lens[1:]
 
-    def add_plot(atime, name, fit_degree: int = 2):
-
-        if fit_degree == 3:
-            fitfunc = lambda p, x: p[0] * x**3 + p[1] * x**2 + p[2] * x + p[3]
-            p0 = np.array(
-                [1.0, 2.35443285e-07, -2.05620996e-06, 8.41931635e-02],
-                dtype=np.float32,
-            )
-        elif fit_degree == 2:
-            fitfunc = lambda p, x: p[0] * x**2 + p[1] * x + p[2]
-            p0 = np.array(
-                [2.35443285e-07, -2.05620996e-06, 8.41931635e-02],
-                dtype=np.float32,
-            )
-        elif fit_degree == 1:
-            fitfunc = lambda p, x: p[0] * x + p[1]
-            p0 = np.array([1.0, 0.0], dtype=np.float32)
-
-        # errfunc = lambda p, x, y: fitfunc(p, x) - y
-        # p2, success = optimize.leastsq(errfunc, p0[:], args=(trj_lens, atime))
-        #
-
+    def add_plot(atime, name):
         logx = np.log(trj_lens)
         logy = np.log(atime)
         p = np.polyfit(logx, logy, deg=1)
@@ -185,16 +161,16 @@ if __name__ == '__main__':
             color=color,
         )
 
-    for _, name, ind, fd in steps:
-        add_plot(times[:, ind], name, fd)
+    for _, name, ind in steps:
+        add_plot(times[:, ind], name)
 
-    plt.xlabel('Trajectory length', fontsize=12)
-    plt.ylabel('Execution Time, sec', fontsize=12)
+    plt.xlabel('Trajectory length', fontsize=14)
+    plt.ylabel('Execution Time, sec', fontsize=14)
     plt.xscale('log')
     plt.yscale('log')
     plt.yticks(fontsize=12)
     plt.xticks(fontsize=12)
-    plt.legend(frameon=False, fontsize=12)
+    plt.legend(frameon=False, fontsize=14)
     plt.savefig(
         "/media/andrey/Samsung_T5/PHD/Kerogen/complexity.pdf",
         bbox_inches="tight",

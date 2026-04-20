@@ -15,9 +15,9 @@ sys.path.append(parent_dir)
 
 
 from base.trajectory import Trajectory
-from processes.struct_trajectory_analyzer import (
-    StructTrajectoryAnalizer,
-    StructAnalizerParams,
+from processes.trajectory_analyzer.dm import (
+    DistanceMatrixAnalyzer,
+    DistanceMatrixParams,
 )
 from visualizer.visualizer import Visualizer
 from examples.utils import visualize_trajectory
@@ -45,9 +45,9 @@ def animate_trajectoryes(trajs: List[Trajectory]) -> None:
     Visualizer.animate_trajectoryes(trajs)
 
 
-def analizy_visualize(trj, params: StructAnalizerParams, win_name: str):
-    analizer = StructTrajectoryAnalizer(params)
-    trj.traps = analizer.run(trj)
+def analizy_visualize(trj, params: DistanceMatrixParams, win_name: str):
+    analyzer = DistanceMatrixAnalyzer(params)
+    trj.traps = analyzer.run(trj)
     clusters = measure.label(trj.traps, connectivity=1).astype(np.float32)
     print(f" --- Count clusters: {clusters.max()}")
     del trj.__dict__['points_without_periodic']
@@ -58,7 +58,7 @@ def analizy_visualize(trj, params: StructAnalizerParams, win_name: str):
 
 def run_and_plot_trap_time_distribution(
     trajectories: List[Trajectory],
-    aparams: List[Tuple[int, StructAnalizerParams]],
+    aparams: List[Tuple[int, DistanceMatrixParams]],
 ):
     fix, axs = plt.subplots(len(aparams))
     for i, ind_params in enumerate(aparams):
@@ -69,7 +69,7 @@ def run_and_plot_trap_time_distribution(
             if my_file.is_file():
                 trj.traps = np.load(my_file)
             else:
-                analizer = StructTrajectoryAnalizer(trj, ind_params[1])
+                analyzer = DistanceMatrixAnalyzer(trj, ind_params[1])
 
             np.save(f"./output/h2_traj/{i}/{ind_params[0]}.npy", trj.traps)
             print(f" --- Trajectory number: {j+1}, Params number: {i+1}")
@@ -89,9 +89,9 @@ def get_trap_time_distribution(trajectories: List[Trajectory]):
     return result
 
 
-def run_default_analizer(path: str, win_name: str) -> None:
+def run_default_analyzer(path: str, win_name: str) -> None:
     trajectories = Trajectory.read_trajectoryes(path)
-    aparams = StructAnalizerParams.get_params([154, 162, 186])
+    aparams = DistanceMatrixParams.get_params([154, 162, 186])
     params = aparams[0]
 
     # run_and_plot_trap_time_distribution(trajectories, list(zip(indexes, aparams)))
@@ -101,14 +101,13 @@ def run_default_analizer(path: str, win_name: str) -> None:
     # visualize_trajectory(trajectories[14])
     # visualize_trajectory(trajectories[19])
 
-    params = StructAnalizerParams(
+    params = DistanceMatrixParams(
         traj_type='Bm',
         nu=0.9,
         diag_percentile=0,
         kernel_size=1,
         list_mu=np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0]),
         p_value=0.9,
-        num_jobs=3,
     )
     trj = trajectories[0]
     analizy_visualize(trj, params, win_name)
@@ -150,4 +149,4 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
 
-    run_default_analizer(args.traj_path, "Article algorithm")
+    run_default_analyzer(args.traj_path, "Article algorithm")

@@ -4,7 +4,7 @@ import os
 from os.path import realpath, exists, join
 from pathlib import Path
 import matplotlib.pyplot as plt
-from processes.struct_trajectory_analyzer import StructAnalizerParams
+from processes.trajectory_analyzer.dm import DistanceMatrixParams
 from utils.types import NPFArray, f32
 import numpy as np
 import pickle
@@ -26,7 +26,7 @@ def run(path):
             assert Path(result_name).is_file()
             with open(result_name, 'rb') as f:
                 errors: dict[
-                    tuple[float, float, StructAnalizerParams], float
+                    tuple[float, float, DistanceMatrixParams], float
                 ] = pickle.load(f)
             full_errors.update(errors)
 
@@ -51,7 +51,7 @@ def run(path):
     for ik, k in enumerate(lk):
         for ip, p in enumerate(lp):
             for imu, lmu in enumerate(llmu):
-                params = StructAnalizerParams.get_params(lmu=lmu)
+                params = DistanceMatrixParams.get_params(lmu=lmu)
                 for idx, param in enumerate(params):
                     fparams[(ik, ip, imu, idx)] = param
 

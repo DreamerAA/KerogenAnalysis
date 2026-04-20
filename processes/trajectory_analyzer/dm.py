@@ -16,7 +16,7 @@ from skimage import measure
 from utils.types import NPFArray, NPIArray, NPBArray, f32
 
 from base.trajectory import Trajectory
-from processes.trajectory_analyzer import TrajectoryAnalyzer
+from processes.trajectory_analyzer.trajectory_analyzer import TrajectoryAnalyzer
 
 list_vert_median = {
     (0, 'Bm'): [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -48,7 +48,7 @@ def find_min_max_index(index: int, arr: NPBArray) -> Tuple[int, int]:
 
 
 @dataclass
-class StructAnalizerParams:
+class DistanceMatrixParams:
     """reference motion type for simulations
     can be `fBm` or `Bm`
     fBm - fractional Brownian Motion
@@ -109,25 +109,25 @@ class StructAnalizerParams:
     def get_params(
         indexes: Optional[List[int]] = None,
         lmu: Optional[List[int]] = None,
-    ) -> List['StructAnalizerParams']:
+    ) -> List['DistanceMatrixParams']:
         list_mu = (
             np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0]) if lmu is None else lmu
         )
-        atparams = StructAnalizerParams.all_params()
+        atparams = DistanceMatrixParams.all_params()
         if indexes is not None:
             tparams = [atparams[i] for i in indexes]
         else:
             tparams = [v for _, v in atparams.items()]
 
         aparams = [
-            StructAnalizerParams(tt, nu, dp, ks, list_mu, pv)
+            DistanceMatrixParams(tt, nu, dp, ks, list_mu, pv)
             for dp, pv, nu, tt, ks in tparams
         ]
         return aparams
 
 
-class StructTrajectoryAnalizer(TrajectoryAnalyzer):
-    def __init__(self, params: StructAnalizerParams):
+class DistanceMatrixAnalyzer(TrajectoryAnalyzer):
+    def __init__(self, params: DistanceMatrixParams):
         self.params = params
 
         self.kernel = (
@@ -153,7 +153,7 @@ class StructTrajectoryAnalizer(TrajectoryAnalyzer):
 
     @staticmethod
     def name() -> str:
-        return "struct"
+        return "dm"
 
     def run(self, trj: Trajectory) -> npt.NDArray[np.bool_]:
         points = trj.points_without_periodic
@@ -202,7 +202,7 @@ class StructTrajectoryAnalizer(TrajectoryAnalyzer):
             list_vertical_m / (list_parallel_m + list_diagonal_m - 1) > nu
         )
 
-        List_min_max = StructTrajectoryAnalizer.Make_list_min_max_index_equal(
+        List_min_max = DistanceMatrixAnalyzer.Make_list_min_max_index_equal(
             list_trapped_m
         )
 
@@ -303,7 +303,7 @@ class StructTrajectoryAnalizer(TrajectoryAnalyzer):
                 start = 2 * n - N + 1
                 index = N - n - 1
 
-            ud_bin, ud_ver = StructTrajectoryAnalizer.get_up_down(
+            ud_bin, ud_ver = DistanceMatrixAnalyzer.get_up_down(
                 index, n, list_bin_vert == 1, matrix[:, n] == 1
             )
             pos_down, pos_up = ud_bin

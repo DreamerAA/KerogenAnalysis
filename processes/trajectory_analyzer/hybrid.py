@@ -11,29 +11,29 @@ from processes.distribution_fitter import (
     GammaFitter,
     WeibullFitter,
 )
-from processes.struct_trajectory_analyzer import (
-    StructTrajectoryAnalizer,
-    StructAnalizerParams,
+from processes.trajectory_analyzer.dm import (
+    DistanceMatrixAnalyzer,
+    DistanceMatrixParams,
 )
-from processes.probability_trajectory_analizer import (
-    ProbabilityTrajectoryAnalizer,
-    ProbabilityAnalizerParams,
+from processes.trajectory_analyzer.sib import (
+    StructureInformedBayesAnalyzer,
+    StructureInformedBayesParams,
 )
-from processes.trajectory_analyzer import TrajectoryAnalyzer
+from processes.trajectory_analyzer.trajectory_analyzer import TrajectoryAnalyzer
 from utils.types import NPFArray, NPBArray, f32
 
 
 @dataclass
-class HybridAnalizerParams:
-    prob_params: ProbabilityAnalizerParams
-    struct_params: StructAnalizerParams
+class HybridParams:
+    prob_params: StructureInformedBayesParams
+    struct_params: DistanceMatrixParams
     prob_diff: float = 0.1
 
 
-class HybridTrajectoryAnalizer(TrajectoryAnalyzer):
+class HybridAnalyzer(TrajectoryAnalyzer):
     def __init__(
         self,
-        params: HybridAnalizerParams,
+        params: HybridParams,
         pi_l_gf: GammaFitter,
         throat_lengthes_wf: WeibullFitter,
     ):
@@ -52,8 +52,8 @@ class HybridTrajectoryAnalizer(TrajectoryAnalyzer):
     def get_trap_approx(self, trj: Optional[Trajectory] = None) -> NPBArray:
         if self.trap_approx is None:
             assert trj is not None
-            analizer = StructTrajectoryAnalizer(self.params.struct_params)
-            self.trap_approx = analizer.run(trj)
+            analyzer = DistanceMatrixAnalyzer(self.params.struct_params)
+            self.trap_approx = analyzer.run(trj)
             print(" --- Matrix Algorithm finished")
         return self.trap_approx
 
@@ -63,7 +63,7 @@ class HybridTrajectoryAnalizer(TrajectoryAnalyzer):
     ) -> NPBArray:
         trap_approx = self.get_trap_approx(trj)
 
-        _, probabilityies = ProbabilityTrajectoryAnalizer.analyze(
+        _, probabilityies = StructureInformedBayesAnalyzer.analyze(
             trj,
             self.throat_lengthes_wf,
             self.pi_l_gf,

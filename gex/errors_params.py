@@ -14,9 +14,9 @@ from base.empiricalcdf import EmpiricalCDF
 from utils.utils import kprint, ps_generate, create_empirical_cdf
 from base.reader import Reader
 from processes.kerogen_walk_simulator import KerogenWalkSimulator
-from processes.struct_trajectory_analyzer import (
-    StructTrajectoryAnalizer,
-    StructAnalizerParams,
+from processes.trajectory_analyzer.dm import (
+    DistanceMatrixAnalyzer,
+    DistanceMatrixParams,
 )
 
 
@@ -79,11 +79,11 @@ def run(path_to_main: str):
 
             for imu, lmu in enumerate(llmu):
                 start_time = time.time()
-                params = StructAnalizerParams.get_params(lmu=lmu)
+                params = DistanceMatrixParams.get_params(lmu=lmu)
 
                 def wrap(idx):
                     param = params[idx]
-                    matrix_analyzer = StructTrajectoryAnalizer(param)
+                    matrix_analyzer = DistanceMatrixAnalyzer(param)
                     me = 0.0
 
                     for trj, real_traps in zip(trjs, l_real_traps):

@@ -1,5 +1,6 @@
 from base.trap_sequence import TrapSequence
 import numpy as np
+from utils.types import NPBArray
 
 
 class TrapExtractor:

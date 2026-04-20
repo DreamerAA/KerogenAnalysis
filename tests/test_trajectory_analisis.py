@@ -3,9 +3,9 @@ import numpy.typing as npt
 import pytest
 from base.boundingbox import BoundingBox
 from base.trajectory import Trajectory
-from processes.struct_trajectory_analyzer import (
-    StructTrajectoryAnalizer,
-    AnalizerParams,
+from processes.trajectory_analyzer.dm import (
+    DistanceMatrixAnalyzer,
+    DistanceMatrixParams,
 )
 import os
 import pickle
@@ -28,10 +28,10 @@ def expected_result(test_path: str) -> npt.NDArray[np.bool_]:
     return matlab_res["list_trapped"][0]  # type: ignore
 
 
-def test_trajectory_analizer_regression(
+def test_trajectory_analyzer_regression(
     trajectory: Trajectory, expected_result: npt.NDArray[np.bool_]
 ) -> None:
-    _ = StructTrajectoryAnalizer(trajectory, AnalizerParams())
+    _ = DistanceMatrixAnalyzer(trajectory, DistanceMatrixParams())
     print(trajectory.traps)
     print("trajectory.traps")
     assert trajectory.traps is not None
@@ -55,10 +55,10 @@ def expected_result2(test_path: str) -> npt.NDArray[np.bool_]:
     return np.load(test_path + "expected_result.npy")
 
 
-def test2_trajectory_analizer_regression(
+def test2_trajectory_analyzer_regression(
     trajectory2: Trajectory, expected_result2: npt.NDArray[np.bool_]
 ) -> None:
-    _ = StructTrajectoryAnalizer(trajectory2, AnalizerParams())
+    _ = DistanceMatrixAnalyzer(trajectory2, DistanceMatrixParams())
     print(trajectory2.traps)
     assert trajectory2.traps is not None
     assert trajectory2.traps.size > 0

@@ -11,39 +11,35 @@ from base.discretecdf import DiscreteCDF
 from processes.trap_extractor import TrapExtractor
 from tqdm import tqdm
 
-path = Path(realpath(__file__))
-parent_dir = str(path.parent.parent.absolute())
-sys.path.append(parent_dir)
-
 from base.bufferedsampler import BufferedSampler
 
 from base.empiricalcdf import EmpiricalCDF
 from utils.utils import kprint, ps_generate, create_empirical_cdf
 from processes.kerogen_walk_simulator import KerogenWalkSimulator
 
-from processes.hybrid_trajectory_analizer import (
-    HybridAnalizerParams,
-    HybridTrajectoryAnalizer,
+from processes.trajectory_analyzer.hybrid import (
+    HybridParams,
+    HybridAnalyzer,
 )
-from processes.struct_trajectory_analyzer import (
-    StructTrajectoryAnalizer,
-    StructAnalizerParams,
+from processes.trajectory_analyzer.dm import (
+    DistanceMatrixAnalyzer,
+    DistanceMatrixParams,
 )
-from processes.probability_trajectory_analizer import (
-    ProbabilityTrajectoryAnalizer,
-    ProbabilityAnalizerParams,
+from processes.trajectory_analyzer.sib import (
+    StructureInformedBayesAnalyzer,
+    StructureInformedBayesParams,
 )
-from processes.neumann_pearson_analizer import (
-    NeumannPearsonTrajectoryAnalizer,
-    NeumannPearsonAnalizerParams,
+from processes.trajectory_analyzer.np import (
+    NeymanPearsonAnalyzer,
+    NeymanPearsonParams,
 )
-from processes.prob_np_analizer import (
-    ProbabilityNPTrajectoryAnalizer,
-    ProbabilityNPTrajectoryAnalizerParams,
+from processes.trajectory_analyzer.sib_np import (
+    StructureInformedBayesNeynamPearsonAnalyzer,
+    StructureInformedBayesNeynamPearsonParams,
 )
-from processes.neumann_pearson_struct_analizer import (
-    NeumannPearsonStructTrajectoryAnalizer,
-    NeumannPearsonStructAnalizerParams,
+from processes.trajectory_analyzer.np_dm import (
+    NeymanPearsonDistanceMatrixAnalyzer,
+    NeymanPearsonDistanceMatrixParams,
 )
 
 
@@ -82,7 +78,7 @@ def save_error_corridor_png(
     for name, (error, k_est) in data.items():
         plot_error(name, error, k_est)
 
-    plt.xlabel(r"Probability move to new trap, $p$", fontsize=14)
+    plt.xlabel(r"Probability of move to new trap, $p$", fontsize=12)
     plt.ylabel(
         "Average error / Count steps", fontsize=12
     )  # или как у тебя подписано
@@ -90,7 +86,7 @@ def save_error_corridor_png(
 
     plt.yticks(fontsize=10)
     plt.xticks(fontsize=10)
-    plt.legend(frameon=False, prop={'size': 10})
+    plt.legend(frameon=False, prop={'size': 12})
 
     fig.savefig(join(out_dir, filename), dpi=300, bbox_inches="tight")
     plt.close(fig)
@@ -151,7 +147,7 @@ def run(
         os.mkdir(path_to_save)
 
     params_struct_set = {
-        0.1: StructAnalizerParams(
+        0.1: DistanceMatrixParams(
             traj_type='fBm',
             nu=0.1,
             diag_percentile=0,
@@ -159,7 +155,7 @@ def run(
             list_mu=[0.5, 1.0, 1.5, 2.0, 2.5, 3.0],
             p_value=0.9,
         ),
-        0.5: StructAnalizerParams(
+        0.5: DistanceMatrixParams(
             traj_type='fBm',
             nu=0.1,
             diag_percentile=0,
@@ -167,7 +163,7 @@ def run(
             list_mu=[1.5, 2.0],
             p_value=0.9,
         ),
-        0.9: StructAnalizerParams(
+        0.9: DistanceMatrixParams(
             traj_type='Bm',
             nu=0.5,
             diag_percentile=0,
@@ -178,40 +174,38 @@ def run(
     }
 
     params_prob_set = {
-        k: ProbabilityAnalizerParams(
+        k: StructureInformedBayesParams(
             critical_probability=1e-3,
         )
         for k in [0.1, 0.5, 0.9]
     }
     params_hybrid_set = {
-        k: HybridAnalizerParams(
+        k: HybridParams(
             params_prob_set[k],
             params_struct_set[k],
             0.3,
         )
         for k in [0.1, 0.5, 0.9]
     }
-    params_np_set = {
-        k: NeumannPearsonAnalizerParams(0.01) for k in [0.1, 0.5, 0.9]
-    }
+    params_np_set = {k: NeymanPearsonParams(0.01) for k in [0.1, 0.5, 0.9]}
     params_pnp_set = {
-        k: ProbabilityNPTrajectoryAnalizerParams(1e-3, 0.01)
+        k: StructureInformedBayesNeynamPearsonParams(1e-3, 0.01)
         for k in [0.1, 0.5, 0.9]
     }
     params_np_struct_set = {
-        k: NeumannPearsonStructAnalizerParams(0.01) for k in [0.1, 0.5, 0.9]
+        k: NeymanPearsonDistanceMatrixParams(0.01) for k in [0.1, 0.5, 0.9]
     }
 
     pset = {
         k: {
-            HybridTrajectoryAnalizer.name(): params_hybrid_set[k],
-            StructTrajectoryAnalizer.name(): params_struct_set[k],
-            ProbabilityTrajectoryAnalizer.name(): params_prob_set[k],
-            NeumannPearsonTrajectoryAnalizer.name(): params_np_set[k],
-            ProbabilityNPTrajectoryAnalizer.name(): params_pnp_set[k],
-            NeumannPearsonStructTrajectoryAnalizer.name(): params_np_struct_set[
+            HybridAnalyzer.name(): params_hybrid_set[k],
+            DistanceMatrixAnalyzer.name(): params_struct_set[k],
+            StructureInformedBayesAnalyzer.name(): params_prob_set[k],
+            NeymanPearsonAnalyzer.name(): params_np_set[k],
+            StructureInformedBayesNeynamPearsonAnalyzer.name(): params_pnp_set[
                 k
             ],
+            NeymanPearsonDistanceMatrixAnalyzer.name(): params_np_struct_set[k],
         }
         for k in [0.1, 0.5, 0.9]
     }
@@ -248,35 +242,35 @@ def run(
     for k, params in pset.items():
         result_shape = (len(prob_grid), count_trj)
 
-        matrix_analyzer = StructTrajectoryAnalizer(
-            params[StructTrajectoryAnalizer.name()]
+        matrix_analyzer = DistanceMatrixAnalyzer(
+            params[DistanceMatrixAnalyzer.name()]
         )
 
-        neumann_pearson_analizer = NeumannPearsonTrajectoryAnalizer(
-            params[NeumannPearsonTrajectoryAnalizer.name()],
+        neumann_pearson_analyzer = NeymanPearsonAnalyzer(
+            params[NeymanPearsonAnalyzer.name()],
             pil_gamma_fitter,
             throat_lengths_weibull_fitter,
         )
 
-        prob_analizer = ProbabilityTrajectoryAnalizer(
-            params[ProbabilityTrajectoryAnalizer.name()],
+        prob_analyzer = StructureInformedBayesAnalyzer(
+            params[StructureInformedBayesAnalyzer.name()],
             pil_gamma_fitter,
             throat_lengths_weibull_fitter,
         )
 
-        hybrid_analizer = HybridTrajectoryAnalizer(
-            params[HybridTrajectoryAnalizer.name()],
+        hybrid_analyzer = HybridAnalyzer(
+            params[HybridAnalyzer.name()],
             pil_gamma_fitter,
             throat_lengths_weibull_fitter,
         )
-        prob_np_analizer = ProbabilityNPTrajectoryAnalizer(
-            params[ProbabilityNPTrajectoryAnalizer.name()],
+        prob_np_analyzer = StructureInformedBayesNeynamPearsonAnalyzer(
+            params[StructureInformedBayesNeynamPearsonAnalyzer.name()],
             pil_gamma_fitter,
             throat_lengths_weibull_fitter,
         )
 
-        np_struct_analizer = NeumannPearsonStructTrajectoryAnalizer(
-            params[NeumannPearsonStructTrajectoryAnalizer.name()],
+        np_struct_analyzer = NeymanPearsonDistanceMatrixAnalyzer(
+            params[NeymanPearsonDistanceMatrixAnalyzer.name()],
             pil_gamma_fitter,
             throat_lengths_weibull_fitter,
         )
@@ -296,20 +290,18 @@ def run(
 
         currect_state = {}
 
-        def set_approx_traps(analizer, pi, ti, name):
+        def set_approx_traps(analyzer, pi, ti, name):
             results = currect_state[name].get("results")
             traps = results[pi, ti]
-            analizer.set_trap_approx(traps)
+            analyzer.set_trap_approx(traps)
 
-        def set_approx_struct_traps(analizer, pi, ti):
-            set_approx_traps(analizer, pi, ti, StructTrajectoryAnalizer.name())
+        def set_approx_struct_traps(analyzer, pi, ti):
+            set_approx_traps(analyzer, pi, ti, DistanceMatrixAnalyzer.name())
 
-        # def set_approx_np_traps(analizer, pi, ti):
-        #     set_approx_traps(
-        #         analizer, pi, ti, NeumannPearsonTrajectoryAnalizer.name()
-        #     )
+        def set_approx_np_traps(analyzer, pi, ti):
+            set_approx_traps(analyzer, pi, ti, NeymanPearsonAnalyzer.name())
 
-        def empty_func(analizer, pi, ti):
+        def empty_func(analyzer, pi, ti):
             pass
 
         def empty_init():
@@ -318,16 +310,16 @@ def run(
             results = np.zeros(shape=(*result_shape, count_steps))
             return k_est, errors, results
 
-        for analizer, approx_func in [
+        for analyzer, approx_func in [
             (matrix_analyzer, empty_func),
-            (neumann_pearson_analizer, empty_func),
-            (prob_analizer, empty_func),
-            (prob_np_analizer, empty_func),
-            (hybrid_analizer, set_approx_struct_traps),
-            (np_struct_analizer, set_approx_struct_traps),
+            (neumann_pearson_analyzer, empty_func),
+            (prob_analyzer, empty_func),
+            (prob_np_analyzer, empty_func),
+            (hybrid_analyzer, set_approx_struct_traps),
+            (np_struct_analyzer, set_approx_struct_traps),
         ]:
             exp_tag = (
-                f"name={analizer.name()}_k={k}_count_trj={count_trj}_" + header
+                f"name={analyzer.name()}_k={k}_count_trj={count_trj}_" + header
             )
             # fn = join(path_to_save, header)
             ckpt_fn = join(path_to_save, f"checkpoint_{exp_tag}.pkl")
@@ -358,7 +350,7 @@ def run(
 
             for ind in tqdm(
                 range(len(prob_grid) * count_trj),
-                desc=f"Analyze {analizer.name()} for k={k}",
+                desc=f"Analyze {analyzer.name()} for k={k}",
             ):
                 if ind < flat_ind:
                     continue
@@ -369,8 +361,8 @@ def run(
                 trjs = trajectories[(k, p)]
                 trj = trjs[ti]
 
-                approx_func(analizer, pi, ti)
-                result = analizer.run(trj).astype(np.int32)
+                approx_func(analyzer, pi, ti)
+                result = analyzer.run(trj).astype(np.int32)
 
                 delta_time = trj.delta_time * 1e-12  # picoseconds
                 seq = TrapExtractor.get_trap_seq(result, delta_time)
@@ -392,7 +384,7 @@ def run(
                         "errors": errors,
                     }
                     _atomic_pickle_dump(ckpt, ckpt_fn)
-            currect_state[analizer.name()] = {
+            currect_state[analyzer.name()] = {
                 "k": k,
                 "prob_grid": prob_grid,
                 "count_steps": count_steps,
@@ -410,23 +402,23 @@ def run(
             return error, k_est
 
         np_errors, np_k_est = get_norm_errors_k_est(
-            NeumannPearsonTrajectoryAnalizer.name()
+            NeymanPearsonAnalyzer.name()
         )
         struct_errors, struct_k_est = get_norm_errors_k_est(
-            StructTrajectoryAnalizer.name()
+            DistanceMatrixAnalyzer.name()
         )
-        # prob_errors, prob_k_est = get_norm_errors_k_est(
-        #     ProbabilityTrajectoryAnalizer.name()
-        # )
+        prob_errors, prob_k_est = get_norm_errors_k_est(
+            StructureInformedBayesAnalyzer.name()
+        )
         hybrid_errors, hybrid_k_est = get_norm_errors_k_est(
-            HybridTrajectoryAnalizer.name()
+            HybridAnalyzer.name()
         )
         prob_np_errors, prob_np_k_est = get_norm_errors_k_est(
-            ProbabilityNPTrajectoryAnalizer.name()
+            StructureInformedBayesNeynamPearsonAnalyzer.name()
         )
-        # np_struct_errors, np_struct_k_est = get_norm_errors_k_est(
-        #     NeumannPearsonStructTrajectoryAnalizer.name()
-        # )
+        np_struct_errors, np_struct_k_est = get_norm_errors_k_est(
+            NeymanPearsonDistanceMatrixAnalyzer.name()
+        )
 
         plots_dir = join(
             path_to_save,
@@ -440,8 +432,8 @@ def run(
             filename=pdf_name,
             prob_grid=prob_grid,
             data={
-                "Structural": (struct_errors, struct_k_est),
-                "Neumann-Pearson": (np_errors, np_k_est),
+                "Distance-matrix": (struct_errors, struct_k_est),
+                "Neyman-Pearson": (np_errors, np_k_est),
                 "Neyman–Pearson + Bayes": (
                     prob_np_errors,
                     prob_np_k_est,
@@ -459,9 +451,9 @@ def run(
         kprint(
             f"For k={k}: "
             # f"probability estimation k={prob_k_est:.3f} | "
-            f"probability + neumann pearson estimation k={prob_np_k_est:.3f} | "
-            f"hybrid estimation k={hybrid_k_est:.3f} | "
-            f"struct estimation k={struct_k_est:.3f} | "
+            f"Bayes + Neyman-pearson estimation k={prob_np_k_est:.3f} | "
+            f"Hybrid estimation k={hybrid_k_est:.3f} | "
+            f"Distance-matrix estimation k={struct_k_est:.3f} | "
             # f"neumann pearson estimation k={np_k_est:.3f} | "
             # f"neumann pearson + struct estimation k={np_struct_k_est:.3f} | "
         )

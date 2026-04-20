@@ -9,25 +9,27 @@ from processes.distribution_fitter import (
     GammaFitter,
     WeibullFitter,
 )
-from processes.neumann_pearson_analizer import NeumannPearsonTrajectoryAnalizer
-from processes.trajectory_analyzer import TrajectoryAnalyzer
+from processes.trajectory_analyzer.np import (
+    NeymanPearsonAnalyzer,
+)
+from processes.trajectory_analyzer.trajectory_analyzer import TrajectoryAnalyzer
 
 from utils.utils import pdistances
 from utils.types import NPFArray, NPBArray, i32
 
 
 @dataclass
-class NeumannPearsonStructAnalizerParams:
+class NeymanPearsonDistanceMatrixParams:
     error: float = 0.01
 
 
 # mask_size = []
 
 
-class NeumannPearsonStructTrajectoryAnalizer(TrajectoryAnalyzer):
+class NeymanPearsonDistanceMatrixAnalyzer(TrajectoryAnalyzer):
     def __init__(
         self,
-        params: NeumannPearsonStructAnalizerParams,
+        params: NeymanPearsonDistanceMatrixParams,
         pi_l_gf: GammaFitter,
         throat_lengthes_wf: WeibullFitter,
     ):
@@ -38,18 +40,16 @@ class NeumannPearsonStructTrajectoryAnalizer(TrajectoryAnalyzer):
         self.transition_step_fitter: Optional[WeibullFitter] = None
         self.trapped_step_fitter: Optional[GammaFitter] = None
 
-        self.threshold = NeumannPearsonTrajectoryAnalizer.calculate_threshold(
+        self.threshold = NeymanPearsonAnalyzer.calculate_threshold(
             self.pi_l_gf, self.throat_lengthes_wf, self.params.error
         )
-        self.reverse_threshold = (
-            NeumannPearsonTrajectoryAnalizer.calculate_threshold(
-                self.throat_lengthes_wf, self.pi_l_gf, self.params.error
-            )
+        self.reverse_threshold = NeymanPearsonAnalyzer.calculate_threshold(
+            self.throat_lengthes_wf, self.pi_l_gf, self.params.error
         )
 
     @staticmethod
     def name() -> str:
-        return "neumann_pearson_struct"
+        return "np_dm"
 
     def set_trap_approx(self, trap_approx: NPBArray):
         self.trap_approx = trap_approx
@@ -58,12 +58,12 @@ class NeumannPearsonStructTrajectoryAnalizer(TrajectoryAnalyzer):
         self,
         trj: Trajectory,
     ) -> NPBArray:
-        likelihood = NeumannPearsonTrajectoryAnalizer.analyze(
+        likelihood = NeymanPearsonAnalyzer.analyze(
             trj,
             self.throat_lengthes_wf,
             self.pi_l_gf,
         )
-        reverse_likelihood = NeumannPearsonTrajectoryAnalizer.analyze(
+        reverse_likelihood = NeymanPearsonAnalyzer.analyze(
             trj,
             self.pi_l_gf,
             self.throat_lengthes_wf,
