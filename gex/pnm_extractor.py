@@ -1,55 +1,49 @@
 import argparse
 import json
+import re
 import subprocess
 from os import listdir
 from os.path import dirname, isfile, join, realpath
 from pathlib import Path
+
+from utils.utils import kprint
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--path_to_extractor',
         type=str,
-        default="/home/andrey/DigitalCore/PNE/pore-network-extraction/build/clang-15-release-cpu/bin/extractor_example",
+        default="/media/andrey/Samsung_T5/DCore/SSM-2/pore-network-extraction/build/clang-15-release-cpu/bin/extractor_example",
     )
-
-    default_path = "/media/andrey/Samsung_T5/PHD/Kerogen/type2matrix/300K/h2/"
-
     parser.add_argument(
-        '--path_to_pnm_folder',
+        '--default_path',
         type=str,
-        # default="/media/andrey/Samsung_T5/PHD/Kerogen/400K/h2/pnm/",
-        default=default_path + "/pnm/",
+        default="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/",
     )
-
-    parser.add_argument(
-        '--path_to_img_folder',
-        type=str,
-        # default="/media/andrey/Samsung_T5/PHD/Kerogen/400K/h2/images/",
-        default=default_path + "/images/",
-    )
-
     parser.add_argument(
         '--path_to_config',
         type=str,
-        default="/home/andrey/DigitalCore/PNE/pore-network-extraction/example/config/ExtractorExampleConfig.json",
+        default="/media/andrey/Samsung_T5/DCore/SSM-2/pore-network-extraction/example/config/ExtractorExampleConfig.json",
     )
     parser.add_argument(
-        '--path_to_save_euler',
+        '--name',
         type=str,
-        # default='/media/andrey/Samsung_T5/PHD/Kerogen/400K/h2/euler.json',
-        default=default_path + "/euler.json",
+        default="result-img-num=25000_time-ps=50_bbox=(x=(0.000-6.231)_y=(0.590-6.821)_z=(3.392-9.623))_resolution=0.012461900",
     )
 
     args = parser.parse_args()
 
-    path_to_images = args.path_to_img_folder
-    path_to_pnm = args.path_to_pnm_folder
     path_to_extractor = args.path_to_extractor
     path_to_config = args.path_to_config
-    path_to_save_euler = args.path_to_save_euler
+    default_path = args.default_path
 
-    Path(path_to_pnm).mkdir(parents=True, exist_ok=True)
+    name = args.name
+
+    pnm_path = join(default_path, "pnm")
+    raw_img_path = join(default_path, "raw_images")
+    euler_path = join(default_path, "euler.json")
+
+    Path(pnm_path).mkdir(parents=True, exist_ok=True)
 
     # Opening JSON file
     with open(path_to_config) as f:
@@ -59,48 +53,68 @@ if __name__ == '__main__':
 
     onlyfiles = [
         f
-        for f in listdir(path_to_images)
-        if isfile(join(path_to_images, f)) and '.raw' in f
+        for f in listdir(raw_img_path)
+        if isfile(join(raw_img_path, f)) and '.raw' in f
     ]
 
-    output_save = {}
-    if isfile(path_to_save_euler):
-        with open(path_to_save_euler, "r") as f:
-            output_save = json.load(f)
+    pattern = re.compile(
+        r"result-img-num=(?P<step>\d+)"
+        r"_time-ps=(?P<time_ps>\d+(?:\.\d+)?)"
+        r"_bbox=\(x=\((?P<x_min>-?\d+(?:\.\d+)?)-(?P<x_max>-?\d+(?:\.\d+)?)\)"
+        r"_y=\((?P<y_min>-?\d+(?:\.\d+)?)-(?P<y_max>-?\d+(?:\.\d+)?)\)"
+        r"_z=\((?P<z_min>-?\d+(?:\.\d+)?)-(?P<z_max>-?\d+(?:\.\d+)?)\)\)"
+        r"_resolution=(?P<resolution>\d+(?:\.\d+)?)"
+    )
 
     for i, file in enumerate(onlyfiles):
-        lfile = file.split('_')
-        parts = [
-            l.split('=')[1]
-            for l in lfile
-            if "num" in l or "resolution" in l or "is=" in l
-        ]
-        print(parts)
-        num = int(parts[0])
-        xs, ys, zs = [int(e) for e in parts[1][1:-1].split(',')]
-        resolution = float(parts[2][:-5])
 
-        pnm_pref = join(path_to_pnm, f"num={num}_{xs}_{ys}_{zs}")
-        jconfig["input_data"]["filename"] = join(path_to_images, file)
+        match = pattern.match(file)
+        if not match:
+            kprint("No match")
+            continue
+        data = match.groupdict()
+        num = data["step"]
+        x_min = data["x_min"]
+        x_max = data["x_max"]
+        y_min = data["y_min"]
+        y_max = data["y_max"]
+        z_min = data["z_min"]
+        z_max = data["z_max"]
+        resolution = float(data["resolution"])
+
+        xs = int(round((float(x_max) - float(x_min)) / resolution))
+        ys = int(round((float(y_max) - float(y_min)) / resolution))
+        zs = int(round((float(z_max) - float(z_min)) / resolution))
+
+        path_to_images = join(raw_img_path, file)
+        path_to_pnm = join(pnm_path, file)
+
+        angstrem_to_um = 0.0001
+
+        pnm_pref = join(pnm_path, "pnm-" + file[11:-4])
+        if isfile(pnm_pref + "_node1.dat"):
+            print(f"Skip {num}")
+            continue
+
+        jconfig["input_data"]["filename"] = path_to_images
         jconfig["input_data"]["size"]["x"] = xs
         jconfig["input_data"]["size"]["y"] = ys
         jconfig["input_data"]["size"]["z"] = zs
         jconfig["output_data"]["statoil_prefix"] = pnm_pref
         jconfig["output_data"]["filename"] = pnm_pref
-        jconfig["extraction_parameters"]["resolution"] = resolution * 0.0001
+        jconfig["extraction_parameters"]["resolution"] = (
+            resolution * angstrem_to_um
+        )
         jconfig["extraction_parameters"]["length_unit_type"] = "UM"
 
-        if isfile(pnm_pref + "_node1.dat") and parts[0] in output_save:
-            print(f"Skip {num}")
-            continue
-
-        print(f"--- File name:{join(path_to_images,file)}")
-        print(f"--- Size: {xs}, {ys}, {zs}")
-        print(f"--- Output name: {pnm_pref}")
-        print(f"--- Resolution: {resolution*0.1} nm")
+        kprint(f"File name:{join(path_to_images)}")
+        kprint(f"Size: {xs}, {ys}, {zs}")
+        kprint(f"Output name: {pnm_pref}")
+        kprint(f"Resolution: {resolution * 0.1} nm")
 
         with open(path_to_config, "w") as outfile:
             json.dump(jconfig, outfile)
+        kprint(f"run: {path_to_extractor} {path_to_config}")
 
         process = subprocess.Popen(
             [
@@ -112,15 +126,10 @@ if __name__ == '__main__':
         )
         # wait for the process to terminate
         out, err = process.communicate()
-        euler = int(out.decode("utf-8").splitlines()[0].split(':')[1])
-        output_save[num] = euler
         errcode = process.returncode
         if errcode != 0:
             print("Error!!!")
             break
         else:
-            print(f"Sucssess: {output_save[num]}")
-            print(f"go next to {i+1} from {len(onlyfiles)}")
-
-        with open(path_to_save_euler, 'w') as f:
-            json.dump(output_save, f)
+            print(f"Sucssess: {pnm_pref}")
+            print(f"go next to {i + 1} from {len(onlyfiles)}")

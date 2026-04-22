@@ -178,11 +178,18 @@ class Reader:
             coords[i, 1] = float(l[28:36])
             coords[i, 2] = float(l[36:44])
 
-        atoms = np.array([
-            AtomData(int(struct_numbers[i]), struct_types[i], atom_ids[i],
-                     int(type_ids[i]), coords[i])
-            for i in range(n)
-        ])
+        atoms = np.array(
+            [
+                AtomData(
+                    int(struct_numbers[i]),
+                    struct_types[i],
+                    atom_ids[i],
+                    int(type_ids[i]),
+                    coords[i],
+                )
+                for i in range(n)
+            ]
+        )
 
         cell_sizes = next(f)
         size = tuple(float(x) for x in cell_sizes.split() if x)
@@ -250,7 +257,7 @@ class Reader:
     @staticmethod
     def read_pnm_ext_data(
         path_to_pnm: str,
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         path_to_node_1 = path_to_pnm + "_node1.dat"
         path_to_node_2 = path_to_pnm + "_node2.dat"
         path_to_link_1 = path_to_pnm + "_link1.dat"

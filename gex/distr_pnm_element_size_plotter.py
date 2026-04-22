@@ -134,10 +134,11 @@ def build_3d_distributions(
             linewidth=2.5,
         )
         ax.text(
-            x_l[-1] - 0.15,  # небольшой сдвиг вправо
+            x_l[-1] - 0.1,  # небольшой сдвиг вправо
             y_l[-1],  # то же время
             p_l[-1] + 0.5,  # конец кривой по z
             rf"{time_us:.2f}",
+            zdir=(1, -0.5, 0),  # размещаем текст в плоскости x-z
             color=color_throat,
             fontsize=12,
             ha="left",
@@ -242,12 +243,12 @@ def build_3d_distributions(
     ax.zaxis._axinfo["juggled"] = (1, 2, 0)
     ax.set_proj_type("ortho")
 
-    for e, a in [(22, -72), (28, -65), (30, -58), (20, -78)]:
+    for e, a in [(22, -72)]:
         ax.view_init(elev=e, azim=a)
         f_name = "fill" if is_fill else "proj"
         fig.savefig(
             path_to_save + f"{f_name}_elev_{e}_azim_{a}.svg",
-            bbox_inches="tight",
+            # bbox_inches="tight",
         )
 
     # fig.savefig("all_distributions_3d.svg", bbox_inches="tight")

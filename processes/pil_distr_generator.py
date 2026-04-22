@@ -3,6 +3,7 @@ from scipy.spatial.distance import pdist
 import numpy as np
 import numpy.typing as npt
 from joblib import Parallel, delayed
+from scipy.stats import exponweib
 
 
 class PiLDistrGenerator:
@@ -201,7 +202,7 @@ class PiLDistrGenerator:
         pi_l_save[:, 1] = pi_l
         return pi_l_save
 
-    def get_conditional_curves(self, pore_radiuses: np.ndarray, step:int = 10):
+    def get_conditional_curves(self, pore_radiuses: np.ndarray, step: int = 10):
         pore_radiuses = np.asarray(pore_radiuses, dtype=f32)
         pore_radiuses = np.sort(pore_radiuses)
 
@@ -226,3 +227,97 @@ class PiLDistrGenerator:
         l_centers = nx_len[:-1] + 0.5 * (nx_len[1:] - nx_len[:-1])
 
         return sample_rad, l_centers, pi_l_cond
+
+    def get_conditional_curves_from_fit(
+        self,
+        params: tuple[float, float, float, float],
+        r_min: float = 1e-6,
+        r_max: float | None = None,
+        r_points: int = 300,
+        step: int = 10,
+        cl: int = 100,
+        pdf_eps: float = 1e-10,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Построение условных распределений Pi(l|r) по параметрам fitted exponweib.
+
+        Parameters
+        ----------
+        params : tuple
+            Параметры fitted распределения scipy.stats.exponweib:
+            (a, c, loc, scale)
+        r_min : float
+            Минимальный радиус для сетки r_fit.
+        r_max : float | None
+            Максимальный радиус для сетки r_fit. Если None, вычисляется
+            через квантиль распределения.
+        r_points : int
+            Количество точек в сетке радиусов r_fit.
+        step : int
+            Шаг прореживания сетки радиусов для построения Pi(l|r).
+        cl : int
+            Количество узлов по длине l.
+        pdf_eps : float
+            Порог для отсечения хвостов pdf, чтобы не брать почти нулевые радиусы.
+
+        Returns
+        -------
+        sample_rad : np.ndarray
+            Радиусы, для которых построены условные кривые.
+        l_centers : np.ndarray
+            Центры бинов по длине l.
+        pi_l_cond : np.ndarray
+            Массив условных плотностей формы (n_r, n_l_bins).
+        pr_sample : np.ndarray
+            Значения fitted pdf в точках sample_rad.
+        """
+        a, c, loc, scale = params
+
+        if r_max is None:
+            # Верхнюю границу удобно брать по высокому квантилю,
+            # чтобы покрыть почти всю массу распределения.
+            r_max = float(exponweib.ppf(0.999, a, c, loc=loc, scale=scale))
+
+            # fallback на случай проблемного ppf
+            if not np.isfinite(r_max) or r_max <= r_min:
+                r_max = float(loc + 5.0 * scale)
+
+        r_fit = np.linspace(r_min, r_max, r_points, dtype=f32)
+        pr_fit = exponweib.pdf(r_fit, a, c, loc=loc, scale=scale).astype(f32)
+
+        # убираем области, где плотность практически нулевая
+        mask = pr_fit > pdf_eps
+        r_fit = r_fit[mask]
+        pr_fit = pr_fit[mask]
+
+        if r_fit.size == 0:
+            raise ValueError("После отсечения хвостов не осталось точек r_fit.")
+
+        sample_rad = r_fit[::step].astype(f32)
+        pr_sample = pr_fit[::step].astype(f32)
+
+        if sample_rad.size == 0:
+            raise ValueError(
+                "sample_rad пуст. Уменьши step или увеличь r_points."
+            )
+
+        max_rad = float(sample_rad[-1])
+        max_length = np.sqrt(3.0 * ((1.5 * max_rad) ** 2))
+
+        nx_len = np.linspace(0.0, max_length, cl, dtype=f32)
+        dl = float(nx_len[1] - nx_len[0])
+
+        d_unit_sorted = self._prepare_unit_distances()
+
+        def sim(radius: float) -> np.ndarray:
+            edges_unit = (nx_len / radius).astype(f32)
+            idx = np.searchsorted(d_unit_sorted, edges_unit, side="right")
+            counts = np.diff(idx).astype(f32)
+
+            norm = float(np.sum(counts) * dl)
+            return (counts / norm) if norm != 0.0 else counts
+
+        pi_l_cond = np.vstack([sim(float(r)) for r in sample_rad]).astype(f32)
+        l_centers = (nx_len[:-1] + 0.5 * (nx_len[1:] - nx_len[:-1])).astype(f32)
+
+        return sample_rad, l_centers, pi_l_cond, pr_sample

@@ -7,6 +7,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import exponweib
 
+from processes.distribution_fitter import GammaFitter
+from utils.utils import kprint
+
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
 sys.path.append(parent_dir)
@@ -15,18 +18,48 @@ from processes.pil_distr_generator import PiLDistrGenerator
 
 
 def plot_distributions(path_to_save: str):
-    radiuses = np.load(join(path_to_save, "radiuses.npy"))
-    radiuses = radiuses[radiuses < 0.22]
+    rad_max = 0.25
+    rad_min = 0.0
 
-    generator = PiLDistrGenerator()
-    sample_rad, l_vals, pi_cond = generator.get_conditional_curves(
-        radiuses, step=150
-    )
+    radiuses = np.load(join(path_to_save, "radiuses.npy"))
+    kprint("Count radiuses: ", len(radiuses))
+    # radiuses = radiuses[radiuses < x_max]
 
     # --- fit P(r) ---
-    params = exponweib.fit(radiuses[radiuses > 0], floc=0)
-    r_fit = np.linspace(float(sample_rad.min()), float(sample_rad.max()), 300)
+    params = exponweib.fit(radiuses[::10])
+    kprint("Fit radiuses params: ", params)
+    r_fit = np.linspace(rad_min, rad_max, 300)
     pr_fit = exponweib.pdf(r_fit, *params)
+
+    # kprint("min. radiuses: ", radiuses.min())
+    generator = PiLDistrGenerator()
+    # sample_rad, l_vals, pi_cond = generator.get_conditional_curves(
+    #     radiuses, step=50
+    # )
+
+    sample_rad, l_vals, pi_cond, pr_sample = (
+        generator.get_conditional_curves_from_fit(
+            params=params,
+            r_min=rad_min,
+            r_max=rad_max,
+            r_points=300,
+            step=2,
+        )
+    )
+    kprint("sample_rad.shape: ", sample_rad.shape)
+    kprint("l_vals.shape: ", l_vals.shape)
+    kprint("pi_cond.shape: ", pi_cond.shape)
+    kprint("pr_sample.shape: ", pr_sample.shape)
+
+    # --- fit Π(l|r) ---
+    data = generator.gen_set(radiuses)
+    kprint("Finish gen_set")
+    gfitter = GammaFitter()
+    gfitter.fit(data)
+    kprint("Finish fit")
+
+    x = np.linspace(0, rad_max, 300)
+    y_pl_fit = gfitter.pdf(x)
 
     # --- mask zeros in Π(l|r) so they are transparent ---
     pi_masked = np.ma.masked_where(pi_cond == 0, pi_cond)
@@ -47,11 +80,27 @@ def plot_distributions(path_to_save: str):
     )
 
     # --- lower schematic part: scaled P(r), y < 0 ---
-    pr_height = 0.25 * float(l_vals.max())
-    y_pr = -(pr_fit / pr_fit.max()) * pr_height
+    coeff = 0.5
+    lower_height = coeff * float(l_vals.max())
+
+    # общий масштаб для обеих плотностей
+    global_max = max(pr_fit.max(), y_pl_fit.max())
+    scale = lower_height / global_max
+
+    y_pr = -scale * pr_fit
+    y_pl_pr = -scale * y_pl_fit
+
+    ax.fill_between(x, y_pl_pr, 0, color="tab:blue", alpha=0.25)
+    ax.plot(
+        x,
+        y_pl_pr,
+        label=r"$\Pi(l)$",
+        linewidth=2.5,
+        color="tab:blue",
+    )
 
     ax.fill_between(r_fit, y_pr, 0.0, color="orange", alpha=0.35, linewidth=0)
-    ax.plot(r_fit, y_pr, color="darkorange", linewidth=1.5)
+    ax.plot(r_fit, y_pr, color="darkorange", linewidth=1.5, label=r"$P(r)$")
 
     # divider / x-axis at y = 0
     ax.axhline(0.0, color="black", linewidth=1.2)
@@ -61,9 +110,10 @@ def plot_distributions(path_to_save: str):
     y_xlabel = -0.10 * float(l_vals.max())
 
     # --- limits ---
-    x_start = 0.03
+    # x_start = 0.03
+    x_start = 0.0
     ax.set_xlim(x_start, float(sample_rad.max()))
-    ax.set_ylim(float(y_pr.min()) * 1.15, float(l_vals.max()) * 1.03)
+    ax.set_ylim(float(y_pr.min()) * 1.15, 0.5)  # float(l_vals.max()) * 1.03)
 
     # --- x axis ---
     xticks = np.linspace(float(sample_rad.min()), float(sample_rad.max()), 5)
@@ -128,6 +178,14 @@ def plot_distributions(path_to_save: str):
         va="center",
         ha="center",
     )
+    # --- legend
+    ax.legend(
+        loc="upper left",
+        fontsize=24,
+        frameon=False,
+        fancybox=False,
+        framealpha=0.9,
+    )
 
     # --- colorbar ---
     cbar = fig.colorbar(mesh, ax=ax, fraction=0.046, pad=0.06)
@@ -143,47 +201,6 @@ def plot_distributions(path_to_save: str):
         join(path_to_save, "figs", "pilr_2d.png"),
         dpi=300,
         bbox_inches="tight",
-        facecolor="white",
-    )
-
-    plt.figure()
-    with open(join(path_to_save, "pi_l_gamma_fitter.pkl"), "rb") as f:
-        gfitter = pickle.load(f)
-    x = np.linspace(0, 0.32, 300)
-    y = gfitter.pdf(x)
-
-    plt.plot(x, y, label=r"$\Pi(l)$", linewidth=2.5, color="tab:blue")
-    plt.fill_between(x, y, 0, color="tab:blue", alpha=0.25)
-
-    plt.tick_params(axis="both", labelsize=16, length=6, width=1.2)
-
-    plt.xlim(left=0)
-    plt.ylim(bottom=0)
-
-    # plt.legend(fontsize=16, frameon=False)
-
-    ax = plt.gca()
-
-    ax.set_xlabel(r"$l$ ($\AA$)", fontsize=20)
-    ax.set_ylabel(r"$\Pi(l)$", fontsize=20)
-
-    ax.xaxis.set_label_coords(1.07, -0.05)
-    ax.yaxis.set_label_coords(-0.05, 0.98)
-
-    plt.subplots_adjust(left=0.16, bottom=0.16)
-
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-
-    plt.savefig(
-        join(path_to_save, "figs", "pil_2d.svg"),
-        # bbox_inches="tight",
-        facecolor="white",
-    )
-    plt.savefig(
-        join(path_to_save, "figs", "pil_2d.png"),
-        dpi=300,
-        # bbox_inches="tight",
         facecolor="white",
     )
 
