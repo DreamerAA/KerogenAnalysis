@@ -110,8 +110,6 @@ def calculateEulerPNM(path_to_pnm: str):
     for j, n in enumerate(nums):
         fn = path_to_pnm + f"num={n}_500_500_500"
         radiuses, throat_lengths = Reader.read_pnm_data(fn, 1, 0)
-        ll, _ = Reader.read_pnm_linklist(fn + "_link1.dat")
-
         V = len(radiuses)
         E = len(throat_lengths)
         ne = V - E

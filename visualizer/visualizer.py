@@ -13,7 +13,11 @@ from vtkmodules.vtkCommonCore import vtkDoubleArray, vtkPoints
 from vtkmodules.vtkCommonDataModel import vtkCellArray, vtkPolyData, vtkLine
 from vtkmodules.vtkFiltersCore import vtkGlyph3D, vtkTubeFilter
 from vtkmodules.vtkFiltersModeling import vtkOutlineFilter
-from vtkmodules.vtkFiltersSources import vtkLineSource, vtkSphereSource
+from vtkmodules.vtkFiltersSources import (
+    vtkLineSource,
+    vtkSphereSource,
+    vtkCubeSource,
+)
 from vtkmodules.vtkInteractionStyle import vtkInteractorStyleTrackballCamera
 from vtkmodules.vtkRenderingAnnotation import vtkCubeAxesActor
 from vtkmodules.vtkRenderingCore import (
@@ -154,6 +158,7 @@ class Visualizer:
         size_edge=0.02,
         save_pos_path='',
         scale="full_by_1",
+        plot_box=True,
         **kwargs,
     ):
         renderer = vtkRenderer()
@@ -186,6 +191,10 @@ class Visualizer:
         )
 
         Visualizer.add_img_actor(renderer, img, False, bbox, isovalue=isovalue)
+
+        if plot_box:
+            outfit_actor = Visualizer.create_box_actor(bbox)
+            renderer.AddActor(outfit_actor)
 
         renWin = vtkRenderWindow()
         renWin.AddRenderer(renderer)
@@ -455,7 +464,7 @@ class Visualizer:
 
         glyph = vtkActor()
         glyph.SetMapper(glyphMapper)
-        glyph.GetProperty().SetDiffuseColor(0.96, 0.95, 0.73)
+        glyph.GetProperty().SetDiffuseColor(0.36, 0.16, 0.53)
         glyph.GetProperty().SetSpecular(0.3)
         glyph.GetProperty().SetSpecularPower(30)
 
@@ -486,7 +495,8 @@ class Visualizer:
         Tubes.SetInputData(edgeData)
         Tubes.SetRadius(size_edge)
         # Tubes.SetVaryRadiusToVaryRadiusByScalar()
-        Tubes.SetRadiusFactor(1.0)
+        # Tubes.SetRadiusFactor(size_edge)
+        # Tubes.SetRadiusFactor(1.0)
         #
         throat_mapper = vtkPolyDataMapper()
         throat_mapper.SetInputConnection(Tubes.GetOutputPort())
@@ -497,9 +507,9 @@ class Visualizer:
         throat_actor = vtkActor()
         throat_actor.SetMapper(throat_mapper)
         # throat_actor.GetProperty().SetColor(colorsGetColor3d("Blue"))
-        throat_actor.GetProperty().SetDiffuseColor(0.61, 0.76, 0.74)
-        throat_actor.GetProperty().SetSpecular(0.3)
-        throat_actor.GetProperty().SetSpecularPower(30)
+        throat_actor.GetProperty().SetDiffuseColor(0.18, 0.53, 0.67)
+        throat_actor.GetProperty().SetSpecular(0.15)
+        throat_actor.GetProperty().SetSpecularPower(20)
 
         ren.AddActor(glyph)
         ren.AddActor(throat_actor)
@@ -611,7 +621,7 @@ class Visualizer:
         lut.SetTableRange(0, 1)
         lut.SetScaleToLinear()
         lut.Build()
-        lut.SetTableValue(0, 0.93, 0.42, 0.35, 1)
+        lut.SetTableValue(0, 0.75, 0.64, 0.48, 1)
         lut.SetTableValue(1, 1, 0, 1, 1)
 
         mapper = vtk.vtkPolyDataMapper()
@@ -847,6 +857,32 @@ class Visualizer:
 
     @staticmethod
     def create_box_actor(box: BoundingBox) -> vtkActor:
+        cube = vtkCubeSource()
+        cube.SetBounds(
+            box.xb_.min_,
+            box.xb_.max_,
+            box.yb_.min_,
+            box.yb_.max_,
+            box.zb_.min_,
+            box.zb_.max_,
+        )
+
+        outline = vtkOutlineFilter()
+        outline.SetInputConnection(cube.GetOutputPort())
+
+        mapper = vtkPolyDataMapper()
+        mapper.SetInputConnection(outline.GetOutputPort())
+
+        actor = vtkActor()
+        actor.SetMapper(mapper)
+        actor.GetProperty().SetColor(0.0, 0.0, 0.0)
+        actor.GetProperty().SetLineWidth(3.0)
+        actor.GetProperty().LightingOff()
+
+        return actor
+
+    @staticmethod
+    def create_box_actor2(box: BoundingBox) -> vtkActor:
         lineSource = vtkLineSource()
         lineSource.SetPoint1(box.min())
         lineSource.SetPoint2(box.max())
@@ -858,7 +894,8 @@ class Visualizer:
         outlineMapper.SetInputConnection(outline.GetOutputPort())
         outlineActor = vtkActor()
         outlineActor.SetMapper(outlineMapper)
-        outlineActor.GetProperty().SetColor(colors.GetColor3d('Brown'))
+        outlineActor.GetProperty().SetColor(colors.GetColor3d('Black'))
+        outlineActor.GetProperty().SetLineWidth(3.0)
         return outlineActor
 
     @staticmethod

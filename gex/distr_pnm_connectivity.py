@@ -56,7 +56,7 @@ def build_distributions(paths: List[Tuple[str, str]]) -> None:
 
         mresult = {}
         for step, file in sorted_lfiles:
-            res, _ = Reader.read_pnm_linklist(join(path_to_pnms, file))
+            res = Reader.read_pnm_linklist(join(path_to_pnms, file))
             mask = np.logical_and(res[:, 0] > 0, res[:, 1] > 0)
             res = res[mask, :]
             graph = nx.Graph()

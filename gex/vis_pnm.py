@@ -12,10 +12,6 @@ import json
 from scipy import ndimage
 import subprocess
 
-path = Path(realpath(__file__))
-parent_dir = str(path.parent.parent.absolute())
-sys.path.append(parent_dir)
-
 from base.boundingbox import BoundingBox, Range
 from base.reader import Reader
 from visualizer.visualizer import Visualizer
@@ -51,6 +47,8 @@ def read_and_draw_pnm(pnm_path: str, path_to_img: str):
     float_img = np.pad(float_img, [(1, 1), (1, 1), (1, 1)], 'maximum')
     float_img[:, (float_img.shape[1] // 2) :, :] = 10.0 * float_img.max()
 
+    rad = tl[:, 0].mean()
+
     Visualizer.draw_pnm_and_img(  # type: ignore
         graph,
         float_img,
@@ -58,7 +56,7 @@ def read_and_draw_pnm(pnm_path: str, path_to_img: str):
         0.11,
         bbox,
         size_node=0.8,
-        size_edge=0.000003,
+        size_edge=rad / 2,
         colors_data=colors_data,
         scales_data=scales_data,
         scale='non',
@@ -68,10 +66,15 @@ def read_and_draw_pnm(pnm_path: str, path_to_img: str):
 
 if "__main__" == __name__:
     main_path = "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/"
-    main_name = "result-img-num=25000_time-ps=50_bbox=(x=(0.000-6.231)_y=(0.590-6.821)_z=(3.392-9.623))_resolution=0.012461900"
 
-    fimg_path = join(main_path, "float_images", main_name + ".npy")
-    pnm_prefix = join(main_path, "pnm", main_name)
+    # main_name = "num=25000_time-ps=50_bbox=(x=(1.489-4.742)_y=(2.078-5.332)_z=(4.881-8.134))_resolution=0.013015000"
+    # main_name = "num=551025000_time-ps=1102050_bbox=(x=(1.489-4.742)_y=(2.078-5.332)_z=(4.881-8.134))_resolution=0.013015000"
+    main_name = "num=1102025000_time-ps=2204050_bbox=(x=(1.489-4.742)_y=(2.078-5.332)_z=(4.881-8.134))_resolution=0.013015000"
+
+    fimg_path = join(
+        main_path, "float_images", "result-img-" + main_name + ".npy"
+    )
+    pnm_prefix = join(main_path, "pnm", "pnm-" + main_name)
 
     parser = argparse.ArgumentParser()
     parser.add_argument(

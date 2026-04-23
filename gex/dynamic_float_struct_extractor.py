@@ -45,7 +45,8 @@ def extanded_struct_extr(
     path_to_data: str,
     struct_file_name: str,
     indexes: List[int],
-    ref_size: int,
+    ref_size: int = 500,
+    dev: float = 2.0,
 ) -> None:
     path_to_structure = join(path_to_data, struct_file_name)
     path_to_save_fimg = join(path_to_data, "float_images")
@@ -64,9 +65,11 @@ def extanded_struct_extr(
     kprint(f"Reading finished! Elapsed time: {time.time() - start_time}s")
 
     for num, time_ps, atoms, size in structures:
-
-        bbox = Segmentator.cut_cell(size, 2)
-        resolution = np.array([s for s in size]).min() / ref_size
+        bbox = Segmentator.cut_cell(size, dev)
+        resolution = (
+            np.array([bbox.xb_.diff(), bbox.yb_.diff(), bbox.zb_.diff()]).mean()
+            / ref_size
+        )
         img_size = Segmentator.calc_image_size(
             bbox.size(), reference_size=ref_size, by_min=True
         )
@@ -151,5 +154,6 @@ if __name__ == '__main__':
         args.def_path,
         args.structure_file_name,
         indexes,
-        500,
+        ref_size=250,
+        dev=4.0,
     )

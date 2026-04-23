@@ -93,7 +93,7 @@ if __name__ == '__main__':
 
         pnm_pref = join(pnm_path, "pnm-" + file[11:-4])
         if isfile(pnm_pref + "_node1.dat"):
-            print(f"Skip {num}")
+            kprint(f"Skip {num}")
             continue
 
         jconfig["input_data"]["filename"] = path_to_images
@@ -132,4 +132,3 @@ if __name__ == '__main__':
             break
         else:
             print(f"Sucssess: {pnm_pref}")
-            print(f"go next to {i + 1} from {len(onlyfiles)}")

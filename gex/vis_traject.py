@@ -12,16 +12,14 @@ import pandas as pd
 import seaborn as sns
 from skimage import measure
 
-path = Path(realpath(__file__))
-parent_dir = str(path.parent.parent.absolute())
-sys.path.append(parent_dir)
-
 
 from base.trajectory import Trajectory
 from visualizer.visualizer import Visualizer, WrapMode
 
 
-def visualize_dist_trajectory(traj_path: str, num: int, traps_path: str = "") -> None:
+def visualize_dist_trajectory(
+    traj_path: str, num: int, traps_path: str = ""
+) -> None:
     trajectories = Trajectory.read_trajectoryes(traj_path)
 
     use_clusters = len(traps_path) != 0
@@ -30,7 +28,6 @@ def visualize_dist_trajectory(traj_path: str, num: int, traps_path: str = "") ->
         with open(traps_path, 'rb') as f:
             trajectories[num].traps = pickle.load(f)
 
-    
     print(trajectories[num].points.shape)
     Visualizer.draw_trajectoryes(
         [trajectories[num]],
@@ -49,10 +46,30 @@ if __name__ == '__main__':
     type = "type1matrix"
     temp = "300K"
     el = "h2"
-    traps_type = "Structural" # "Probabilistic" "Structural"
-    
+    traps_type = "SIB"
     num = 1
-    traj_path = prefix + f"{type}/{temp}/{el}/trj.gro"
-    traps_path = prefix + f"{type}/{temp}/{el}/traps/{traps_type}/traps_{num}.pickle"
-    visualize_dist_trajectory(traj_path, num)
+
+    trj_path = prefix + f"{type}/{temp}/{el}/trj.gro"
+
+    traps_path = (
+        prefix + f"{type}/{temp}/{el}/traps/{traps_type}/traps_{num}.pickle"
+    )
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--trj_path',
+        type=str,
+        default=trj_path,
+    )
+    parser.add_argument(
+        '--traps_path',
+        type=str,
+        default=traps_path,
+    )
+    args = parser.parse_args()
+
+    trj_path = args.trj_path
+    traps_path = args.traps_path
+
+    visualize_dist_trajectory(trj_path, num, traps_path)
     # visualize_dist_trajectory(traj_path, num, traps_path)
