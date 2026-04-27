@@ -17,7 +17,7 @@ from base.reader import Reader
 from visualizer.visualizer import Visualizer
 
 
-def read_and_draw_pnm(pnm_path: str, path_to_img: str):
+def read_and_draw_pnm_and_img(pnm_path: str, path_to_img: str):
     r, tl, ll, positions = Reader.read_pnm_ext_data(pnm_path)
 
     colors_data = {
@@ -49,7 +49,7 @@ def read_and_draw_pnm(pnm_path: str, path_to_img: str):
 
     rad = tl[:, 0].mean()
 
-    Visualizer.draw_pnm_and_img(  # type: ignore
+    Visualizer.draw_graph_and_img(  # type: ignore
         graph,
         float_img,
         node_pos,
@@ -100,7 +100,7 @@ if "__main__" == __name__:
 
     # run_extractor(ker_prefix, args.extractor_path, args.config_extractor_path)
 
-    read_and_draw_pnm(
+    read_and_draw_pnm_and_img(
         args.pnm_prefix,
         args.fimg_path,
     )

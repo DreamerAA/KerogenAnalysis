@@ -159,12 +159,17 @@ class Trajectory:
         Trajectory.msd_by_points(self.points_without_periodic), self.times
 
     def msd_average_time(self):
-        cp = self.points_without_periodic.shape[0]
         points = self.points_without_periodic
-        amsd = np.zeros(shape=(cp, cp), dtype=np.float32)
-        for i in range(cp):
-            amsd[i, : (cp - i)] = Trajectory.msd_by_points(points[i:, :])
-        return np.sum(amsd, axis=0) / np.arange(cp, 0, -1)
+        n = points.shape[0]
+
+        msd = np.zeros(n, dtype=np.float64)
+
+        for lag in range(n):
+            dr = points[lag:] - points[: n - lag]
+            sq_disp = np.sum(dr * dr, axis=1)
+            msd[lag] = np.mean(sq_disp)
+
+        return msd.astype(np.float32)
 
     @staticmethod
     def msd_by_points(points):

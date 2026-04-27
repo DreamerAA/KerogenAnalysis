@@ -148,11 +148,10 @@ class Visualizer:
         plt.yticks(None, fontsize=18)
         return degree, hist
 
-    def draw_pnm_and_img(
+    def draw_graph_and_img(
         G,
         img,
         node_pos_corr,
-        isovalue,
         bbox,
         size_node=0.25,
         size_edge=0.02,
@@ -190,7 +189,13 @@ class Visualizer:
             **kwargs,
         )
 
-        Visualizer.add_img_actor(renderer, img, False, bbox, isovalue=isovalue)
+        Visualizer.add_img_actor(
+            renderer,
+            img,
+            False,
+            bbox,
+            **kwargs,
+        )
 
         if plot_box:
             outfit_actor = Visualizer.create_box_actor(bbox)
@@ -458,8 +463,8 @@ class Visualizer:
         glyphMapper = vtkPolyDataMapper()
         glyphMapper.SetInputConnection(glyphPoints.GetOutputPort())
         glyphMapper.SetScalarModeToUsePointFieldData()
-        # glyphMapper.SelectColorArray(pore_data.GetName())
-        # glyphMapper.SetLookupTable(color_transfer)
+        glyphMapper.SelectColorArray(pore_data.GetName())
+        glyphMapper.SetLookupTable(color_transfer)
         glyphMapper.Update()
 
         glyph = vtkActor()
@@ -631,6 +636,7 @@ class Visualizer:
 
         actor = vtk.vtkActor()
         actor.SetMapper(mapper)
+        actor.GetProperty().SetOpacity(kwargs["img_opacity"])
         return actor
 
     @staticmethod

@@ -1,19 +1,19 @@
 import argparse
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 import os
 
-import time
+from itertools import repeat
 from os.path import join
 
+from pathlib import Path
+import time
 from typing import List
 
 from matplotlib import pyplot as plt
 import numpy as np
-from base.kerogendata import KerogenData
-from base.periodizer import Periodizer
-from base.reader import Reader
 from base.trajectory import Trajectory
 from utils.utils import kprint
-from processes.segmentaion import Segmentator
 
 additional_radius = 0.0
 
@@ -35,6 +35,12 @@ ext_radius = {
 }
 
 
+@dataclass
+class RMSDResult:
+    rmsd: np.ndarray
+    t: np.ndarray
+
+
 def get_size(type_id: int) -> float:
     return atom_real_sizes[type_id]
 
@@ -43,9 +49,7 @@ def get_ext_size(type_id: int) -> float:
     return ext_radius[type_id]
 
 
-def extract_mean_displacement(
-    trajectories, traj_stride: int = 1
-) -> tuple[np.ndarray, np.ndarray]:
+def extract_mean_displacement(trajectories, traj_stride: int = 1) -> RMSDResult:
     a_msd = []
     a_t = []
 
@@ -58,19 +62,25 @@ def extract_mean_displacement(
 
     msd_mean = np.mean(np.stack(a_msd, axis=0), axis=0)
     rmsd = np.sqrt(msd_mean)
+    # rmsd = msd_mean
 
-    return rmsd, a_t[0]
+    return RMSDResult(rmsd, a_t[0])
 
 
 def plot_corrfunc_and_md(
     dt,
     C_t,
-    ddata: tuple[np.ndarray, np.ndarray],
+    trj_msd_list: List[tuple[RMSDResult, str]],
     save_path: str | None = None,
     pore_mode: bool = False,
+    max_t: float = 1.5,
 ) -> None:
     dt = np.asarray(dt, dtype=float)
     C_t = np.asarray(C_t, dtype=float)
+    mask = dt <= max_t
+    mask[0] = False
+    dt = dt[mask]
+    C_t = C_t[mask]
 
     default_colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
     color_ct = default_colors[0]
@@ -95,27 +105,42 @@ def plot_corrfunc_and_md(
     ax1.set_ylim(bottom=0)
     # ax1.grid(True, linestyle="--", alpha=0.4)
 
+    lines = line1
+    styles = ['-', ':', '--', '-.', '.']
     ax2 = ax1.twinx()
-    line2 = ax2.plot(
-        ddata[1],
-        ddata[0],
-        linewidth=3.0,
-        color=color_md,
-        label=r"$\sqrt{MSD(t)}$",
-    )
-    ax2.set_ylabel(
-        r"$\sqrt{\mathrm{MSD}(t)}$, $\AA$", fontsize=16, color=color_md
-    )
+    for res, prefix in trj_msd_list:
+        label = prefix + " "
+        label += r"$RMSD(t)$"
+
+        r = res.rmsd
+        t = res.t
+
+        mask = t <= max_t
+        mask[0] = False
+        t = t[mask]
+        r = r[mask]
+
+        line = ax2.plot(
+            t,
+            r,
+            linewidth=3.0,
+            color=color_md,
+            label=label,
+            linestyle=styles.pop(0),
+        )
+        lines += line
+
+    ax2.set_yscale("log")
+    ax2.set_ylabel(r"$\mathrm{RMSD}(t)$, $\AA$", fontsize=16, color=color_md)
     ax2.tick_params(axis="both", labelsize=12)
     ax2.tick_params(axis="y", labelcolor=color_md)
     ax2.set_ylim(bottom=0)
 
-    lines = line1 + line2
     labels = [line.get_label() for line in lines]
     ax1.legend(
         lines,
         labels,
-        loc="lower right",
+        loc="center right",
         # bbox_to_anchor=(1.02, 1.0),
         borderaxespad=0.0,
         fontsize=16,
@@ -130,100 +155,123 @@ def plot_corrfunc_and_md(
     plt.show()
 
 
+def correlation_average_time(
+    image_infos, load_img, ct_save_path: str | Path, num_workers: int = 4
+):
+    """
+    Time-averaged autocorrelation function:
+
+        C(tau_k) = mean_i [ sum_x I_i(x) I_{i+k}(x) / V ]
+
+    image_infos:
+        list of tuples (time_ps, img_file_name)
+
+    load_img:
+        function that loads image by filename
+
+    save_path:
+        path where ct, dt array will be saved
+    """
+    image_infos = sorted(image_infos, key=lambda x: x[0])
+
+    times_ps = np.array([info[0] for info in image_infos], dtype=np.float64)
+    img_files = [info[1] for info in image_infos]
+
+    n = len(image_infos)
+    dt = (times_ps - times_ps[0]) * 1e-6
+    print("start dt = ", dt[:5])
+    print("end dt = ", dt[-5:])
+
+    if os.path.exists(ct_save_path):
+        C_t = np.load(ct_save_path)
+    else:
+        C_t = np.full(n, np.nan, dtype=np.float64)
+
+    def process(chunk_i, lag):
+        result = np.full(len(chunk_i), np.nan, dtype=np.float64)
+        for local_idx, i in enumerate(chunk_i):
+            img_i = load_img(img_files[i])
+            image_size = float(np.sum(img_i))
+            img_j = load_img(img_files[i + lag])
+            result[local_idx] = np.sum(img_i * img_j) / image_size
+        return result
+
+    for lag in range(n):
+        start_time = time.time()
+        if not np.isnan(C_t[lag]):
+            kprint(f"Skip lag: {lag} from {n}, C: {C_t[lag]}")
+            continue
+        xdata = np.array(list(range(n - lag)), dtype=np.int32)
+        values = np.zeros(shape=(n - lag), dtype=np.float64)
+
+        if num_workers == 0:
+            values = process(xdata, lag)
+        else:
+            chunk_size = ((n - lag) // num_workers) + 1
+            chunks = [
+                xdata[i : min(i + chunk_size, len(xdata))]
+                for i in range(0, len(xdata), chunk_size)
+            ]
+            with ThreadPoolExecutor(max_workers=num_workers) as executor:
+                chunk_results = list(executor.map(process, chunks, repeat(lag)))
+                values = np.concatenate(chunk_results)
+
+        C_t[lag] = np.mean(values)
+
+        # Сохраняем промежуточное состояние после каждого lag
+        np.save(ct_save_path, C_t)
+
+        kprint(
+            f"Ready lag: {lag} from {n}, C: {C_t[lag]} in {time.time() - start_time:.2f} sec"
+        )
+
+    return dt, C_t
+
+
 def extanded_struct_extr(
     path_to_data: str,
-    struct_file_name: str,
-    indexes: List[int],
+    path_to_trjs: list[tuple[str, str]],
+    template: str,
+    indexes: list[int],
+    times: list[int],
     ref_size: int,
+    prefix: str,
 ) -> None:
-    path_to_structure = join(path_to_data, struct_file_name)
-    path_to_save_img = join(path_to_data, "images")
+    path_to_img = join(path_to_data, "images")
     path_to_save_fig = join(path_to_data, "figs", "corrfunc+msd.svg")
-    path_to_trj = join(path_to_data, "trj.gro")
 
-    start_time = time.time()
-    structures = Reader.read_structures_by_num(path_to_structure, indexes)
-    print(f" -- Count structures: {len(structures)}")
-    print(f" -- Reading finished! Elapsed time: {time.time() - start_time}s")
-
-    image_infos: tuple[int, str] = []
-    for num, time_ps, atoms, size in structures:
-        start_time = time.time()
-
-        bbox = Segmentator.cut_cell(size, 2)
-        resolution = np.array([s for s in size]).min() / ref_size
-        img_size = Segmentator.calc_image_size(
-            bbox.size(), reference_size=ref_size, by_min=True
-        )
-        binarized_file_name = join(
-            path_to_save_img,
-            f"result-img-num={num}_time-ps={time_ps}_bbox={bbox._short_str()}_resolution={resolution:.9f}.npy",
-        )
-        image_infos.append((time_ps, binarized_file_name))
-
-        # print(f" --- Current num: {num}")
-        # print(f" --- Box size: {bbox.size()}")
-
-        if os.path.isfile(binarized_file_name):
-            kprint(f"Skip and load image with num={num}")
-            with open(binarized_file_name, 'rb') as f:  # type: ignore
-                img = np.load(f)  # type: ignore
-        else:
-            kprint(f"Run segmentation for num={num}")
-            start_time = time.time()
-            kerogen_data = KerogenData(None, atoms, bbox)  # type: ignore
-            if not kerogen_data.checkPeriodization():
-                Periodizer.periodize(kerogen_data)
-
-            segmentator = Segmentator(
-                kerogen_data,
-                img_size,
-                size_data=get_size,
-                radius_extention=get_ext_size,
-                partitioning=2,
-            )
-            img = 1 - segmentator.binarize()
-            np.save(binarized_file_name, img)  # type: ignore
-
-            kprint(
-                f"Binarization struct {num} is finished! Elapsed time: {time.time() - start_time}s"
-            )
+    filenames = [
+        join(path_to_img, template.format(num=n, time=t))
+        for n, t in zip(indexes, times)
+    ]
+    image_infos = list(zip(times, filenames))
 
     pore_mode = True
 
     def load_img(file_name: str) -> np.ndarray:
-
-        with open(file_name, 'rb') as f:  # type: ignore
-            img = np.load(f)  # type: ignore
+        if not os.path.isfile(file_name):
+            raise FileNotFoundError(file_name)
+        img = np.load(file_name, mmap_mode="r")  # type: ignore
         if pore_mode:
             img = 1 - img
+        if ref_size not in img.shape:
+            raise ValueError(f"ref_size {ref_size} not in {img.shape}")
         return img.astype(np.int8)
 
-    start_info = image_infos[0]
-    start_time_ps = start_info[0]
-    first_step_img = load_img(start_info[1])
-    image_size = float(np.sum(first_step_img, dtype=np.float32))
-
-    assert np.all(first_step_img <= 1)
-
-    dt = []
-    C_t = []
-    for info in image_infos:
-        time_ps, img_file_name = info
-        img_t = load_img(img_file_name)
-        assert np.all(img_t <= 1)
-        C_ti = np.sum(first_step_img * img_t) / image_size
-        C_t.append(C_ti)
-        dt.append((time_ps - start_time_ps) * 1e-6)
+    c_t_save_path = join(path_to_data, prefix + "_ct.npy")
+    dt, C_t = correlation_average_time(image_infos, load_img, c_t_save_path, 8)
     kprint(f"C(t) min time {dt[0]}, max time {dt[-1]}")
 
-    trajectories = Trajectory.read_trajectoryes(path_to_trj)
-    ddata = extract_mean_displacement(trajectories, traj_stride=2)
+    trj_msd_list: list[RMSDResult, str] = []
+    for ptrj, gas in path_to_trjs:
+        trajectories = Trajectory.read_trajectoryes(ptrj)
+        res = extract_mean_displacement(trajectories, traj_stride=1)
+        trj_msd_list.append((res, gas))
 
     plot_corrfunc_and_md(
         dt=dt,
         C_t=C_t,
-        ddata=ddata,
+        trj_msd_list=trj_msd_list,
         save_path=path_to_save_fig,
         pore_mode=pore_mode,
     )
@@ -237,39 +285,71 @@ if __name__ == '__main__':
         type=str,
         default="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/h2/",
     )
+    def_template = (
+        "result-img-num={num}_time-ps={time}"
+        "_bbox=(x=(0.000-6.231)_y=(0.590-6.821)_z=(3.392-9.623))"
+        "_resolution=0.024923800.npy"
+    )
 
     parser.add_argument(
-        '--structure_file_name',
+        '--path_temp_case',
         type=str,
-        default="type1.h2.300.gro",
+        default="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/",
+    )
+
+    parser.add_argument(
+        '--template',
+        type=str,
+        default=def_template,
     )
 
     args = parser.parse_args()
 
+    full_count_steps = 6612
+
+    start_time = 50
+    step_time_size = 500
+
     start_step = 25000
     full_count_steps = 6612
     step_size = 250000
-    last_step = full_count_steps * step_size + start_step
 
-    count_slices = 200
+    last_step = full_count_steps * step_size + start_step
+    last_time_step = full_count_steps * step_time_size + start_time
+
+    count_slices = 500
+
+    def gen_list(start, step_size, step, count):
+        return [start + step_size * i * step for i in range(count)]
 
     mode = "all"
+    # mode = "part"
     if mode == "all":
         step = int(full_count_steps / count_slices)
-        indexes = [
-            start_step + step_size * i * step for i in range(count_slices)
-        ]
+        indexes = gen_list(start_step, step_size, step, count_slices)
+        times = gen_list(start_time, step_time_size, step, count_slices)
         if last_step not in indexes:
             indexes.append(last_step)
+            times.append(last_time_step)
     else:
         step = 1
-        indexes = [
-            start_step + step_size * i * step for i in range(count_slices)
-        ]
+        indexes = gen_list(start_step, step_size, step, count_slices)
+        times = gen_list(start_time, step_time_size, step, count_slices)
+
+    trj_paths = [
+        (
+            join(args.path_temp_case, gas, "trj.gro"),
+            sgas,
+        )
+        for gas, sgas in [("ch4", r"$CH_4$"), ("h2", r"$H_2$")]
+    ]
 
     extanded_struct_extr(
         args.def_path,
-        args.structure_file_name,
+        trj_paths,
+        args.template,
         indexes,
+        times,
         250,
+        f"mode={mode}_count-slices={count_slices}",
     )

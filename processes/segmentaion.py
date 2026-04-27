@@ -170,17 +170,18 @@ class Segmentator:
 
             return (~atom_mask).reshape(Ny, Nz).astype(np.int8)
 
-        # for ix in range(self.img_size[0]):
-        #     img[ix] = process_slice(ix)
-        #     print(f" --- Slice {ix}-x finished!")
-
-        n = min(num_workers, self.img_size[0])
-        with ThreadPoolExecutor(max_workers=n) as executor:
-            for ix, result in enumerate(
-                executor.map(process_slice, range(self.img_size[0]))
-            ):
-                img[ix] = result
+        if num_workers == 0:
+            for ix in range(self.img_size[0]):
+                img[ix] = process_slice(ix)
                 print(f" --- Slice {ix}-x finished!")
+        else:
+            n = min(num_workers, self.img_size[0])
+            with ThreadPoolExecutor(max_workers=n) as executor:
+                for ix, result in enumerate(
+                    executor.map(process_slice, range(self.img_size[0]))
+                ):
+                    img[ix] = result
+                    print(f" --- Slice {ix}-x finished!")
 
         return img
 

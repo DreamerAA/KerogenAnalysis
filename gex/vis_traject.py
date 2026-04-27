@@ -21,16 +21,19 @@ def visualize_dist_trajectory(
     traj_path: str, num: int, traps_path: str = ""
 ) -> None:
     trajectories = Trajectory.read_trajectoryes(traj_path)
+    trj = trajectories[num]
+    cp = trj.points.shape[0]
+    trj.cut(cp // 2)
 
     use_clusters = len(traps_path) != 0
 
     if use_clusters:
         with open(traps_path, 'rb') as f:
-            trajectories[num].traps = pickle.load(f)
+            trj.traps = pickle.load(f)
 
-    print(trajectories[num].points.shape)
+    print(trj.points.shape)
     Visualizer.draw_trajectoryes(
-        [trajectories[num]],
+        [trj],
         wrap_mode=WrapMode.EMPTY,
         periodic=False,
         radius=0.15,
@@ -47,7 +50,7 @@ if __name__ == '__main__':
     temp = "300K"
     el = "h2"
     traps_type = "SIB"
-    num = 1
+    num = 4
 
     trj_path = prefix + f"{type}/{temp}/{el}/trj.gro"
 
@@ -71,5 +74,5 @@ if __name__ == '__main__':
     trj_path = args.trj_path
     traps_path = args.traps_path
 
-    visualize_dist_trajectory(trj_path, num, traps_path)
-    # visualize_dist_trajectory(traj_path, num, traps_path)
+    visualize_dist_trajectory(trj_path, num)
+    # visualize_dist_trajectory(trj_path, num, traps_path)
