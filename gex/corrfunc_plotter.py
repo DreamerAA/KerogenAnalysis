@@ -73,7 +73,7 @@ def plot_corrfunc_and_md(
     trj_msd_list: List[tuple[RMSDResult, str]],
     save_path: str | None = None,
     pore_mode: bool = False,
-    max_t: float = 1.5,
+    max_t: float = 2.8,
 ) -> None:
     dt = np.asarray(dt, dtype=float)
     C_t = np.asarray(C_t, dtype=float)
@@ -95,14 +95,13 @@ def plot_corrfunc_and_md(
         color=color_ct,
         label=r"$C(t)$",
     )
-    y_name = r"Autocorrelation $C(t)$ of "
+    y_name = r"Autocorrelation $C(t)$ of pore space"
     y_name += " pore" if pore_mode else " solid"
     ax1.set_xlabel(r"Time delay, $\mu$s", fontsize=16)
     ax1.set_ylabel(y_name, fontsize=16)
     ax1.tick_params(axis="both", labelsize=12)
     ax1.tick_params(axis="y", labelcolor=color_ct)
-    ax1.set_xlim(left=0)
-    ax1.set_ylim(bottom=0)
+
     # ax1.grid(True, linestyle="--", alpha=0.4)
 
     lines = line1
@@ -131,10 +130,19 @@ def plot_corrfunc_and_md(
         lines += line
 
     ax2.set_yscale("log")
+    ax2.set_xscale("log")
+    ax1.set_xscale("log")
     ax2.set_ylabel(r"$\mathrm{RMSD}(t)$, $\AA$", fontsize=16, color=color_md)
     ax2.tick_params(axis="both", labelsize=12)
     ax2.tick_params(axis="y", labelcolor=color_md)
-    ax2.set_ylim(bottom=0)
+
+    positive_r = []
+    for res, prefix in trj_msd_list:
+        r = np.asarray(res.rmsd, dtype=float)
+        positive_r.extend(r[np.isfinite(r) & (r > 0)])
+
+    if positive_r:
+        ax2.set_ylim(bottom=min(positive_r) * 0.8)
 
     labels = [line.get_label() for line in lines]
     ax1.legend(

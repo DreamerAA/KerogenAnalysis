@@ -8,6 +8,34 @@ import sys
 from scipy.stats import poisson
 from base.boundingbox import BoundingBox
 from utils.types import NPFArray, NPIArray, NPBArray
+import re
+
+
+def get_pattern_bbox():
+    return re.compile(
+        r"bbox=\("
+        r"x=\((?P<x_min>[\d.]+)-(?P<x_max>[\d.]+)\)_"
+        r"y=\((?P<y_min>[\d.]+)-(?P<y_max>[\d.]+)\)_"
+        r"z=\((?P<z_min>[\d.]+)-(?P<z_max>[\d.]+)\)"
+        r"\)_resolution=(?P<resolution>[\d.]+).npy"
+    )
+
+
+def get_patter_full():
+    return re.compile(
+        r"num=(?P<step>\d+)"
+        r"_time-ps=(?P<time_ps>\d+(?:\.\d+)?)"
+        r"_bbox=\(x=\((?P<x_min>-?\d+(?:\.\d+)?)-(?P<x_max>-?\d+(?:\.\d+)?)\)"
+        r"_y=\((?P<y_min>-?\d+(?:\.\d+)?)-(?P<y_max>-?\d+(?:\.\d+)?)\)"
+        r"_z=\((?P<z_min>-?\d+(?:\.\d+)?)-(?P<z_max>-?\d+(?:\.\d+)?)\)\)"
+        r"_resolution=(?P<resolution>\d+(?:\.\d+)?)"
+    )
+
+
+def get_pattern_num_time():
+    return re.compile(
+        r"num=(?P<step>\d+)" r"_time-ps=(?P<time_ps>\d+(?:\.\d+)?).pickle"
+    )
 
 
 def create_empirical_cdf(vals, n=30):
@@ -94,7 +122,7 @@ def create_box_mask(atoms: List[AtomData], box: BoundingBox):
     removed_atoms = set()
     rm_mask = np.array(range(len(atoms)), dtype=np.bool_)
     for i, a in enumerate(atoms):
-        rm_mask[i] = box.is_inside(a.pos)
+        rm_mask[i] = box.inside(a.pos)
         if ~rm_mask[i]:
             removed_atoms.add(i)
     return removed_atoms, rm_mask

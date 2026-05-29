@@ -21,7 +21,7 @@ def read_and_draw_pnm_and_img(pnm_path: str, path_to_img: str):
     r, tl, ll, positions = Reader.read_pnm_ext_data(pnm_path)
 
     colors_data = {
-        0: (1.0, 0.0, 0.0, 1.0),
+        0: (0.36, 0.16, 0.53, 1.0),
     }
     scales_data = {i: rad for i, rad in enumerate(r)}
 
@@ -46,6 +46,7 @@ def read_and_draw_pnm_and_img(pnm_path: str, path_to_img: str):
     float_img = ndimage.gaussian_filter(float_img, 4)
     float_img = np.pad(float_img, [(1, 1), (1, 1), (1, 1)], 'maximum')
     float_img[:, (float_img.shape[1] // 2) :, :] = 10.0 * float_img.max()
+    print(float_img.mean(), float_img.min(), float_img.max())
 
     rad = tl[:, 0].mean()
 
@@ -53,13 +54,15 @@ def read_and_draw_pnm_and_img(pnm_path: str, path_to_img: str):
         graph,
         float_img,
         node_pos,
-        0.11,
         bbox,
         size_node=0.8,
-        size_edge=rad / 2,
+        size_edge=rad,
         colors_data=colors_data,
         scales_data=scales_data,
         scale='non',
+        isovalue=0.1,
+        volume_mode=False,
+        img_opacity=1,
     )
     Visualizer.show()
 
@@ -89,16 +92,6 @@ if "__main__" == __name__:
     )
 
     args = parser.parse_args()
-
-    # extanded_struct_extr(
-    #     args.structure_path,
-    #     args.save_path,
-    #     indexes,
-    #     True,
-    #     200,
-    # )
-
-    # run_extractor(ker_prefix, args.extractor_path, args.config_extractor_path)
 
     read_and_draw_pnm_and_img(
         args.pnm_prefix,

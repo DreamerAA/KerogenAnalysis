@@ -1,8 +1,11 @@
 from typing import List, Optional, Tuple
-
+from utils.types import NPBArray, NumberLike, f64
 import numpy as np
 import numpy.typing as npt
 from scipy.spatial.distance import cdist
+
+
+from typing import cast
 
 
 class Range(object):
@@ -37,8 +40,11 @@ class Range(object):
     def diff(self) -> float:
         return self.max_ - self.min_
 
-    def is_inside(self, v: float) -> bool:
-        return self.min_ <= v and v <= self.max_
+    def inside(self, v: NumberLike) -> bool | f64 | NPBArray:
+        return cast(
+            bool | np.float64 | np.ndarray,
+            np.logical_and(self.min_ <= v, v <= self.max_),
+        )
 
     def center(self) -> float:
         return (self.max_ + self.min_) * 0.5
@@ -55,12 +61,16 @@ class BoundingBox(object):
         self.yb_ = Range() if yb is None else yb
         self.zb_ = Range() if zb is None else zb
 
-    def is_inside(self, pos: npt.NDArray[np.float32]) -> bool:
-        m = [
-            b.is_inside(v)
-            for b, v in zip([self.xb_, self.yb_, self.zb_], pos.flat)
-        ]
-        return np.all(m)
+    def inside(
+        self,
+        x: float | f64 | np.ndarray,
+        y: float | f64 | np.ndarray,
+        z: float | f64 | np.ndarray,
+    ) -> bool | np.ndarray:
+        return np.logical_and(
+            np.logical_and(self.xb_.inside(x), self.yb_.inside(y)),
+            self.zb_.inside(z),
+        )
 
     def __str__(self) -> str:
         return f"BoundingBox(x={self.xb_}|y={self.yb_}|z={self.zb_})"

@@ -1,3 +1,5 @@
+from typing import Iterable
+
 from utils.types import NPFArray, f32
 from scipy.spatial.distance import pdist
 import numpy as np

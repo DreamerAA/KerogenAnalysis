@@ -144,7 +144,7 @@ def create_box_mask(atoms: List[AtomData], box: BoundingBox):
     removed_atoms = set()
     rm_mask = np.array(range(len(atoms)), dtype=np.bool_)
     for i, a in enumerate(atoms):
-        rm_mask[i] = box.is_inside(a.pos)
+        rm_mask[i] = box.inside(a.pos)
         if ~rm_mask[i]:
             removed_atoms.add(i)
     return removed_atoms, rm_mask

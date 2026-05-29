@@ -198,14 +198,15 @@ def build_3d_distributions(
             linewidth=1.0,
         )
 
-    ax.set_xlabel(r"$r, h (\AA)$", fontsize=16, labelpad=-8)
-    ax.set_ylabel(r"Time ($\mu$s)", fontsize=16, labelpad=-10)
-    ax.set_zlabel("Density", fontsize=16, labelpad=-6)
+    ax.set_xlabel(r"$r, h (\AA)$", fontsize=20, labelpad=-10)
+    ax.set_ylabel(r"Time ($\mu$s)", fontsize=20, labelpad=-10)
+    ax.set_zlabel("Density", fontsize=20, labelpad=-6)
 
     xlabels = ax.get_xticklabels()
     res_xlabels = []
+    print("xlabels=", list(enumerate(xlabels)))
     for i, x in enumerate(xlabels):
-        if i % 2 != 1:
+        if i in [3, 4, 5]:
             x._text = ""
         res_xlabels.append(x)
 
@@ -258,37 +259,14 @@ def build_3d_distributions(
 if __name__ == '__main__':
     build_3d_distributions(
         (
-            "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/pnm/",
-            r"$CH_4$",
-            "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/figs/",
+            "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/h2/pnm/",
+            r"$H_2$",
+            "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/h2/figs/",
         ),
         # (
         #     "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/h2/pnm/",
         #     r"$H_2$",
-        # ),
-        # (
-        #     "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/pnm/",
-        #     "type1-300K-CH4",
-        # ),
-        # (
-        #     "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/h2/pnm/",
-        #     "type1-300K-H2",
-        # ),
-        # (
-        #     "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/400K/ch4/pnm/",
-        #     "type1-400K-CH4",
-        # ),
-        # (
-        #     "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/400K/h2/pnm/",
-        #     "type1-400K-H2",
-        # ),
-        # (
-        #     "/media/andrey/Samsung_T5/PHD/Kerogen/type2matrix/300K/ch4/pnm/",
-        #     "type2-300K-CH4",
-        # ),
-        # (
-        #     "/media/andrey/Samsung_T5/PHD/Kerogen/type2matrix/300K/h2/pnm/",
-        #     "type2-300K-H2",
+        #     "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/h2/figs/",
         # ),
         pnm_step=30,
         bins=50,

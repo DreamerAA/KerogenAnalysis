@@ -13,18 +13,11 @@ import networkx as nx
 import json
 from scipy import ndimage
 import subprocess
+from utils.utils import kprint, get_pattern_bbox
 
 from base.boundingbox import BoundingBox, Range
 from base.reader import Reader
 from visualizer.visualizer import Visualizer
-
-pattern = re.compile(
-    r"bbox=\("
-    r"x=\((?P<x_min>[\d.]+)-(?P<x_max>[\d.]+)\)_"
-    r"y=\((?P<y_min>[\d.]+)-(?P<y_max>[\d.]+)\)_"
-    r"z=\((?P<z_min>[\d.]+)-(?P<z_max>[\d.]+)\)"
-    r"\)_resolution=(?P<resolution>[\d.]+).npy"
-)
 
 atom_real_sizes = {
     i: s * 0.5 for i, s in enumerate([0.17, 0.152, 0.155, 0.109, 0.18])
@@ -60,7 +53,7 @@ def read_and_draw_atoms_struct(
         path_to_save_structs,
         f"struct-num={index}_time-ps={time_ps}.pickle",
     )
-
+    pattern = get_pattern_bbox()
     match = pattern.search(path_to_img)
 
     if not match:
@@ -90,7 +83,7 @@ def read_and_draw_atoms_struct(
     filtered_atoms = []
 
     for old_idx, atom in enumerate(atoms):
-        if bbox.is_inside(atom.pos):
+        if bbox.inside(*atom.pos):
             new_idx = len(filtered_atoms)
             old_to_new[old_idx] = new_idx
             filtered_atoms.append(atom)

@@ -192,7 +192,6 @@ class Visualizer:
         Visualizer.add_img_actor(
             renderer,
             img,
-            False,
             bbox,
             **kwargs,
         )
@@ -213,12 +212,14 @@ class Visualizer:
 
         # Add the actors
 
+        camera_y_shift = 3.0e-10  # подбери значение в единицах твоей сцены
         camera = renderer.GetActiveCamera()
         camera.SetFocalPoint(focal_pos[0], focal_pos[1], focal_pos[2])
-        camera.SetPosition(camera_pos[0], camera_pos[1], camera_pos[2])
+        camera.SetPosition(
+            camera_pos[0], camera_pos[1] - camera_y_shift, camera_pos[2]
+        )
         # renWin.SetSize(640, 640)
 
-        renWin.Render()
         renWin.Render()
         iren.Initialize()
 
@@ -486,7 +487,7 @@ class Visualizer:
             lines.InsertNextCell(2)
             for n in (u, v):
                 ni = corr[int(n)]
-                (x, y, z) = positions[ni, :]
+                x, y, z = positions[ni, :]
                 points.InsertPoint(i, x, y, z)
                 lines.InsertCellPoint(i)
                 i = i + 1
@@ -568,8 +569,12 @@ class Visualizer:
 
         if bbox is not None:
             bbs = bbox.size()
-            t = [bs / iis for iis, bs in zip(size, bbs)]
-            image_data.SetSpacing(*t)
+            # t = [bs / iis for iis, bs in zip(size, bbs)]
+            # image_data.SetSpacing(*t)
+            spacing = np.asarray(bbox.size(), dtype=float) / (
+                np.asarray(img.shape, dtype=float) - 1.0
+            )
+            image_data.SetSpacing(*spacing)
         else:
             image_data.SetSpacing(1, 1, 1)
         for ix in range(size[0]):
@@ -643,14 +648,13 @@ class Visualizer:
     def add_img_actor(
         ren: vtkRenderer,
         img: npt.NDArray[Any],
-        volume_mode: bool,
         bbox: Optional[BoundingBox],
         **kwargs,
     ) -> None:
         image_data = Visualizer.create_img_data(img, bbox)
 
         mactor = None
-        if volume_mode:
+        if kwargs["volume_mode"]:
             mactor = Visualizer.create_volume_img(image_data)
             ren.AddVolume(mactor)
         else:
@@ -751,16 +755,18 @@ class Visualizer:
     @staticmethod
     def create_trajectory_actor(
         trj: Trajectory,
-        periodic: bool,
-        color_type: str = 'dist',
-        line_width: int = 1,
+        **kwargs,
     ) -> vtkActor:
-        points = trj.points_without_periodic if not periodic else trj.points
-        if color_type == 'dist':
+        points = (
+            trj.points_without_periodic
+            if not kwargs["periodic"]
+            else trj.points
+        )
+        if kwargs["color_type"] == 'dist':
             colors = np.cumsum(trj.dists())
             colors = np.append(0, colors)
             colors /= colors[-1]
-        elif color_type == 'clusters':
+        elif kwargs["color_type"] == 'clusters':
             assert trj.traps is not None
             clusters = trj.traps
 
@@ -772,7 +778,7 @@ class Visualizer:
         return Visualizer.create_polyline_actor(
             points,
             colors,
-            trj.atom_size * line_width,
+            kwargs["line_width"],
         )[0]
 
     @staticmethod
@@ -980,7 +986,7 @@ class Visualizer:
         ctf.AddRGBPoint(1e-6, 0, 0, 1.0)
         ctf.AddRGBPoint(0.25, 0, 1.0, 1)
         ctf.AddRGBPoint(0.5, 0, 1, 0)
-        ctf.AddRGBPoint(0.75, 1, 1, 0)
+        ctf.AddRGBPoint(0.9, 1, 1, 0)
         ctf.AddRGBPoint(1.0, 1, 0, 0)
 
         color_data = vtkDoubleArray()
@@ -1047,11 +1053,13 @@ class Visualizer:
     @staticmethod
     def create_trj_points_actor(
         trj: Trajectory,
-        periodic: bool = True,
-        radius: int = 1,
-        color_type: str = '',
+        **kwargs,
     ) -> None:
-        tp = trj.points_without_periodic if not periodic else trj.points
+        tp = (
+            trj.points_without_periodic
+            if not kwargs["periodic"]
+            else trj.points
+        )
 
         pcount = tp.shape[0]
 
@@ -1069,7 +1077,7 @@ class Visualizer:
 
         for i in range(pcount):
             points.SetPoint(i, tp[i, 0], tp[i, 1], tp[i, 2])
-            if color_type == 'clusters':
+            if kwargs["color_type"] == 'clusters':
                 zero_trap = (
                     (i > 0 and i < pcount - 2)
                     and not trj.traps[i]
@@ -1089,10 +1097,10 @@ class Visualizer:
 
         # const double pore_scale = vis_set->poreScaleRadius();
         sphere_source = vtkSphereSource()
-        # sphere_source.SetRadius(radius)
+        # sphere_source.SetRadius(kwargs["radius"])
         glyph = vtkGlyph3D()
         glyph.SetScaleModeToScaleByScalar()
-        glyph.SetScaleFactor(2 * radius)
+        glyph.SetScaleFactor(2 * kwargs["radius"])
 
         glyph.SetSourceConnection(sphere_source.GetOutputPort())
         glyph.SetInputData(polydata)
@@ -1101,7 +1109,7 @@ class Visualizer:
         color = colors.GetColor3d("gray")
 
         ctf = vtkColorTransferFunction()
-        if color_type == 'clusters':
+        if kwargs["color_type"] == 'clusters':
             assert trj.traps is not None
             zero_trap_color = colors.GetColor3d("red")
             ctf.AddRGBPoint(0, *zero_trap_color)
@@ -1160,36 +1168,42 @@ class Visualizer:
 
     @staticmethod
     def draw_img_trj(
-        img: npt.NDArray[np.int8],
+        img: npt.NDArray[Any],
         bbox: BoundingBox,
         trj: Trajectory,
-        volume_mode,
-        with_points: bool = True,
-        radius: int = 0.05,
-        isovalue: float = 0.5,
+        **kwargs,
     ) -> None:
-        ren = vtkRenderer()
+        renderer = vtkRenderer()
 
-        Visualizer.add_img_actor(ren, img, volume_mode, bbox, isovalue=isovalue)
+        Visualizer.add_img_actor(renderer, img, bbox, **kwargs)
 
-        actor = Visualizer.create_trajectory_actor(trj, False, 'dist', radius)
-        ren.AddActor(actor)
-        if with_points:
-            actor = Visualizer.create_trj_points_actor(
-                trj, False, radius * 0.25, 'dist'
-            )
-            ren.AddActor(actor)
+        actor = Visualizer.create_trajectory_actor(trj, **kwargs)
+        renderer.AddActor(actor)
+        if kwargs["with_points"]:
+            actor = Visualizer.create_trj_points_actor(trj, **kwargs)
+            renderer.AddActor(actor)
 
         colors = vtkNamedColors()
-        ren.SetBackground(colors.GetColor3d("White"))
+        renderer.SetBackground(colors.GetColor3d("White"))
 
         renWin = vtkRenderWindow()
-        renWin.AddRenderer(ren)
+        renWin.AddRenderer(renderer)
 
         style = vtkInteractorStyleTrackballCamera()
         iren = vtkRenderWindowInteractor()
         iren.SetRenderWindow(renWin)
         iren.SetInteractorStyle(style)
+
+        if kwargs["wrap_mode"] == WrapMode.BOX:
+            outfit_actor = Visualizer.create_box_actor(bbox)
+            renderer.AddActor(outfit_actor)
+        elif kwargs["wrap_mode"] == WrapMode.AXES:
+            actor = Visualizer.create_axes_actor(
+                bbox, renderer.GetActiveCamera()
+            )
+            renderer.AddActor(actor)
+        else:
+            assert kwargs["wrap_mode"] == WrapMode.EMPTY
 
         # Add the actors
         size = img.shape
@@ -1199,7 +1213,7 @@ class Visualizer:
             fpos = bbox.center()
             cpos = bbox.center() + np.array([*(bbox.size())])
 
-        camera = ren.GetActiveCamera()
+        camera = renderer.GetActiveCamera()
         camera.SetFocalPoint(*fpos)
         camera.SetPosition(*cpos)
         # renWin.SetSize(640, 640)

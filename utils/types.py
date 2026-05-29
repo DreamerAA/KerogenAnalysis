@@ -14,6 +14,7 @@ NPUIArray = npt.NDArray[np.uint8]
 NPDTArray = npt.NDArray[np.datetime64]
 XYLine = Tuple[NPFArray, NPFArray]
 
+NumberLike = float | f64 | np.ndarray
 
 # from utils.types import NPFArray, NPIArray, NPBArray, XYLine, f64
 # from utils.types import NPFArray, NPIArray, NPBArray, XYLine, f64

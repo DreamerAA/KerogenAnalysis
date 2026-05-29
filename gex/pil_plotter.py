@@ -9,6 +9,7 @@ from scipy.stats import exponweib
 
 from processes.distribution_fitter import GammaFitter
 from utils.utils import kprint
+from matplotlib.colors import PowerNorm
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
@@ -46,6 +47,45 @@ def plot_distributions(path_to_save: str):
             step=2,
         )
     )
+
+    print("sample_rad:", sample_rad.min(), sample_rad.max(), sample_rad.shape)
+    print("l_vals:", l_vals.min(), l_vals.max(), l_vals.shape)
+    print("pi_cond shape:", pi_cond.shape)
+
+    positive = pi_cond[pi_cond > 0]
+    print("pi_cond min positive:", positive.min())
+    print("pi_cond max:", positive.max())
+    print("pi_cond q95:", np.quantile(positive, 0.95))
+    print("pi_cond q99:", np.quantile(positive, 0.99))
+    print("pi_cond q999:", np.quantile(positive, 0.999))
+
+    imax = np.unravel_index(np.argmax(pi_cond), pi_cond.shape)
+    print("argmax pi_cond:", imax)
+
+    # Если pi_cond имеет форму (len(sample_rad), len(l_vals))
+    if pi_cond.shape == (len(sample_rad), len(l_vals)):
+        integrals_l = np.trapezoid(pi_cond, x=l_vals, axis=1)
+        print("max at r,l:", sample_rad[imax[0]], l_vals[imax[1]])
+
+    # Если вдруг форма транспонированная
+    elif pi_cond.shape == (len(l_vals), len(sample_rad)):
+        integrals_l = np.trapezoid(pi_cond, x=l_vals, axis=0)
+        print("max at l,r:", l_vals[imax[0]], sample_rad[imax[1]])
+
+    else:
+        raise ValueError("Unexpected pi_cond shape")
+
+    print("Integral_l min:", integrals_l.min())
+    print("Integral_l mean:", integrals_l.mean())
+    print("Integral_l max:", integrals_l.max())
+    print(
+        "Integral_l q05/q50/q95:", np.quantile(integrals_l, [0.05, 0.5, 0.95])
+    )
+
+    dl = float(np.mean(np.diff(l_vals)))
+    print("dl:", dl)
+    print("max pi_cond * dl:", positive.max() * dl)
+
     kprint("sample_rad.shape: ", sample_rad.shape)
     kprint("l_vals.shape: ", l_vals.shape)
     kprint("pi_cond.shape: ", pi_cond.shape)
@@ -68,14 +108,23 @@ def plot_distributions(path_to_save: str):
     ax.set_facecolor("white")
 
     # --- upper panel in the same axes: heatmap Π(l|r), y >= 0 ---
+    # cmap = plt.colormaps["magma"].copy()
     cmap = plt.cm.YlOrRd.copy()
     cmap.set_bad(alpha=0)
+
+    norm = PowerNorm(
+        gamma=0.45,
+        vmin=0.0,
+        vmax=np.quantile(positive, 0.995),
+        clip=True,
+    )
 
     mesh = ax.pcolormesh(
         sample_rad,
         l_vals,
         pi_masked.T,
         cmap=cmap,
+        norm=norm,
         shading="auto",
     )
 

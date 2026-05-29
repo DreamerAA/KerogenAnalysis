@@ -20,13 +20,18 @@ class Trajectory:
     def cut(self, start: int = 0, stop: int = None):
         if stop is None:
             stop = len(self.points)
+
+        start = max(start, 0)
+        stop = min(stop, len(self.points))
         self.points = self.points[start:stop]
         self.times = self.times[start:stop]
         if self.traps is not None:
             self.traps = self.traps[start:stop]
 
     def dists(self) -> NPFArray:
-        return Trajectory.extractDists(self.points_without_periodic)
+        dist = Trajectory.extractDists(self.points_without_periodic)
+        # dist[100:] += dist.max()
+        return dist
 
     def is_intersect_borders(self) -> np.bool_:
         ppoints = self.points_without_periodic()
