@@ -94,10 +94,10 @@ def plot_trapping_on_axis(
             ax.annotate(
                 rf"$\sim t^{{{slope:.2f}}}$",
                 xy=(x_txt, y_txt),
-                xytext=(-55, 8),  # <-- сдвиг: влево и чуть вверх
+                xytext=(15, -75),  # <-- сдвиг: влево и чуть вверх
                 textcoords="offset points",
                 color=color,
-                fontsize=20,
+                fontsize=30,
                 ha="right",
                 va="bottom",
                 bbox=dict(
@@ -117,10 +117,10 @@ def plot_trapping_on_axis(
             ax.annotate(
                 rf"$\sim t^{{{slope:.2f}}}$",
                 xy=(x_txt, y_txt),
-                xytext=(18, 8),  # <-- сдвиг: вправо и чуть вверх
+                xytext=(50, -20),  # <-- сдвиг: вправо и чуть вверх
                 textcoords="offset points",
                 color=color,
-                fontsize=20,
+                fontsize=30,
                 ha="left",
                 va="bottom",
                 bbox=dict(
@@ -313,7 +313,7 @@ if __name__ == '__main__':
         # легенда вне графика справа
         ax.legend(
             frameon=False,
-            fontsize=14,
+            fontsize=20,
             # loc="center left",
             # bbox_to_anchor=(1.02, 0.5),
         )

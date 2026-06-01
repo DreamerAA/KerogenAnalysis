@@ -778,7 +778,7 @@ class Visualizer:
         return Visualizer.create_polyline_actor(
             points,
             colors,
-            kwargs["line_width"],
+            kwargs['radius'],
         )[0]
 
     @staticmethod
@@ -797,14 +797,20 @@ class Visualizer:
         bbox = BoundingBox()
         for trj in trjs:
             actor = Visualizer.create_trajectory_actor(
-                trj, periodic, color_type, radius
+                trj,
+                periodic=periodic,
+                color_type=color_type,
+                radius=radius * 0.75,
             )
             trjbox: BoundingBox = trj.trjbox(periodic)
             bbox.update_by_box(trjbox)
             renderer.AddActor(actor)
             if with_points:
                 actor = Visualizer.create_trj_points_actor(
-                    trj, periodic, radius * 0.25, color_type
+                    trj,
+                    periodic=periodic,
+                    color_type=color_type,
+                    radius=radius,
                 )
                 renderer.AddActor(actor)
 

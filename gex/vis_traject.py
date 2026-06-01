@@ -36,7 +36,7 @@ def visualize_dist_trajectory(
         [trj],
         wrap_mode=WrapMode.EMPTY,
         periodic=False,
-        radius=0.15,
+        radius=0.005,
         with_points=True,
         color_type='clusters' if use_clusters else 'dist',
     )
@@ -48,9 +48,9 @@ if __name__ == '__main__':
 
     type = "type1matrix"
     temp = "300K"
-    el = "h2"
+    el = "ch4"
     traps_type = "SIB"
-    num = 4
+    num = 2  # 1
 
     trj_path = prefix + f"{type}/{temp}/{el}/trj.gro"
 

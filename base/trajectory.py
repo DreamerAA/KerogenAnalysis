@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from pathlib import Path
 from typing import List, Optional
 
 import numpy as np
@@ -110,7 +111,7 @@ class Trajectory:
         return self.delta_time * 1e-12
 
     @staticmethod
-    def read_trajectoryes(file_name: str) -> List['Trajectory']:
+    def read_trajectoryes(file_name: str | Path) -> List['Trajectory']:
         ax = []
         ay = []
         az = []
@@ -157,6 +158,97 @@ class Trajectory:
             # points = points[:(count_step // 3), :]
 
             trajectories.append(Trajectory(points, np.array(time_steps), box))
+
+        return trajectories
+
+    @staticmethod
+    def read_trajectories_fast(file_name: str | Path) -> List['Trajectory']:
+        frames = []
+        time_steps = []
+        box = None
+        count = None
+
+        with open(file_name, "rb") as f:
+            while True:
+                header = f.readline()
+
+                if not header:
+                    break
+
+                if b"t=" not in header:
+                    raise RuntimeError(f"Unexpected frame header: {header!r}")
+
+                t = float(header.split(b"t=", 1)[1].split()[0])
+                time_steps.append(t)
+
+                count_line = f.readline()
+                if not count_line:
+                    raise RuntimeError("Unexpected EOF after header")
+
+                current_count = int(count_line)
+
+                if count is None:
+                    count = current_count
+                elif current_count != count:
+                    raise RuntimeError(
+                        f"Atom count changed between frames: {count} -> {current_count}"
+                    )
+
+                atom_lines = [f.readline() for _ in range(count)]
+
+                coord_block = b" ".join(line[20:44] for line in atom_lines)
+
+                xyz = np.fromstring(
+                    coord_block,
+                    sep=" ",
+                    dtype=np.float32,
+                )
+
+                expected_size = count * 3
+                if xyz.size != expected_size:
+                    raise RuntimeError(
+                        f"Failed to parse coordinates: got {xyz.size}, expected {expected_size}"
+                    )
+
+                xyz = xyz.reshape(count, 3)
+                frames.append(xyz)
+
+                box_line = f.readline()
+                if not box_line:
+                    raise RuntimeError("Unexpected EOF while reading box line")
+
+                if box is None:
+                    box_values = np.fromstring(
+                        box_line, sep=" ", dtype=np.float32
+                    )
+
+                    if box_values.size < 3:
+                        raise RuntimeError(
+                            f"Cannot parse box line: {box_line!r}"
+                        )
+
+                    box = BoundingBox(
+                        Range(0, float(box_values[0])),
+                        Range(0, float(box_values[1])),
+                        Range(0, float(box_values[2])),
+                    )
+
+        coords = np.stack(frames, axis=0)
+        # shape: (count_step, count_atoms, 3)
+
+        time_steps = np.array(time_steps, dtype=np.float32)
+        count_step = coords.shape[0]
+        count_atoms = coords.shape[1]
+
+        trajectories = []
+
+        for i in range(count_atoms):
+            points = coords[:, i, :]
+
+            # Если дальше код меняет points inplace, лучше сделать copy:
+            # points = coords[:, i, :].copy()
+
+            trajectories.append(Trajectory(points, time_steps, box))
 
         return trajectories
 

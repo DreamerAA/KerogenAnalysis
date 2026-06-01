@@ -142,13 +142,14 @@ def plot_corrfunc_and_md(
         positive_r.extend(r[np.isfinite(r) & (r > 0)])
 
     if positive_r:
-        ax2.set_ylim(bottom=min(positive_r) * 0.8)
+        ax2.set_ylim(bottom=0.09)
+        ax2.set_ylim(top=max(positive_r) * 10)
 
     labels = [line.get_label() for line in lines]
     ax1.legend(
         lines,
         labels,
-        loc="center right",
+        loc="upper right",
         # bbox_to_anchor=(1.02, 1.0),
         borderaxespad=0.0,
         fontsize=16,
