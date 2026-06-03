@@ -109,7 +109,7 @@ def calculateEulerPNM(path_to_pnm: str):
     eulers = np.zeros(shape=(len(onlyfiles)), dtype=np.int64)
     for j, n in enumerate(nums):
         fn = path_to_pnm + f"num={n}_500_500_500"
-        radiuses, throat_lengths = Reader.read_pnm_data(fn, 1, 0)
+        radiuses, throat_lengths = Reader.read_pnm_data(fn)
         V = len(radiuses)
         E = len(throat_lengths)
         ne = V - E

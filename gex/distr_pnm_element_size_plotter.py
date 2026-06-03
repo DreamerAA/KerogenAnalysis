@@ -45,7 +45,7 @@ def compute_density(
 
     x = x[:-10]
     pn = pn[:-10]
-    mask = x < 1.2
+    mask = x < 0.12
     x = x[mask]
     pn = pn[mask]
 
@@ -89,8 +89,8 @@ def build_3d_distributions(
     pnm_step: int = 10,
     bins: int = 50,
     smooth: bool = True,
-    border: float = 0.015,
-    scale: float = 1e10,
+    border: float = 0.0015,
+    scale: float = Reader.PNM_M_TO_NM,
 ) -> None:
     fig = plt.figure(figsize=(11, 8))
     ax = fig.add_subplot(111, projection="3d")
@@ -198,7 +198,7 @@ def build_3d_distributions(
             linewidth=1.0,
         )
 
-    ax.set_xlabel(r"$r, h (\AA)$", fontsize=20, labelpad=-10)
+    ax.set_xlabel(r"$r, h$ (nm)", fontsize=20, labelpad=-10)
     ax.set_ylabel(r"Time ($\mu$s)", fontsize=20, labelpad=-10)
     ax.set_zlabel("Density", fontsize=20, labelpad=-6)
 

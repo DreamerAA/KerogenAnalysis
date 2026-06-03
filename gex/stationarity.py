@@ -793,7 +793,7 @@ def analysis(main_path: str, pnm_dir: str, oputput_dir: str):
             continue
 
         radiuses, throat_lengths = Reader.read_pnm_data(
-            join(path_to_pnms, file[:-10]), scale=1e10, border=0.015
+            join(path_to_pnms, file[:-10]), border=0.0015
         )
         time = int(50 + (step - 25000.0) * 500.0 / 250000.0)
 
@@ -810,7 +810,7 @@ def analysis(main_path: str, pnm_dir: str, oputput_dir: str):
             samples_l,
             outdir,
             label="P(h)",
-            xname=r"Throat length, $h$($\AA$)",
+            xname=r"Throat length, $h$ (nm)",
             alpha=0.05,
             transform=None,
             positive_only=False,
@@ -821,7 +821,7 @@ def analysis(main_path: str, pnm_dir: str, oputput_dir: str):
             samples_r,
             outdir,
             label="P(r)",
-            xname=r"Pore radius, $r$($\AA$)",
+            xname=r"Pore radius, $r$ (nm)",
             alpha=0.05,
             transform=None,
             positive_only=False,

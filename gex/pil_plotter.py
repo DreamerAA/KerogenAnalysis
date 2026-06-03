@@ -1,6 +1,7 @@
+import json
 import pickle
 import sys
-from os.path import join, realpath
+from os.path import isfile, join, realpath
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -19,8 +20,16 @@ from processes.pil_distr_generator import PiLDistrGenerator
 
 
 def plot_distributions(path_to_save: str):
-    rad_max = 0.25
+    rad_max = 0.025
     rad_min = 0.0
+
+    path_units = join(path_to_save, "pnm_distribution_units.json")
+    if not isfile(path_units):
+        raise RuntimeError("PIL distribution cache must be regenerated in nm")
+    with open(path_units) as f:
+        units = json.load(f)
+    if units.get("length_unit") != "nm":
+        raise RuntimeError("PIL distribution cache must be regenerated in nm")
 
     radiuses = np.load(join(path_to_save, "radiuses.npy"))
     kprint("Count radiuses: ", len(radiuses))
@@ -159,10 +168,10 @@ def plot_distributions(path_to_save: str):
     y_xlabel = -0.10 * float(l_vals.max())
 
     # --- limits ---
-    # x_start = 0.03
+    # x_start = 0.003
     x_start = 0.0
     ax.set_xlim(x_start, float(sample_rad.max()))
-    ax.set_ylim(float(y_pr.min()) * 1.15, 0.5)  # float(l_vals.max()) * 1.03)
+    ax.set_ylim(float(y_pr.min()) * 1.15, 0.05)  # float(l_vals.max()) * 1.03)
 
     # --- x axis ---
     xticks = np.linspace(float(sample_rad.min()), float(sample_rad.max()), 5)
@@ -174,7 +183,7 @@ def plot_distributions(path_to_save: str):
     ax.text(
         float(sample_rad.max()),
         y_xlabel,
-        r"$r, h (\AA)$",
+        r"$r, h$ (nm)",
         fontsize=24,
         ha="right",
         va="top",
@@ -202,10 +211,10 @@ def plot_distributions(path_to_save: str):
         )
 
     # --- y axis: show ticks only for l > 0 ---
-    yticks_top = np.linspace(0.1, float(l_vals.max()), 5)
+    yticks_top = np.linspace(0.01, float(l_vals.max()), 5)
     ax.set_yticks(yticks_top)
-    ax.set_yticklabels([f"{y:.1f}" for y in yticks_top], fontsize=16)
-    ax.set_ylabel(r"$l (\AA)$", fontsize=24)
+    ax.set_yticklabels([f"{y:.2f}" for y in yticks_top], fontsize=16)
+    ax.set_ylabel(r"$l$ (nm)", fontsize=24)
 
     # --- clean spines ---
     ax.spines["top"].set_visible(False)

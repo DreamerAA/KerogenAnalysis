@@ -133,7 +133,7 @@ def plot_corrfunc_and_md(
     ax2.set_yscale("log")
     ax2.set_xscale("log")
     ax1.set_xscale("log")
-    ax2.set_ylabel(r"$\mathrm{RMSD}(t)$, $\AA$", fontsize=16, color=color_md)
+    ax2.set_ylabel(r"$\mathrm{RMSD}(t)$, nm", fontsize=16, color=color_md)
     ax2.tick_params(axis="both", labelsize=12)
     ax2.tick_params(axis="y", labelcolor=color_md)
 

@@ -1,3 +1,4 @@
+import json
 import pickle
 import sys
 from os import listdir
@@ -60,15 +61,15 @@ def plot_distributions(path_to_pnms: str, path_to_save_pil: str):
     pi_l = np.load(path_to_save_pil + "pi_l.npy")
 
     fig, axs = plt.subplots(1, 3)
-    plot_ar(pi_l, axs[2], "PDF(Step size in the trap)", "Step size (A)")
+    plot_ar(pi_l, axs[2], "PDF(Step size in the trap)", "Step size (nm)")
     plot_hist(
-        radiuses, axs[0], "PDF(Pore size distribution)", "Pore diameter (A)"
+        radiuses, axs[0], "PDF(Pore size distribution)", "Pore diameter (nm)"
     )
     plot_hist(
         throat_lengths,
         axs[1],
         "PDF(Throat length distribution)",
-        "Throat length (A)",
+        "Throat length (nm)",
     )
     plt.yticks(fontsize=12)
     plt.xticks(fontsize=12)
@@ -84,9 +85,7 @@ def get_radiuses_lengthes(path_to_pnms: str):
     ]
     radiuses, throat_lengths = [], []
     for f in onlyfiles:
-        r, t = Reader.read_pnm_data(
-            f, scale=1e10, border=0.03
-        )  # scale=1e10 - to A
+        r, t = Reader.read_pnm_data(f, border=0.003)
         radiuses = np.concatenate((radiuses, r))
         throat_lengths = np.concatenate((throat_lengths, t))
 
@@ -96,18 +95,27 @@ def get_radiuses_lengthes(path_to_pnms: str):
 def generate_pil_distribution(path_to_pnms: str, path_to_save: str):
     path_rads = join(path_to_save, "radiuses.npy")
     path_lens = join(path_to_save, "throat_lengths.npy")
-    if isfile(path_lens) and isfile(path_rads):
+    path_units = join(path_to_save, "pnm_distribution_units.json")
+    has_nm_cache = False
+    if isfile(path_units):
+        with open(path_units) as f:
+            has_nm_cache = json.load(f).get("length_unit") == "nm"
+
+    use_cached_samples = isfile(path_lens) and isfile(path_rads) and has_nm_cache
+    if use_cached_samples:
         radiuses = np.load(path_rads)
         throat_lengths = np.load(path_lens)
     else:
         radiuses, throat_lengths = get_radiuses_lengthes(path_to_pnms)
         np.save(path_rads, radiuses)
         np.save(path_lens, throat_lengths)
+        with open(path_units, "w") as f:
+            json.dump({"length_unit": "nm"}, f)
 
     generator = PiLDistrGenerator()
 
     paht_pi_l = join(path_to_save, "pi_l_curve.npy")
-    if isfile(paht_pi_l):
+    if isfile(paht_pi_l) and use_cached_samples:
         pi_l = np.load(paht_pi_l)
     else:
         pi_l = generator.get_curve(radiuses)

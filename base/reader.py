@@ -38,6 +38,8 @@ _TYPE_MAP = {'c': 0, 'o': 1, 'n': 2, 'h': 3, 's': 4}
 
 
 class Reader:
+    PNM_M_TO_NM = 1e9
+
     @staticmethod
     def read_structures_by_num(
         path_to_structure: str, indexes: List[int]
@@ -235,7 +237,7 @@ class Reader:
 
     @staticmethod
     def read_pnm_data(
-        path_to_pnm: str, scale: float, border: float
+        path_to_pnm: str, scale: float = PNM_M_TO_NM, border: float = 0.0
     ) -> Tuple[np.ndarray, np.ndarray]:
         path_to_node_2 = path_to_pnm + "_node2.dat"
         path_to_link_1 = path_to_pnm + "_link1.dat"
@@ -283,12 +285,13 @@ class Reader:
     @staticmethod
     def read_pnm_ext_data(
         path_to_pnm: str,
+        scale: float = PNM_M_TO_NM,
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         path_to_node_1 = path_to_pnm + "_node1.dat"
         path_to_node_2 = path_to_pnm + "_node2.dat"
         path_to_link_1 = path_to_pnm + "_link1.dat"
 
-        radiuses = Reader.read_psd(path_to_node_2)
+        radiuses = Reader.read_psd(path_to_node_2) * scale
 
         linked_list, t_throat_lengths = Reader.read_pnm_ext_linklist(
             path_to_link_1
@@ -302,11 +305,15 @@ class Reader:
         linked_list[:, 0] -= 1
         linked_list[:, 1] -= 1
 
+        t_throat_lengths[:, 0] *= scale
+        t_throat_lengths[:, 2] *= scale
+        positions = Reader.read_pore_positions(path_to_node_1) * scale
+
         return (
             radiuses,
             t_throat_lengths,
             linked_list,
-            Reader.read_pore_positions(path_to_node_1),
+            positions,
         )
 
     @staticmethod

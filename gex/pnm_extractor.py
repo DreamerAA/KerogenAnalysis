@@ -89,7 +89,7 @@ if __name__ == '__main__':
         path_to_images = join(raw_img_path, file)
         path_to_pnm = join(pnm_path, file)
 
-        angstrem_to_um = 0.0001
+        nm_to_um = 0.001
 
         pnm_pref = join(pnm_path, "pnm-" + file[11:-4])
         if isfile(pnm_pref + "_node1.dat"):
@@ -102,15 +102,13 @@ if __name__ == '__main__':
         jconfig["input_data"]["size"]["z"] = zs
         jconfig["output_data"]["statoil_prefix"] = pnm_pref
         jconfig["output_data"]["filename"] = pnm_pref
-        jconfig["extraction_parameters"]["resolution"] = (
-            resolution * angstrem_to_um
-        )
+        jconfig["extraction_parameters"]["resolution"] = resolution * nm_to_um
         jconfig["extraction_parameters"]["length_unit_type"] = "UM"
 
         kprint(f"File name:{join(path_to_images)}")
         kprint(f"Size: {xs}, {ys}, {zs}")
         kprint(f"Output name: {pnm_pref}")
-        kprint(f"Resolution: {resolution * 0.1} nm")
+        kprint(f"Resolution: {resolution} nm ({resolution * nm_to_um} um)")
 
         with open(path_to_config, "w") as outfile:
             json.dump(jconfig, outfile)

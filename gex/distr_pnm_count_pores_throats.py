@@ -21,28 +21,6 @@ sys.path.append(parent_dir)
 
 from base.reader import Reader
 
-# def drawDistr(axs, radiuses, throat_lengths, label):
-#     n = 50
-
-#     def plot_hist(data, maxes, title, xlabel):
-#         p, bb = np.histogram(data, bins=n)
-#         xdel = bb[1] - bb[0]
-#         x = bb[:-1] + xdel * 0.5
-#         pn = p / np.sum(p * xdel)
-#         maxes.plot(x, pn, label=label)
-#         maxes.set_title(title)
-#         maxes.set_xlabel(xlabel)
-
-#     plot_hist(
-#         radiuses, axs[0], "PDF(Pore size distribution)", "Pore diameter (A)"
-#     )
-#     plot_hist(
-#         throat_lengths,
-#         axs[1],
-#         "PDF(Throat length distribution)",
-#         "Throat length (A)",
-#     )
-
 
 def build_distributions(paths: List[Tuple[str, str]]) -> None:
     result = {}
@@ -58,7 +36,7 @@ def build_distributions(paths: List[Tuple[str, str]]) -> None:
         count_pores = []
         count_throats = []
         for _, file in sorted_lfiles:
-            r, tl = Reader.read_pnm_data(join(path_to_pnms, file)[:-10], 1, 0)
+            r, tl = Reader.read_pnm_data(join(path_to_pnms, file)[:-10])
             count_pores.append(len(r))
             count_throats.append(len(tl))
 

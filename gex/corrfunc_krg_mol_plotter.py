@@ -77,7 +77,7 @@ def plot_corrfunc_and_md(
     ax.yaxis.set_label_position("right")
 
     plt.xlabel(r"Time delay, $\mu$s", fontsize=16)
-    plt.ylabel(r"$\mathrm{RMSD}(t), \AA$", fontsize=16)
+    plt.ylabel(r"$\mathrm{RMSD}(t)$, nm", fontsize=16)
 
     # Убираем тики и подписи слева
     ax.tick_params(

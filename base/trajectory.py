@@ -11,7 +11,7 @@ from utils.types import NPFArray, NPBArray
 
 @dataclass
 class Trajectory:
-    points: NPFArray  # coords of atom position Angstrom
+    points: NPFArray  # coords of atom position, nm for .gro input
     times: NPFArray
     box: BoundingBox  # its box of cell
     atom_size: float = 0.19
