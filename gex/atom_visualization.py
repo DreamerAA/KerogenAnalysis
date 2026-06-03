@@ -24,14 +24,9 @@ path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
 sys.path.append(parent_dir)
 
-from base.boundingbox import BoundingBox, KerogenBox, Range
+from base.boundingbox import BoundingBox, Range
 from base.kerogendata import AtomData, KerogenData
-from base.periodizer import Periodizer
-from base.reader import Reader
-from base.trajectory import Trajectory
-from processes.segmentaion import Segmentator
 from visualizer.visualizer import Visualizer
-
 
 atom_real_sizes = {
     i: s for i, s in enumerate([0.17, 0.152, 0.155, 0.109, 0.18])
@@ -63,11 +58,13 @@ def draw_kerogen_data(kerogen: KerogenData, scale: str = 'physical') -> None:
     )
 
 
-atoms = [AtomData(1, "KRG", 'c', 0, np.array([0., 0., 0.])), 
-         AtomData(1, "KRG", 'o', 1, np.array([0., 0., 0.5])),
-         AtomData(1, "KRG", 'n', 2, np.array([0., 0., 1.])),
-         AtomData(1, "KRG", 'h', 3, np.array([0., 0., 1.5])),
-         AtomData(1, "KRG", 's', 4, np.array([0., 0., 2.]))]
+atoms = [
+    AtomData(1, "KRG", 'c', 0, np.array([0.0, 0.0, 0.0])),
+    AtomData(1, "KRG", 'o', 1, np.array([0.0, 0.0, 0.5])),
+    AtomData(1, "KRG", 'n', 2, np.array([0.0, 0.0, 1.0])),
+    AtomData(1, "KRG", 'h', 3, np.array([0.0, 0.0, 1.5])),
+    AtomData(1, "KRG", 's', 4, np.array([0.0, 0.0, 2.0])),
+]
 
 
 graph = nx.Graph()
@@ -80,6 +77,6 @@ graph.add_nodes_from(
 # graph.add_edges_from([(0, 1)])
 
 
-bbox = BoundingBox(Range(0., 0.5), Range(0., 0.5), Range(0., 0.5))
+bbox = BoundingBox(Range(0.0, 0.5), Range(0.0, 0.5), Range(0.0, 0.5))
 kerogen_data = KerogenData(graph, atoms, bbox)
 draw_kerogen_data(kerogen_data)

@@ -86,7 +86,7 @@ def plot_corrfunc_and_md(
     color_ct = default_colors[0]
     color_md = default_colors[1]
 
-    fig, ax1 = plt.subplots(figsize=(8.5, 5.5))
+    fig, ax1 = plt.subplots(figsize=(9, 5))
 
     line1 = ax1.plot(
         dt,
@@ -95,8 +95,9 @@ def plot_corrfunc_and_md(
         color=color_ct,
         label=r"$C(t)$",
     )
-    y_name = r"Autocorrelation $C(t)$ of pore space"
+    y_name = r"Autocorrelation $C(t)$ of"
     y_name += " pore" if pore_mode else " solid"
+    y_name += " space"
     ax1.set_xlabel(r"Time delay, $\mu$s", fontsize=16)
     ax1.set_ylabel(y_name, fontsize=16)
     ax1.tick_params(axis="both", labelsize=12)

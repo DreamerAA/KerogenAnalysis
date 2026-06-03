@@ -126,7 +126,7 @@ def extanded_struct_extr(
         start_time = time.time()
 
         bbox = Segmentator.cut_cell(size, 2)
-        resolution = np.array([s for s in size]).min() / ref_size
+        resolution = np.array([s for s in size]).min() / ref_size  # nm
         img_size = Segmentator.calc_image_size(
             bbox.size(), reference_size=ref_size, by_min=True
         )

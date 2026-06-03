@@ -43,7 +43,7 @@ def plot_corrfunc_and_md(
     save_path: str | Path | None = None,
     max_t: float = 2.8,
 ) -> None:
-    fig, ax1 = plt.subplots(figsize=(8.75, 5.5))
+    fig, ax1 = plt.subplots(figsize=(9, 5))
 
     default_colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
     color_msd = default_colors[3]
@@ -66,7 +66,7 @@ def plot_corrfunc_and_md(
     plt.xscale("log")
 
     positive_r = r[np.isfinite(r) & (r > 0)]
-    plt.ylim(bottom=min(positive_r) * 0.8, top=max(positive_r) * 3)
+    plt.ylim(bottom=min(positive_r) * 0.8, top=max(positive_r) * 5)
 
     ax = plt.gca()
     # Оставляем рамку целиком
