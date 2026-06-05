@@ -1,6 +1,40 @@
 # KerogenAnalysis
 !!!TODO!!!
 
+1) у меня есть скрипты extract_gas_tajectory_to_file, extract_krg_trajectory_to_file они делаю схожую вещь, Берут файл парсят его и сохраняют в другой файл часть информации.
+файл extract_gas_trajectory_to_file болле старый, думаю можно вынести общие вещи в utils или base. и сделать скрипт работающим не по циклу а по входным путям как в extract_krg_trajectory_to_file
+2) Второй шаг это извлечени определенных структур их четнеи и сохранение. Файл dynamic_struct_extractor.py сейчас делает больше чем нужно, он не просто извлекает структуру, но и бинаризует ее, хочу разделить на несколько скриптов эту логику. Для начала просто вытащим структуру, и в отдельном скрипт делаем логику бинаризации (binarization_structs - что-нибудь такое), и посмотри также на скрипт dynamic_float_struct_extractor - он делает схожую вещь, но сохраняет не бинаризацию и дистанс мап - наверное нужен ренейм файла. 
+
+3) обрати внимание на изменяемых тобою файлах сделать логику подачи путей через входные аргументы скрипта, желательно без дефлотных путей, чтобы в будущем, когда это будет наружу торчать не было абсолютных путей в скриптах
+
+
+## Check main logic
+
+export DATA_PATH="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/"
+
+## Экстракция траектории молекулы газа
+python -m gex.extract_gas_trajectory_to_file $DATA_PATH/type1.ch4.300.gro $DATA_PATH/trj.gro
+
+
+## Экстракция фреймов структур
+python -m gex.dynamic_struct_extractor $DATA_PATH/type1.ch4.300.gro $DATA_PATH/structures
+
+python3 -m gex.dynamic_struct_extractor $DATA_PATH/type1.ch4.300.gro $DATA_PATH/structures --auto-indexes --mode all --count-structures 5 --dry-run
+python3 -m gex.dynamic_struct_extractor $DATA_PATH/type1.ch4.300.gro $DATA_PATH/structures --auto-indexes --mode all --count-structures 500
+
+## Бинаризация
+python3 -m gex.binarization_structs $DATA_PATH/structures $DATA_PATH/bin_images $DATA_PATH/raw_images --ref-size 250 --mode all --count-slices 500 --num_workers 6 
+
+
+## Экстракция DM 
+python3 -m gex.distance_map_structs $DATA_PATH/type1.ch4.300.gro $DATA_PATH/structures --auto-indexes --mode all --count-structures 500
+
+
+
+
+## Экстракция молекулы керогена
+
+
 export DATA_PATH="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/"
 
 python -m gex.extract_krg_trajectory_to_file ${DATA_PATH}/type1.ch4.300.gro ${DATA_PATH}/trj_krg/krg_99.gro --select KRG:99

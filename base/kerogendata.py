@@ -30,4 +30,4 @@ class KerogenData:
         return {i: a.tuple_pos() for i, a in enumerate(self.atoms)}
 
     def checkPeriodization(self) -> bool:
-        return np.all([self.box.inside(a.pos) for a in self.atoms])
+        return np.all([self.box.inside_pos(a.pos) for a in self.atoms])

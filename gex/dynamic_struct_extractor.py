@@ -1,224 +1,164 @@
 import argparse
-import os
 import pickle
-import re
 import time
-from os.path import join
-
-from typing import List
+from pathlib import Path
 
 import numpy as np
-from base.kerogendata import KerogenData
-from base.periodizer import Periodizer
-from base.reader import Reader
-from utils.utils import kprint
-from utils.utils import write_binary_file
-from processes.segmentaion import Segmentator
 
-additional_radius = 0.0
-
-atom_real_sizes = {
-    i: s for i, s in enumerate([0.17, 0.152, 0.155, 0.109, 0.18])
-}
-
-ext_radius = {
-    i: s
-    for i, s in enumerate(
-        [
-            additional_radius,
-            additional_radius,
-            additional_radius,
-            0.0,
-            additional_radius,
-        ]
-    )
-}
+from gex.structure_image_utils import (
+    collect_indexes,
+    generate_indexes_by_mode,
+    kprint,
+    scan_gro_trajectory_info,
+    structure_file_name,
+)
 
 
-def get_size(type_id: int) -> float:
-    return atom_real_sizes[type_id]
-
-
-def get_ext_size(type_id: int) -> float:
-    return ext_radius[type_id]
-
-
-def extanded_struct_extr(
-    path_to_data: str,
-    struct_file_name: str,
-    indexes: List[int],
-    times: List[int],
-    ref_size: int,
+def extract_structures(
+    input_path: Path,
+    output_dir: Path,
+    indexes: list[int],
     slice_len: int = 100,
 ) -> None:
-    path_to_structure = join(path_to_data, struct_file_name)
-    path_to_save_img = join(path_to_data, "images")
-    path_to_save_rimg = join(path_to_data, "raw_images")
-    path_to_save_structs = join(path_to_data, "structures")
-    if not os.path.exists(path_to_save_img):
-        os.makedirs(path_to_save_img, exist_ok=True)
-    if not os.path.exists(path_to_save_rimg):
-        os.makedirs(path_to_save_rimg, exist_ok=True)
-    if not os.path.exists(path_to_save_structs):
-        os.makedirs(path_to_save_structs, exist_ok=True)
+    from base.reader import Reader
 
-    atimes = np.asarray(times, dtype=np.int32)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
     aindexes = np.asarray(indexes, dtype=np.int32)
-
-    mask = np.asarray(
+    existing_mask = np.asarray(
         [
-            os.path.isfile(
-                join(
-                    path_to_save_structs,
-                    f"struct-num={num}_time-ps={time}.pickle",
-                )
-            )
-            for num, time in zip(aindexes, atimes)
+            any(output_dir.glob(f"struct-num={num}_time-ps=*.pickle"))
+            for num in aindexes
         ],
         dtype=bool,
     )
-    aindexes = aindexes[~mask]
-    atimes = atimes[~mask]
+    aindexes = aindexes[~existing_mask]
 
     count_steps = len(aindexes) // slice_len + 1
     for i in range(count_steps):
         start_time = time.time()
         start = i * slice_len
         stop = min((i + 1) * slice_len, len(aindexes))
-        cur_indexes = aindexes[start:stop]
-        if len(cur_indexes) == 0:
+        cur_indexes = aindexes[start:stop].tolist()
+        if not cur_indexes:
             continue
-        structures = Reader.read_structures_by_num(
-            path_to_structure, cur_indexes
-        )
+
+        structures = Reader.read_structures_by_num(str(input_path), cur_indexes)
         for struct in structures:
             num, time_ps, _, _ = struct
-            save_file_name = join(
-                path_to_save_structs,
-                f"struct-num={num}_time-ps={time_ps}.pickle",
-            )
-            with open(save_file_name, 'wb') as f:
+            save_path = output_dir / structure_file_name(num, time_ps)
+            with save_path.open("wb") as f:
                 pickle.dump(struct, f)
 
-        print(f" -- Count structures step: {i+1} from {count_steps}")
-        print(
-            f" -- Reading finished! Elapsed time: {time.time() - start_time}s"
-        )
+        kprint(f"Count structures step: {i + 1} from {count_steps}")
+        kprint(f"Reading finished! Elapsed time: {time.time() - start_time}s")
 
-    pattern = re.compile(
-        r"struct-num=(?P<step>\d+)"
-        r"_time-ps=(?P<time_ps>\d+(?:\.\d+)?).pickle"
+
+def build_indexes_from_args(args: argparse.Namespace) -> list[int]:
+    if args.auto_indexes:
+        info = scan_gro_trajectory_info(
+            args.input,
+            count_all_frames=args.full_count_steps is None,
+        )
+        if info.step_size is None:
+            raise ValueError("Need at least two frames to infer step size")
+
+        full_count_steps = args.full_count_steps
+        if full_count_steps is None:
+            if info.frame_count is None:
+                raise ValueError("Cannot infer full_count_steps")
+            full_count_steps = info.frame_count - 1
+
+        indexes = generate_indexes_by_mode(
+            start_step=info.start_step,
+            step_size=info.step_size,
+            full_count_steps=full_count_steps,
+            count_structures=args.count_structures,
+            mode=args.mode,
+        )
+        kprint(
+            "Trajectory info: "
+            f"start_step={info.start_step}, "
+            f"step_size={info.step_size}, "
+            f"start_time={info.start_time}, "
+            f"time_step_size={info.time_step_size}, "
+            f"full_count_steps={full_count_steps}"
+        )
+        kprint(f"Generated structure indexes: {len(indexes)}")
+        return indexes
+
+    return collect_indexes(args.index, args.indexes_file)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Extract selected structures from a .gro trajectory into pickle files."
     )
-    filenames = []
-    for file in os.listdir(path_to_save_structs):
-        match = pattern.match(file)
-        if not match:
-            raise Exception(f"Bad file name: {file}")
-        data = match.groupdict()
-        if int(data["step"]) in indexes:
-            assert int(data["time_ps"]) in times
-            filenames.append(join(path_to_save_structs, file))
-
-    for i, filename in enumerate(filenames):
-        with open(filename, 'rb') as f:
-            num, time_ps, atoms, size = pickle.load(f)
-
-        start_time = time.time()
-
-        bbox = Segmentator.cut_cell(size, 2)
-        resolution = np.array([s for s in size]).min() / ref_size  # nm
-        img_size = Segmentator.calc_image_size(
-            bbox.size(), reference_size=ref_size, by_min=True
-        )
-        binarized_file_name = join(
-            path_to_save_img,
-            f"result-img-num={num}_time-ps={time_ps}_bbox={bbox._short_str()}_resolution={resolution:.9f}.npy",
-        )
-        raw_file_name = join(
-            path_to_save_rimg,
-            f"result-img-num={num}_time-ps={time_ps}_bbox={bbox._short_str()}_resolution={resolution:.9f}.raw",
-        )
-
-        if os.path.isfile(binarized_file_name):
-            kprint(
-                f"Skip and load image with num={num}. Its {i + 1} from {len(filenames)}"
-            )
-            with open(binarized_file_name, 'rb') as f:  # type: ignore
-                img = np.load(f)  # type: ignore
-        else:
-            kprint(f"Run segmentation for num={num}")
-            start_time = time.time()
-            kerogen_data = KerogenData(None, atoms, bbox)  # type: ignore
-            if not kerogen_data.checkPeriodization():
-                Periodizer.periodize(kerogen_data)
-
-            segmentator = Segmentator(
-                kerogen_data,
-                img_size,
-                size_data=get_size,
-                radius_extention=get_ext_size,
-                partitioning=2,
-            )
-            img = 1 - segmentator.binarize(num_workers=4)
-            np.save(binarized_file_name, img)  # type: ignore
-            write_binary_file(img, raw_file_name)
-
-            kprint(
-                f"Binarization struct {num} is finished! Elapsed time: {time.time() - start_time}s. Its {i + 1} from {len(filenames)}"
-            )
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-
+    parser.add_argument("input", type=Path, help="Input .gro trajectory file")
+    parser.add_argument("output_dir", type=Path, help="Directory for structures")
     parser.add_argument(
-        '--def_path',
-        type=str,
-        default="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/h2/",
+        "--index",
+        action="append",
+        default=[],
+        help="Structure step number. Can be repeated or comma-separated.",
     )
-
     parser.add_argument(
-        '--structure_file_name',
-        type=str,
-        default="type1.h2.300.gro",
+        "--indexes-file",
+        type=Path,
+        help="Text file with structure step numbers separated by whitespace or commas.",
+    )
+    parser.add_argument(
+        "--auto-indexes",
+        action="store_true",
+        help="Infer trajectory parameters and generate indexes by mode/count.",
+    )
+    parser.add_argument(
+        "--mode",
+        choices=["all", "part"],
+        default="all",
+        help="Old-style index generation mode for --auto-indexes.",
+    )
+    parser.add_argument(
+        "--count-structures",
+        type=int,
+        help="How many structures to request in --auto-indexes mode.",
+    )
+    parser.add_argument(
+        "--full-count-steps",
+        type=int,
+        help=(
+            "Old full_count_steps value. If omitted, frames are counted by "
+            "quickly skipping through the trajectory."
+        ),
+    )
+    parser.add_argument(
+        "--slice-len",
+        type=int,
+        default=100,
+        help="How many requested structures to read per batch.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print generated indexes and exit without extracting structures.",
     )
 
     args = parser.parse_args()
+    if args.auto_indexes and args.count_structures is None:
+        parser.error("--auto-indexes requires --count-structures")
+    if args.auto_indexes and (args.index or args.indexes_file):
+        parser.error("Use either --auto-indexes or --index/--indexes-file")
 
-    full_count_steps = 6612
+    indexes = build_indexes_from_args(args)
+    if args.dry_run:
+        preview = ", ".join(str(index) for index in indexes[:20])
+        if len(indexes) > 20:
+            preview += ", ..."
+        kprint(f"Indexes preview: {preview}")
+        return
 
-    start_time = 50
-    step_time_size = 500
+    extract_structures(args.input, args.output_dir, indexes, args.slice_len)
 
-    start_step = 25000
-    step_size = 250000
 
-    last_step = full_count_steps * step_size + start_step
-    last_time_step = full_count_steps * step_time_size + start_time
-
-    count_slices = 500
-
-    def gen_list(start, step_size, step, count):
-        return [start + step_size * i * step for i in range(count)]
-
-    mode = "all"
-    # mode = "part"
-    if mode == "all":
-        step = int(full_count_steps / count_slices)
-        indexes = gen_list(start_step, step_size, step, count_slices)
-        times = gen_list(start_time, step_time_size, step, count_slices)
-        if last_step not in indexes:
-            indexes.append(last_step)
-            times.append(last_time_step)
-    else:
-        step = 1
-        indexes = gen_list(start_step, step_size, step, count_slices)
-        times = gen_list(start_time, step_time_size, step, count_slices)
-
-    extanded_struct_extr(
-        args.def_path,
-        args.structure_file_name,
-        indexes,
-        times,
-        250,
-    )
+if __name__ == "__main__":
+    main()

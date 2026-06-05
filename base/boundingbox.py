@@ -72,6 +72,13 @@ class BoundingBox(object):
             self.zb_.inside(z),
         )
 
+    def inside_pos(
+        self,
+        pos: np.ndarray,
+    ) -> bool:
+        assert pos.shape[0] == 3
+        return self.inside(pos[0], pos[1], pos[2])
+
     def __str__(self) -> str:
         return f"BoundingBox(x={self.xb_}|y={self.yb_}|z={self.zb_})"
 
