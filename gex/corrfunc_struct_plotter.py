@@ -1,39 +1,24 @@
 import argparse
+import os
+import re
+import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-import os
-
 from itertools import repeat
-from os.path import join
-
 from pathlib import Path
-import time
 from typing import List
 
 from matplotlib import pyplot as plt
 import numpy as np
-from base.trajectory import Trajectory
-from utils.utils import kprint
 from scipy.stats import linregress
 
-additional_radius = 0.0
+from base.trajectory import Trajectory
+from utils.utils import kprint
 
-atom_real_sizes = {
-    i: s for i, s in enumerate([0.17, 0.152, 0.155, 0.109, 0.18])
-}
 
-ext_radius = {
-    i: s
-    for i, s in enumerate(
-        [
-            additional_radius,
-            additional_radius,
-            additional_radius,
-            0.0,
-            additional_radius,
-        ]
-    )
-}
+_IMAGE_PATTERN = re.compile(
+    r"result-img-num=\d+_time-ps=(?P<time_ps>\d+(?:\.\d+)?).*\.npy$"
+)
 
 
 @dataclass
@@ -42,29 +27,42 @@ class RMSDResult:
     t: np.ndarray
 
 
-def get_size(type_id: int) -> float:
-    return atom_real_sizes[type_id]
+def parse_trj(value: str) -> tuple[Path, str]:
+    """Parse 'path/to/trj.gro:LABEL' into (Path, label)."""
+    parts = value.rsplit(":", 1)
+    if len(parts) != 2 or not parts[1]:
+        raise argparse.ArgumentTypeError(
+            f"Expected path:label, got '{value}'"
+        )
+    return Path(parts[0]), parts[1]
 
 
-def get_ext_size(type_id: int) -> float:
-    return ext_radius[type_id]
+def scan_image_infos(images_dir: Path) -> list[tuple[float, str]]:
+    """Scan directory for binarized .npy image files, extract time stamps from names."""
+    infos = []
+    for path in images_dir.iterdir():
+        match = _IMAGE_PATTERN.match(path.name)
+        if match is None:
+            continue
+        time_ps = float(match.group("time_ps"))
+        infos.append((time_ps, str(path)))
+    if not infos:
+        raise RuntimeError(f"No matching image files found in {images_dir}")
+    return sorted(infos, key=lambda x: x[0])
 
 
 def extract_mean_displacement(trajectories, traj_stride: int = 1) -> RMSDResult:
     a_msd = []
     a_t = []
 
-    for i, trj in enumerate(trajectories[::traj_stride]):
+    for _, trj in enumerate(trajectories[::traj_stride]):
         msd = trj.msd_average_time()
         t = np.asarray(trj.times, dtype=float)
-
         a_t.append((t * 1e-6).astype(float))
         a_msd.append(msd)
 
     msd_mean = np.mean(np.stack(a_msd, axis=0), axis=0)
     rmsd = np.sqrt(msd_mean)
-    # rmsd = msd_mean
-
     return RMSDResult(rmsd, a_t[0])
 
 
@@ -72,7 +70,7 @@ def plot_corrfunc_and_md(
     dt,
     C_t,
     trj_msd_list: List[tuple[RMSDResult, str]],
-    save_path: str | None = None,
+    save_path: Path | None = None,
     pore_mode: bool = False,
     max_t: float = 2.8,
     fit_t_range: tuple[float, float] | None = None,
@@ -105,15 +103,12 @@ def plot_corrfunc_and_md(
     ax1.tick_params(axis="both", labelsize=12)
     ax1.tick_params(axis="y", labelcolor=color_ct)
 
-    # ax1.grid(True, linestyle="--", alpha=0.4)
-
     lines = line1
     styles = ['-', ':', '--', '-.', '.']
     _ann_fracs = [0.30, 0.55, 0.75]
     ax2 = ax1.twinx()
     for curve_idx, (res, prefix) in enumerate(trj_msd_list):
-        label = prefix + " "
-        label += r"$RMSD(t)$"
+        label = prefix + " " + r"$RMSD(t)$"
 
         r = res.rmsd
         t = res.t
@@ -165,7 +160,7 @@ def plot_corrfunc_and_md(
     ax2.tick_params(axis="y", labelcolor=color_md)
 
     positive_r = []
-    for res, prefix in trj_msd_list:
+    for res, _ in trj_msd_list:
         r = np.asarray(res.rmsd, dtype=float)
         positive_r.extend(r[np.isfinite(r) & (r > 0)])
 
@@ -178,7 +173,6 @@ def plot_corrfunc_and_md(
         lines,
         labels,
         loc="upper right",
-        # bbox_to_anchor=(1.02, 1.0),
         borderaxespad=0.0,
         fontsize=16,
         frameon=False,
@@ -193,21 +187,12 @@ def plot_corrfunc_and_md(
 
 
 def correlation_average_time(
-    image_infos, load_img, ct_save_path: str | Path, num_workers: int = 4
+    image_infos, load_img, ct_save_path: Path, num_workers: int = 4
 ):
     """
     Time-averaged autocorrelation function:
 
         C(tau_k) = mean_i [ sum_x I_i(x) I_{i+k}(x) / V ]
-
-    image_infos:
-        list of tuples (time_ps, img_file_name)
-
-    load_img:
-        function that loads image by filename
-
-    save_path:
-        path where ct, dt array will be saved
     """
     image_infos = sorted(image_infos, key=lambda x: x[0])
 
@@ -215,9 +200,8 @@ def correlation_average_time(
     img_files = [info[1] for info in image_infos]
 
     n = len(image_infos)
-    dt = (times_ps - times_ps[0]) * 1e-6
-    print("start dt = ", dt[:5])
-    print("end dt = ", dt[-5:])
+    dt = (times_ps - times_ps[0]) * 1e-6  # ps → μs
+    kprint(f"dt range: {dt[1]:.6f} … {dt[-1]:.3f} μs  ({n} frames)")
 
     if os.path.exists(ct_save_path):
         C_t = np.load(ct_save_path)
@@ -239,7 +223,6 @@ def correlation_average_time(
             kprint(f"Skip lag: {lag} from {n}, C: {C_t[lag]}")
             continue
         xdata = np.array(list(range(n - lag)), dtype=np.int32)
-        values = np.zeros(shape=(n - lag), dtype=np.float64)
 
         if num_workers == 0:
             values = process(xdata, lag)
@@ -254,10 +237,7 @@ def correlation_average_time(
                 values = np.concatenate(chunk_results)
 
         C_t[lag] = np.mean(values)
-
-        # Сохраняем промежуточное состояние после каждого lag
         np.save(ct_save_path, C_t)
-
         kprint(
             f"Ready lag: {lag} from {n}, C: {C_t[lag]} in {time.time() - start_time:.2f} sec"
         )
@@ -265,128 +245,104 @@ def correlation_average_time(
     return dt, C_t
 
 
-def extanded_struct_extr(
-    path_to_data: str,
-    path_to_trjs: list[tuple[str, str]],
-    template: str,
-    indexes: list[int],
-    times: list[int],
-    ref_size: int,
-    prefix: str,
-) -> None:
-    path_to_img = join(path_to_data, "images")
-    path_to_save_fig = join(path_to_data, "figs", "corrfunc+msd.svg")
-
-    filenames = [
-        join(path_to_img, template.format(num=n, time=t))
-        for n, t in zip(indexes, times)
-    ]
-    image_infos = list(zip(times, filenames))
-
-    pore_mode = True
-
-    def load_img(file_name: str) -> np.ndarray:
-        if not os.path.isfile(file_name):
-            raise FileNotFoundError(file_name)
-        img = np.load(file_name, mmap_mode="r")  # type: ignore
-        if pore_mode:
-            img = 1 - img
-        if ref_size not in img.shape:
-            raise ValueError(f"ref_size {ref_size} not in {img.shape}")
-        return img.astype(np.int8)
-
-    c_t_save_path = join(path_to_data, prefix + "_ct.npy")
-    dt, C_t = correlation_average_time(image_infos, load_img, c_t_save_path, 8)
-    kprint(f"C(t) min time {dt[0]}, max time {dt[-1]}")
-
-    trj_msd_list: list[RMSDResult, str] = []
-    for ptrj, gas in path_to_trjs:
-        trajectories = Trajectory.read_trajectoryes(ptrj)
-        res = extract_mean_displacement(trajectories, traj_stride=1)
-        trj_msd_list.append((res, gas))
-
-    plot_corrfunc_and_md(
-        dt=dt,
-        C_t=C_t,
-        trj_msd_list=trj_msd_list,
-        save_path=path_to_save_fig,
-        pore_mode=pore_mode,
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Compute time-averaged autocorrelation C(t) from binarized images "
+            "and plot together with RMSD(t) trajectories."
+        )
     )
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-
     parser.add_argument(
-        '--def_path',
-        type=str,
-        default="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/h2/",
+        "images_dir",
+        type=Path,
+        help="Directory containing binarized .npy images (output of binarization_structs).",
     )
-    def_template = (
-        "result-img-num={num}_time-ps={time}"
-        "_bbox=(x=(0.000-6.231)_y=(0.590-6.821)_z=(3.392-9.623))"
-        "_resolution=0.024923800.npy"
-    )
-
     parser.add_argument(
-        '--path_temp_case',
-        type=str,
-        default="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/",
+        "ct_file",
+        type=Path,
+        help="Path to save/load the C(t) cache (.npy). Computed incrementally.",
     )
-
     parser.add_argument(
-        '--template',
-        type=str,
-        default=def_template,
+        "output",
+        type=Path,
+        help="Output figure path (e.g. figs/corrfunc.svg).",
+    )
+    parser.add_argument(
+        "--trj",
+        action="append",
+        type=parse_trj,
+        required=True,
+        metavar="PATH:LABEL",
+        help=(
+            "Trajectory .gro file with a display label, e.g. trj.gro:CH4. "
+            "Can be repeated for multiple gases."
+        ),
+    )
+    parser.add_argument(
+        "--pore",
+        action="store_true",
+        help="Pore mode: invert images (1-img) before computing C(t).",
+    )
+    parser.add_argument(
+        "--max-t",
+        type=float,
+        default=2.8,
+        metavar="US",
+        help="Maximum time in μs shown on the plot (default: 2.8).",
+    )
+    parser.add_argument(
+        "--fit-t-range",
+        type=float,
+        nargs=2,
+        metavar=("T_MIN", "T_MAX"),
+        help="Time range in μs for power-law regression (default: full range).",
+    )
+    parser.add_argument(
+        "--num-workers",
+        type=int,
+        default=4,
+        help="Number of threads for C(t) computation (default: 4).",
     )
 
     args = parser.parse_args()
 
-    full_count_steps = 6612
+    images_dir: Path = args.images_dir
+    ct_file: Path = args.ct_file
+    output: Path = args.output
+    pore_mode: bool = args.pore
 
-    start_time = 50
-    step_time_size = 500
+    image_infos = scan_image_infos(images_dir)
+    kprint(f"Found {len(image_infos)} image files in {images_dir}")
 
-    start_step = 25000
-    full_count_steps = 6612
-    step_size = 250000
+    def load_img(file_name: str) -> np.ndarray:
+        img = np.load(file_name, mmap_mode="r")
+        if pore_mode:
+            img = 1 - img
+        return img.astype(np.int8)
 
-    last_step = full_count_steps * step_size + start_step
-    last_time_step = full_count_steps * step_time_size + start_time
+    ct_file.parent.mkdir(parents=True, exist_ok=True)
+    dt, C_t = correlation_average_time(image_infos, load_img, ct_file, args.num_workers)
+    kprint(f"C(t) time range: {dt[0]:.4f} … {dt[-1]:.4f} μs")
 
-    count_slices = 500
+    trj_msd_list = []
+    for trj_path, label in args.trj:
+        trajectories = Trajectory.read_trajectoryes(trj_path)
+        res = extract_mean_displacement(trajectories)
+        trj_msd_list.append((res, label))
 
-    def gen_list(start, step_size, step, count):
-        return [start + step_size * i * step for i in range(count)]
+    fit_t_range = tuple(args.fit_t_range) if args.fit_t_range else None
 
-    mode = "all"
-    # mode = "part"
-    if mode == "all":
-        step = int(full_count_steps / count_slices)
-        indexes = gen_list(start_step, step_size, step, count_slices)
-        times = gen_list(start_time, step_time_size, step, count_slices)
-        if last_step not in indexes:
-            indexes.append(last_step)
-            times.append(last_time_step)
-    else:
-        step = 1
-        indexes = gen_list(start_step, step_size, step, count_slices)
-        times = gen_list(start_time, step_time_size, step, count_slices)
-
-    trj_paths = [
-        (
-            join(args.path_temp_case, gas, "trj.gro"),
-            sgas,
-        )
-        for gas, sgas in [("ch4", r"$CH_4$"), ("h2", r"$H_2$")]
-    ]
-
-    extanded_struct_extr(
-        args.def_path,
-        trj_paths,
-        args.template,
-        indexes,
-        times,
-        250,
-        f"mode={mode}_count-slices={count_slices}",
+    output.parent.mkdir(parents=True, exist_ok=True)
+    plot_corrfunc_and_md(
+        dt=dt,
+        C_t=C_t,
+        trj_msd_list=trj_msd_list,
+        save_path=output,
+        pore_mode=pore_mode,
+        max_t=args.max_t,
+        fit_t_range=fit_t_range,
     )
+
+
+if __name__ == "__main__":
+    main()
