@@ -14,6 +14,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 from base.trajectory import Trajectory
 from utils.utils import kprint
+from scipy.stats import linregress
 
 additional_radius = 0.0
 
@@ -74,6 +75,7 @@ def plot_corrfunc_and_md(
     save_path: str | None = None,
     pore_mode: bool = False,
     max_t: float = 2.8,
+    fit_t_range: tuple[float, float] | None = None,
 ) -> None:
     dt = np.asarray(dt, dtype=float)
     C_t = np.asarray(C_t, dtype=float)
@@ -107,8 +109,9 @@ def plot_corrfunc_and_md(
 
     lines = line1
     styles = ['-', ':', '--', '-.', '.']
+    _ann_fracs = [0.30, 0.55, 0.75]
     ax2 = ax1.twinx()
-    for res, prefix in trj_msd_list:
+    for curve_idx, (res, prefix) in enumerate(trj_msd_list):
         label = prefix + " "
         label += r"$RMSD(t)$"
 
@@ -129,6 +132,30 @@ def plot_corrfunc_and_md(
             linestyle=styles.pop(0),
         )
         lines += line
+
+        fit_mask = np.isfinite(t) & np.isfinite(r) & (t > 0) & (r > 0)
+        if fit_t_range is not None:
+            fit_mask &= (t >= fit_t_range[0]) & (t <= fit_t_range[1])
+        if fit_mask.sum() >= 2:
+            slope, intercept, *_ = linregress(np.log(t[fit_mask]), np.log(r[fit_mask]))
+            t_line = np.logspace(
+                np.log10(t[fit_mask].min()), np.log10(t[fit_mask].max()), 200
+            )
+            r_line = np.exp(intercept) * t_line**slope
+            ax2.plot(t_line, r_line, '--', linewidth=1.5, color=color_md)
+            frac = _ann_fracs[min(curve_idx, len(_ann_fracs) - 1)]
+            ai = int(frac * (len(t_line) - 1))
+            ax2.annotate(
+                rf"$\sim t^{{{slope:.2f}}}$",
+                xy=(t_line[ai], r_line[ai]),
+                xytext=(0, -22),
+                textcoords="offset points",
+                color=color_md,
+                fontsize=16,
+                ha="center",
+                va="bottom",
+                bbox=dict(facecolor="white", edgecolor="none", alpha=0.7, pad=1.5),
+            )
 
     ax2.set_yscale("log")
     ax2.set_xscale("log")

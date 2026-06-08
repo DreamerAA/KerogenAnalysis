@@ -12,6 +12,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 from base.trajectory import Trajectory
 from utils.utils import kprint
+from scipy.stats import linregress
 
 
 @dataclass
@@ -42,6 +43,7 @@ def plot_corrfunc_and_md(
     trj_msd: RMSDResult,
     save_path: str | Path | None = None,
     max_t: float = 2.8,
+    fit_t_range: tuple[float, float] | None = None,
 ) -> None:
     fig, ax1 = plt.subplots(figsize=(9, 5))
 
@@ -69,6 +71,30 @@ def plot_corrfunc_and_md(
     plt.ylim(bottom=min(positive_r) * 0.8, top=max(positive_r) * 5)
 
     ax = plt.gca()
+
+    fit_mask = np.isfinite(t) & np.isfinite(r) & (t > 0) & (r > 0)
+    if fit_t_range is not None:
+        fit_mask &= (t >= fit_t_range[0]) & (t <= fit_t_range[1])
+    if fit_mask.sum() >= 2:
+        slope, intercept, *_ = linregress(np.log(t[fit_mask]), np.log(r[fit_mask]))
+        t_line = np.logspace(
+            np.log10(t[fit_mask].min()), np.log10(t[fit_mask].max()), 200
+        )
+        r_line = np.exp(intercept) * t_line**slope
+        ax.plot(t_line, r_line, '--', linewidth=1.5, color=color_msd)
+        ai = int(0.55 * (len(t_line) - 1))
+        ax.annotate(
+            rf"$\sim t^{{{slope:.2f}}}$",
+            xy=(t_line[ai], r_line[ai]),
+            xytext=(0, -22),
+            textcoords="offset points",
+            color=color_msd,
+            fontsize=16,
+            ha="center",
+            va="bottom",
+            bbox=dict(facecolor="white", edgecolor="none", alpha=0.7, pad=1.5),
+        )
+
     # Оставляем рамку целиком
     for spine in ax.spines.values():
         spine.set_visible(True)
