@@ -6,6 +6,7 @@ import numpy as np
 
 from gex.structure_image_utils import (
     build_segmentator,
+    extract_settings,
     collect_processing_indexes,
     image_base_name,
     iter_structure_files,
@@ -13,6 +14,7 @@ from gex.structure_image_utils import (
     load_structure,
     write_binary_file,
 )
+from processes.segmentaion import BinarizeAlgo
 
 
 def binarize_structures(
@@ -30,8 +32,8 @@ def binarize_structures(
     structure_files = iter_structure_files(structures_dir, indexes)
     for i, structure_file in enumerate(structure_files):
         structure = load_structure(structure_file)
-        num, time_ps, bbox, resolution, segmentator = build_segmentator(
-            structure, ref_size=ref_size, dev=dev
+        num, time_ps, bbox, resolution, img_size = extract_settings(
+            structure, ref_size, dev
         )
         base_name = image_base_name(num, time_ps, bbox, resolution)
         binarized_path = output_bin_dir / f"{base_name}.npy"
@@ -43,9 +45,13 @@ def binarize_structures(
             )
             continue
 
+        segmentator = build_segmentator(structure, bbox, img_size)
+
         kprint(f"Run binarization for num={num}")
         start_time = time.time()
-        img = 1 - segmentator.binarize(num_workers=num_workers)
+        img = 1 - segmentator.binarize(
+            num_workers=num_workers, algo=BinarizeAlgo.PROCESS_CHUNK
+        )
         np.save(binarized_path, img)
         write_binary_file(img, raw_path)
         kprint(

@@ -24,8 +24,7 @@ ext_radius = {
 }
 
 STRUCTURE_PATTERN = re.compile(
-    r"struct-num=(?P<step>\d+)"
-    r"_time-ps=(?P<time_ps>\d+(?:\.\d+)?)\.pickle"
+    r"struct-num=(?P<step>\d+)" r"_time-ps=(?P<time_ps>\d+(?:\.\d+)?)\.pickle"
 )
 
 HEADER_PATTERN = re.compile(
@@ -195,7 +194,9 @@ def generate_indexes_from_available_structures(
 
     available_indexes = list_available_structure_indexes(structures_dir)
     if not available_indexes:
-        raise RuntimeError(f"No structure pickle files found in {structures_dir}")
+        raise RuntimeError(
+            f"No structure pickle files found in {structures_dir}"
+        )
 
     if mode == "part":
         return available_indexes[:count_slices]
@@ -223,7 +224,9 @@ def collect_processing_indexes(
     has_mode_indexes = bool(mode or count_slices is not None)
 
     if has_explicit_indexes and has_mode_indexes:
-        raise ValueError("Use either --index/--indexes-file or --mode/--count-slices")
+        raise ValueError(
+            "Use either --index/--indexes-file or --mode/--count-slices"
+        )
     if has_explicit_indexes:
         return collect_indexes(indexes, indexes_file)
     if has_mode_indexes:
@@ -302,9 +305,7 @@ def load_structure(path: Path):
         return pickle.load(f)
 
 
-def build_segmentator(structure, ref_size: int, dev: float):
-    from base.kerogendata import KerogenData
-    from base.periodizer import Periodizer
+def extract_settings(structure, ref_size: int, dev: float):
     from processes.segmentaion import Segmentator
 
     num, time_ps, atoms, size = structure
@@ -313,16 +314,27 @@ def build_segmentator(structure, ref_size: int, dev: float):
     img_size = Segmentator.calc_image_size(
         bbox.size(), reference_size=ref_size, by_min=True
     )
+    return num, time_ps, bbox, resolution, img_size
 
+
+def build_segmentator(
+    structure,
+    bbox,
+    img_size,
+):
+    from processes.segmentaion import Segmentator
+    from base.kerogendata import KerogenData
+    from base.periodizer import Periodizer
+
+    _, _, atoms, _ = structure
     kerogen_data = KerogenData(None, atoms, bbox)
     if not kerogen_data.checkPeriodization():
         Periodizer.periodize(kerogen_data)
 
-    segmentator = Segmentator(
+    return Segmentator(
         kerogen_data,
         img_size,
         size_data=get_size,
         radius_extention=get_ext_size,
         partitioning=2,
     )
-    return num, time_ps, bbox, resolution, segmentator
