@@ -9,10 +9,16 @@ from pathlib import Path
 from utils.utils import kprint
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Extract PNM from binary images")
-    parser.add_argument("path", type=Path, help="Data directory (contains raw_images/)")
+    parser = argparse.ArgumentParser(
+        description="Extract PNM from binary images"
+    )
+    parser.add_argument(
+        "path", type=Path, help="Data directory (contains raw_images/)"
+    )
     parser.add_argument("extractor", type=Path, help="Path to extractor binary")
-    parser.add_argument("config", type=Path, help="Path to extractor config JSON")
+    parser.add_argument(
+        "config", type=Path, help="Path to extractor config JSON"
+    )
 
     args = parser.parse_args()
 
@@ -107,7 +113,8 @@ if __name__ == '__main__':
         out, err = process.communicate()
         errcode = process.returncode
         if errcode != 0:
-            print("Error!!!")
+            kprint(err.decode("utf-8"))
             break
         else:
-            print(f"Sucssess: {pnm_pref}")
+            kprint(f"Sucssess: {pnm_pref}")
+            kprint(f"Ready index = {i+1} from {len(onlyfiles)}")

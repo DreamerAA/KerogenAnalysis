@@ -31,7 +31,19 @@ python -m gex.corrfunc_krg_mol_plotter ${DATA_PATH}/trj_krg/krg_99.gro ${DATA_PA
 
 python -m gex.corrfunc_struct_plotter ${DATA_PATH}/bin_images ${DATA_PATH}/ct_pore.npy ${DATA_PATH}/figs/corrfunc.svg --trj ${DATA_PATH}/../ch4/trj.gro:CH4 --trj ${DATA_PATH}/../h2/trj.gro:H2 --pore --max-t 2.8
 
+## PNM экстракция
 
+export EXTRACTOR_PATH="/media/andrey/Samsung_T5/DCore/SSM-2/pore-network-extraction_new/build/clang-15-release-cpu/bin/extractor_example"
+export EXTRACTOR_CONFIG="/media/andrey/Samsung_T5/DCore/SSM-2/pore-network-extraction_new/build/clang-15-release-cpu/example/config/ExtractorExampleConfig.json"
+
+python -m gex.pnm_extractor $DATA_PATH $EXTRACTOR_PATH $EXTRACTOR_CONFIG
+
+
+
+
+
+
+# OLD BUT NEED CHECK
 
 
 ## Экстракция DM 
@@ -73,12 +85,6 @@ pymol -q external_scripts/visualize_kerogen_part_cell_with_molecula.pml
 python -m gex.extract_one_molecula $DATA_PATH/Ker.pdb $DATA_PATH/KRG_chainA_res1.pdb --chain A --resid 1
 
 
-## PNM экстракция
-
-export EXTRACTOR_PATH="/path/to/pore-network-extraction/build/bin/extractor_example"
-export EXTRACTOR_CONFIG="/path/to/pore-network-extraction/example/config/ExtractorExampleConfig.json"
-
-python -m gex.pnm_extractor $DATA_PATH $EXTRACTOR_PATH $EXTRACTOR_CONFIG
 
 
 ## Числа Эйлера (PNM vs image)

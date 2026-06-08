@@ -15,7 +15,6 @@ from scipy.stats import linregress
 from base.trajectory import Trajectory
 from utils.utils import kprint
 
-
 _IMAGE_PATTERN = re.compile(
     r"result-img-num=\d+_time-ps=(?P<time_ps>\d+(?:\.\d+)?).*\.npy$"
 )
@@ -31,9 +30,7 @@ def parse_trj(value: str) -> tuple[Path, str]:
     """Parse 'path/to/trj.gro:LABEL' into (Path, label)."""
     parts = value.rsplit(":", 1)
     if len(parts) != 2 or not parts[1]:
-        raise argparse.ArgumentTypeError(
-            f"Expected path:label, got '{value}'"
-        )
+        raise argparse.ArgumentTypeError(f"Expected path:label, got '{value}'")
     return Path(parts[0]), parts[1]
 
 
@@ -74,6 +71,7 @@ def plot_corrfunc_and_md(
     pore_mode: bool = False,
     max_t: float = 2.8,
     fit_t_range: tuple[float, float] | None = None,
+    x_max: float | None = None,
 ) -> None:
     dt = np.asarray(dt, dtype=float)
     C_t = np.asarray(C_t, dtype=float)
@@ -132,29 +130,41 @@ def plot_corrfunc_and_md(
         if fit_t_range is not None:
             fit_mask &= (t >= fit_t_range[0]) & (t <= fit_t_range[1])
         if fit_mask.sum() >= 2:
-            slope, intercept, *_ = linregress(np.log(t[fit_mask]), np.log(r[fit_mask]))
+            slope, intercept, *_ = linregress(
+                np.log(t[fit_mask]), np.log(r[fit_mask])
+            )
             t_line = np.logspace(
                 np.log10(t[fit_mask].min()), np.log10(t[fit_mask].max()), 200
             )
             r_line = np.exp(intercept) * t_line**slope
+
+            count = len(t_line) // 2 - 50
+            t_line = t_line[count:]
+            r_line = r_line[count:]
+
             ax2.plot(t_line, r_line, '--', linewidth=1.5, color=color_md)
             frac = _ann_fracs[min(curve_idx, len(_ann_fracs) - 1)]
             ai = int(frac * (len(t_line) - 1))
             ax2.annotate(
                 rf"$\sim t^{{{slope:.2f}}}$",
                 xy=(t_line[ai], r_line[ai]),
-                xytext=(0, -22),
+                xytext=(0, -30),
                 textcoords="offset points",
                 color=color_md,
                 fontsize=16,
                 ha="center",
                 va="bottom",
-                bbox=dict(facecolor="white", edgecolor="none", alpha=0.7, pad=1.5),
+                bbox=dict(
+                    facecolor="white", edgecolor="none", alpha=0.7, pad=1.5
+                ),
             )
 
     ax2.set_yscale("log")
     ax2.set_xscale("log")
     ax1.set_xscale("log")
+    if x_max is not None:
+        ax1.set_xlim(right=x_max)
+        ax2.set_xlim(right=x_max)
     ax2.set_ylabel(r"$\mathrm{RMSD}(t)$, nm", fontsize=16, color=color_md)
     ax2.tick_params(axis="both", labelsize=12)
     ax2.tick_params(axis="y", labelcolor=color_md)
@@ -291,6 +301,13 @@ def main() -> None:
         help="Maximum time in μs shown on the plot (default: 2.8).",
     )
     parser.add_argument(
+        "--x-max",
+        type=float,
+        default=None,
+        metavar="US",
+        help="Right X-axis display limit in μs (default: auto from data).",
+    )
+    parser.add_argument(
         "--fit-t-range",
         type=float,
         nargs=2,
@@ -321,7 +338,9 @@ def main() -> None:
         return img.astype(np.int8)
 
     ct_file.parent.mkdir(parents=True, exist_ok=True)
-    dt, C_t = correlation_average_time(image_infos, load_img, ct_file, args.num_workers)
+    dt, C_t = correlation_average_time(
+        image_infos, load_img, ct_file, args.num_workers
+    )
     kprint(f"C(t) time range: {dt[0]:.4f} … {dt[-1]:.4f} μs")
 
     trj_msd_list = []
@@ -341,6 +360,7 @@ def main() -> None:
         pore_mode=pore_mode,
         max_t=args.max_t,
         fit_t_range=fit_t_range,
+        x_max=args.x_max,
     )
 
 
