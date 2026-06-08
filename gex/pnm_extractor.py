@@ -9,35 +9,16 @@ from pathlib import Path
 from utils.utils import kprint
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--path_to_extractor',
-        type=str,
-        default="/media/andrey/Samsung_T5/DCore/SSM-2/pore-network-extraction/build/clang-15-release-cpu/bin/extractor_example",
-    )
-    parser.add_argument(
-        '--default_path',
-        type=str,
-        default="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/",
-    )
-    parser.add_argument(
-        '--path_to_config',
-        type=str,
-        default="/media/andrey/Samsung_T5/DCore/SSM-2/pore-network-extraction/example/config/ExtractorExampleConfig.json",
-    )
-    parser.add_argument(
-        '--name',
-        type=str,
-        default="result-img-num=25000_time-ps=50_bbox=(x=(0.000-6.231)_y=(0.590-6.821)_z=(3.392-9.623))_resolution=0.012461900",
-    )
+    parser = argparse.ArgumentParser(description="Extract PNM from binary images")
+    parser.add_argument("path", type=Path, help="Data directory (contains raw_images/)")
+    parser.add_argument("extractor", type=Path, help="Path to extractor binary")
+    parser.add_argument("config", type=Path, help="Path to extractor config JSON")
 
     args = parser.parse_args()
 
-    path_to_extractor = args.path_to_extractor
-    path_to_config = args.path_to_config
-    default_path = args.default_path
-
-    name = args.name
+    path_to_extractor = str(args.extractor)
+    path_to_config = str(args.config)
+    default_path = str(args.path)
 
     pnm_path = join(default_path, "pnm")
     raw_img_path = join(default_path, "raw_images")

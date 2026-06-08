@@ -126,26 +126,12 @@ def visualize_dist_trajectory(
 
 
 if __name__ == '__main__':
-    main_path = "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/"
-    img_name = "result-img-num=551025000_time-ps=1102050_bbox=(x=(1.489-4.742)_y=(2.078-5.332)_z=(4.881-8.134))_resolution=0.013015000.npy"
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--main_path',
-        type=str,
-        default=main_path,
-    )
-    parser.add_argument(
-        '--path_to_img',
-        type=str,
-        default=join(main_path, "float_images", img_name),
-    )
-    parser.add_argument(
-        '--num',
-        type=int,
-        default=2,  # 14 17
-    )
+    parser = argparse.ArgumentParser(description="Visualize distance trajectory with structure image")
+    parser.add_argument("path", type=Path, help="Data directory")
+    parser.add_argument("img", type=Path, help="Float image .npy file")
+    parser.add_argument("--num", type=int, default=2, help="Molecule index")
     args = parser.parse_args()
 
     visualize_dist_trajectory(
-        args.main_path, args.path_to_img, 4500, 6700, args.num
+        str(args.path), str(args.img), 4500, 6700, args.num
     )

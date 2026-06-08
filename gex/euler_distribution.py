@@ -24,9 +24,8 @@ from base.reader import Reader
 
 
 def calculateEulerImage(
-    path_to_img: str, path_to_config: str
+    path_to_img: str, path_to_config: str, path_to_exe: str
 ) -> npt.NDArray[np.int64]:
-    path_to_exe = "/home/andrey/DigitalCore/PNE/pore-network-extraction/build/bin/extractor_example"
 
     # Opening JSON file
     with open(path_to_config) as f:
@@ -133,7 +132,8 @@ def plotEulerDistributions(
 
 
 def calculateEulers(
-    path_to_euler: str, path_to_img: str, path_to_conf: str, path_to_pnm: str
+    path_to_euler: str, path_to_img: str, path_to_conf: str, path_to_pnm: str,
+    path_to_exe: str,
 ) -> Tuple[List[int], List[int]]:
     img_eulers_file = path_to_euler + "img_euler.pkl"
     img_eulers_file_j = path_to_euler + "img_euler.json"
@@ -145,7 +145,7 @@ def calculateEulers(
             j_eulers = json.load(f)
             img_eulers = [v for k, v in j_eulers.items()]
     else:
-        img_eulers = calculateEulerImage(path_to_img, path_to_conf)
+        img_eulers = calculateEulerImage(path_to_img, path_to_conf, path_to_exe)
         with open(img_eulers_file, 'wb') as f:
             pickle.dump(img_eulers, f)
 
@@ -161,29 +161,27 @@ def calculateEulers(
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Euler number distributions (PNM vs image)")
+    parser.add_argument("main_path", type=Path, help="Base data directory (contains <temp>/<gas>/)")
+    parser.add_argument("--config", type=Path, required=True, help="Extractor config JSON")
+    parser.add_argument("--extractor", type=Path, required=True, help="Extractor binary path")
+    args = parser.parse_args()
+
     fig, axs = plt.subplots(1, 2)
-    for i, a in enumerate(axs):
+    for a in axs:
         a.set_xlabel("Euler number")
     axs[0].set_title("Eulers by Pore Network")
     axs[1].set_title("Eulers by Image")
 
-    main_path = "/media/andrey/Samsung_T5/PHD/Kerogen/"
-    path_to_conf = main_path + "ExtractorExampleConfig.json"
-
     for tem in ["300K", "400K"]:
         for el in ["h2", "ch4"]:
-            c_path = main_path + f"{tem}/{el}/"
+            c_path = str(args.main_path / tem / el) + "/"
 
-            path_to_euler = c_path
-            path_to_img = c_path + "images/"
-            path_to_pnm = c_path + "pnm/"
-
-            pnm_eulers_h2, img_eulers_h2 = calculateEulers(
-                path_to_euler, path_to_img, path_to_conf, path_to_pnm
+            pnm_eulers, img_eulers = calculateEulers(
+                c_path, c_path + "images/", str(args.config), c_path + "pnm/",
+                str(args.extractor),
             )
-            plotEulerDistributions(
-                pnm_eulers_h2, img_eulers_h2, el.upper() + " - " + tem, axs
-            )
+            plotEulerDistributions(pnm_eulers, img_eulers, el.upper() + " - " + tem, axs)
 
     plt.legend()
     plt.show()

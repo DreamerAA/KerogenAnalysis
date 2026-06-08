@@ -257,18 +257,18 @@ def build_3d_distributions(
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="3D PNM element size distributions")
+    parser.add_argument("pnm_dir", type=Path, help="PNM directory")
+    parser.add_argument("figs_dir", type=Path, help="Output figures directory")
+    parser.add_argument("--label", type=str, default="", help="Series label")
+    parser.add_argument("--pnm-step", type=int, default=30)
+    parser.add_argument("--bins", type=int, default=50)
+    parser.add_argument("--no-smooth", action="store_true")
+    args = parser.parse_args()
+
     build_3d_distributions(
-        (
-            "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/h2/pnm/",
-            r"$H_2$",
-            "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/h2/figs/",
-        ),
-        # (
-        #     "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/h2/pnm/",
-        #     r"$H_2$",
-        #     "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/h2/figs/",
-        # ),
-        pnm_step=30,
-        bins=50,
-        smooth=True,
+        (str(args.pnm_dir), args.label, str(args.figs_dir)),
+        pnm_step=args.pnm_step,
+        bins=args.bins,
+        smooth=not args.no_smooth,
     )

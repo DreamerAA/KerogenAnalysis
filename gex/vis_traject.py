@@ -44,35 +44,11 @@ def visualize_dist_trajectory(
 
 
 if __name__ == '__main__':
-    prefix = "/media/andrey/Samsung_T5/PHD/Kerogen/"
-
-    type = "type1matrix"
-    temp = "300K"
-    el = "ch4"
-    traps_type = "SIB"
-    num = 2  # 1
-
-    trj_path = prefix + f"{type}/{temp}/{el}/trj.gro"
-
-    traps_path = (
-        prefix + f"{type}/{temp}/{el}/traps/{traps_type}/traps_{num}.pickle"
-    )
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--trj_path',
-        type=str,
-        default=trj_path,
-    )
-    parser.add_argument(
-        '--traps_path',
-        type=str,
-        default=traps_path,
-    )
+    parser = argparse.ArgumentParser(description="Visualize distance trajectory")
+    parser.add_argument("trj", type=Path, help="Trajectory file (.gro)")
+    parser.add_argument("num", type=int, help="Molecule index")
+    parser.add_argument("--traps", type=Path, help="Traps pickle file (optional)")
     args = parser.parse_args()
 
-    trj_path = args.trj_path
-    traps_path = args.traps_path
-
-    visualize_dist_trajectory(trj_path, num)
-    # visualize_dist_trajectory(trj_path, num, traps_path)
+    traps_path = str(args.traps) if args.traps else ""
+    visualize_dist_trajectory(str(args.trj), args.num, traps_path)

@@ -68,32 +68,23 @@ def build_distributions(paths: List[Tuple[str, str]]) -> None:
     plt.show()
 
 
+def _parse_trj(s: str) -> Tuple[str, str]:
+    parts = s.split(":", 1)
+    if len(parts) != 2:
+        raise argparse.ArgumentTypeError(f"Expected PATH:LABEL, got: {s!r}")
+    return parts[0], parts[1]
+
+
 if __name__ == '__main__':
-    build_distributions(
-        [
-            (
-                "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/pnm/",
-                "type1-300K-CH4",
-            ),
-            (
-                "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/h2/pnm/",
-                "type1-300K-H2",
-            ),
-            (
-                "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/400K/ch4/pnm/",
-                "type1-400K-CH4",
-            ),
-            (
-                "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/400K/h2/pnm/",
-                "type1-400K-H2",
-            ),
-            (
-                "/media/andrey/Samsung_T5/PHD/Kerogen/type2matrix/300K/ch4/pnm/",
-                "type2-300K-CH4",
-            ),
-            (
-                "/media/andrey/Samsung_T5/PHD/Kerogen/type2matrix/300K/h2/pnm/",
-                "type2-300K-H2",
-            ),
-        ]
+    parser = argparse.ArgumentParser(description="PNM connectivity distributions")
+    parser.add_argument(
+        "--trj",
+        action="append",
+        type=_parse_trj,
+        required=True,
+        metavar="PATH:LABEL",
+        help="PNM directory and label (repeatable)",
     )
+    args = parser.parse_args()
+
+    build_distributions(args.trj)

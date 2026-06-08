@@ -1,6 +1,8 @@
+import argparse
 import sys
 from os.path import isfile, realpath
 from pathlib import Path
+from typing import Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -153,60 +155,39 @@ def runTimeAvarage(
     sns.lineplot(data=ddata, x="Time", y="MSD", label=prefix)
 
 
-if __name__ == '__main__':
-    input_data = [
-        (
-            "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/",
-            "type1-300K-CH4",
-            1,
-        ),
-        (
-            "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/h2/",
-            "type1-300K-H2",
-            2,
-        ),
-        (
-            "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/400K/ch4/",
-            "type1-400K-CH4",
-            1,
-        ),
-        (
-            "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/400K/h2/",
-            "type1-400K-H2",
-            2,
-        ),
-        (
-            "/media/andrey/Samsung_T5/PHD/Kerogen/type2matrix/300K/ch4/",
-            "type2-300K-CH4",
-            1,
-        ),
-        (
-            "/media/andrey/Samsung_T5/PHD/Kerogen/type2matrix/300K/h2/",
-            "type2-300K-H2",
-            2,
-        ),
-    ]
+def _parse_trj(s: str) -> Tuple[str, str, int]:
+    parts = s.split(":", 2)
+    if len(parts) != 3:
+        raise argparse.ArgumentTypeError(f"Expected PATH:LABEL:STEP, got: {s!r}")
+    try:
+        step = int(parts[2])
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"STEP must be an integer, got: {parts[2]!r}")
+    return parts[0], parts[1], step
 
-    for path, prefix, step in input_data:
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="MSD time-average builder")
+    parser.add_argument(
+        "--trj",
+        action="append",
+        type=_parse_trj,
+        required=True,
+        metavar="PATH:LABEL:STEP",
+        help="Data directory, label, and molecule step (repeatable)",
+    )
+    args = parser.parse_args()
+
+    for data_path, prefix, step in args.trj:
         print("Run " + prefix)
-        traj_path = path + "trj.gro"
-        # runClear(
-        # traj_path, prefix + f"{temp}/{el}/msd.csv", f"{el}-{temp}", step
-        # )
+        traj_path = data_path + "trj.gro"
         runTimeAvarage(
             traj_path,
-            path + "msd_time_avarage.csv",
+            data_path + "msd_time_avarage.csv",
             prefix,
             step,
             False,
         )
-
-    # runSmooth(traj_path, el)
-
-    # temp = "400K"
-    # el, step = "ch4", 1
-    # traj_path = prefix + f"{temp}/{el}/trj.gro"
-    # runAll(traj_path, temp, el, step)
 
     plt.xscale('log')
     plt.yscale('log')

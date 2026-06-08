@@ -30,14 +30,11 @@ from processes.trajectory_analyzer.sib import (
 )
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--path_to_main',
-        type=str,
-        default="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/400K/h2/",
-    )
+    parser = argparse.ArgumentParser(description="Complexity estimation for trajectory analyzers")
+    parser.add_argument("path", type=Path, help="Data directory (contains pi_l_gamma_fitter.pkl etc.)")
+    parser.add_argument("output", type=Path, help="Output PDF path")
     args = parser.parse_args()
-    path_to_main = args.path_to_main
+    path_to_main = str(args.path)
 
     path_to_pil_gf: str = join(path_to_main, "pi_l_gamma_fitter.pkl")
     path_to_tl_wf: str = join(path_to_main, "throat_lengths_weibull_fitter.pkl")
@@ -121,9 +118,7 @@ if __name__ == '__main__':
         (get_hybrid_analyzer, "Hybrid", 2),
     ]
 
-    times_path = (
-        "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/400K/h2/times.npy"
-    )
+    times_path = str(args.path / "times.npy")
     if os.path.isfile(times_path):
         times = np.load(times_path)
     else:
@@ -172,7 +167,7 @@ if __name__ == '__main__':
     plt.xticks(fontsize=12)
     plt.legend(frameon=False, fontsize=14)
     plt.savefig(
-        "/media/andrey/Samsung_T5/PHD/Kerogen/complexity.pdf",
+        str(args.output),
         bbox_inches="tight",
         pad_inches=0,
     )

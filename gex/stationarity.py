@@ -26,6 +26,7 @@ This script:
 
 from __future__ import annotations
 
+import argparse
 from os import listdir
 from os.path import dirname, isfile, join, realpath
 
@@ -829,7 +830,8 @@ def analysis(main_path: str, pnm_dir: str, oputput_dir: str):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="KS-based stationarity analysis")
+    parser.add_argument("path", type=Path, help="Data directory")
+    args = parser.parse_args()
 
-    paths = ["/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/"]
-    for path in paths:
-        analysis(path, "pnm", "ks_stationarity")
+    analysis(str(args.path), "pnm", "ks_stationarity")

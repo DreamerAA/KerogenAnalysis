@@ -113,11 +113,7 @@ def run(path_to_main: str):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--path_to_main',
-        type=str,
-        default="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/",
-    )
+    parser.add_argument("path", type=Path, help="Data directory")
     args = parser.parse_args()
 
-    run(args.path_to_main)
+    run(str(args.path))

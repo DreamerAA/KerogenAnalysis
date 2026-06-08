@@ -1,3 +1,4 @@
+import argparse
 import json
 import pickle
 import sys
@@ -141,21 +142,9 @@ def generate_pil_distribution(path_to_pnms: str, path_to_save: str):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Generate PIL distributions from PNM data")
+    parser.add_argument("pnm_dir", type=Path, help="PNM directory (input)")
+    parser.add_argument("output_dir", type=Path, help="Output directory for fitter pickles")
+    args = parser.parse_args()
 
-    for mtype in ["type1matrix", "type2matrix"]:
-        # for mtype in ["type1matrix"]:
-        mpath = join("/media/andrey/Samsung_T5/PHD/Kerogen/", mtype)
-        for tem in ["300K", "400K"]:
-            if not exists(join(mpath, tem)):
-                continue
-            # for tem in ["300K"]:
-            for el in ["h2", "ch4"]:
-                # for el in ["ch4"]:
-                path_to_save = join(mpath, tem, el)
-                path_to_pnm = join(path_to_save, "pnm")
-
-                generate_pil_distribution(path_to_pnm, path_to_save)
-
-                # plot_distributions(path_to_pnm, path_to_save)
-
-    # plt.show()
+    generate_pil_distribution(str(args.pnm_dir), str(args.output_dir))

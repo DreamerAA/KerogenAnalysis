@@ -67,11 +67,7 @@ def run(path):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--path_to_data',
-        type=str,
-        default="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/errors/find_best_params",
-    )
+    parser.add_argument("path", type=Path, help="Directory with find_best_params data")
     args = parser.parse_args()
 
-    run(args.path_to_data)
+    run(str(args.path))

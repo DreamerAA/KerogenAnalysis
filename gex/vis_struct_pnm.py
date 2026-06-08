@@ -68,32 +68,12 @@ def read_and_draw_pnm_and_img(pnm_path: str, path_to_img: str):
 
 
 if "__main__" == __name__:
-    main_path = "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/"
-
-    # main_name = "num=25000_time-ps=50_bbox=(x=(1.489-4.742)_y=(2.078-5.332)_z=(4.881-8.134))_resolution=0.013015000"
-    # main_name = "num=551025000_time-ps=1102050_bbox=(x=(1.489-4.742)_y=(2.078-5.332)_z=(4.881-8.134))_resolution=0.013015000"
-    main_name = "num=1102025000_time-ps=2204050_bbox=(x=(1.489-4.742)_y=(2.078-5.332)_z=(4.881-8.134))_resolution=0.013015000"
-
-    fimg_path = join(
-        main_path, "float_images", "result-img-" + main_name + ".npy"
-    )
-    pnm_prefix = join(main_path, "pnm", "pnm-" + main_name)
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--fimg_path',
-        type=str,
-        default=fimg_path,
-    )
-    parser.add_argument(
-        '--pnm_prefix',
-        type=str,
-        default=pnm_prefix,
-    )
-
+    parser = argparse.ArgumentParser(description="Visualize PNM and structure image")
+    parser.add_argument("img", type=Path, help="Float image .npy file")
+    parser.add_argument("pnm_prefix", type=Path, help="PNM files prefix (without _node1.dat etc.)")
     args = parser.parse_args()
 
     read_and_draw_pnm_and_img(
-        args.pnm_prefix,
-        args.fimg_path,
+        str(args.pnm_prefix),
+        str(args.img),
     )

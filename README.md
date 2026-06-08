@@ -62,3 +62,92 @@ pymol -q external_scripts/visualize_kerogen_part_cell_with_molecula.pml
 export PYMOL_SCRIPT_ARGS="--ker-pdb '$DATA_PATH/ker.pdb' --sim-gro '$DATA_PATH/type1.ch4.300.gro' --frame 50 --mol-index 85 --box-size 30"
 pymol -q external_scripts/visualize_kerogen_part_cell_with_molecula.pml
 `turn y, 45 & turn x, 15`
+
+
+# NEW NEED CHECK
+
+
+
+## Извлечение молекулы керогена из PDB
+
+python -m gex.extract_one_molecula $DATA_PATH/Ker.pdb $DATA_PATH/KRG_chainA_res1.pdb --chain A --resid 1
+
+
+## PNM экстракция
+
+export EXTRACTOR_PATH="/path/to/pore-network-extraction/build/bin/extractor_example"
+export EXTRACTOR_CONFIG="/path/to/pore-network-extraction/example/config/ExtractorExampleConfig.json"
+
+python -m gex.pnm_extractor $DATA_PATH $EXTRACTOR_PATH $EXTRACTOR_CONFIG
+
+
+## Числа Эйлера (PNM vs image)
+
+python -m gex.euler_distribution $DATA_PATH --config $EXTRACTOR_CONFIG --extractor $EXTRACTOR_PATH
+
+
+## PIL распределения (одна директория)
+
+python -m gex.generate_pil_distr $DATA_PATH/pnm $DATA_PATH
+
+python -m gex.pil_plotter $DATA_PATH
+
+
+## Распределения по PNM
+
+python -m gex.distr_pnm_connectivity \
+  --trj $DATA_PATH/pnm:type1-300K-CH4 \
+  --trj ${DATA_PATH/ch4/h2}/pnm:type1-300K-H2
+
+python -m gex.distr_pnm_count_pores_throats \
+  --trj $DATA_PATH/pnm:type1-300K-CH4 \
+  --trj ${DATA_PATH/ch4/h2}/pnm:type1-300K-H2
+
+python -m gex.distr_pnm_element_size_plotter $DATA_PATH/pnm $DATA_PATH/figs --label 'CH4'
+
+
+## MSD (mean square displacement)
+
+python -m gex.msdt_builder \
+  --trj $DATA_PATH/trj.gro:type1-300K-CH4:1 \
+  --trj ${DATA_PATH/ch4/h2}/trj.gro:type1-300K-H2:2
+
+
+## Стационарность PNM
+
+python -m gex.stationarity $DATA_PATH
+
+
+## Распределение времён ловушек
+
+python -m gex.trap_distr_builder $DATA_PATH --label CH4 --num 1
+python -m gex.trap_distr_builder ${DATA_PATH/ch4/h2} --label H2 --num 2
+
+
+## Оценка сложности алгоритмов
+
+python -m gex.complexity_estimation $DATA_PATH $DATA_PATH/complexity.pdf
+
+
+## Визуализация траектории (3D)
+
+python -m gex.vis_traject $DATA_PATH/trj.gro 2
+python -m gex.vis_traject $DATA_PATH/trj.gro 2 --traps $DATA_PATH/traps/SIB/traps_2.pickle
+
+python -m gex.simulate_trajectory $DATA_PATH
+
+
+## Проверка алгоритмов
+
+python -m gex.sim_algo_check $DATA_PATH
+python -m gex.errors_params $DATA_PATH
+python -m gex.find_best_params $DATA_PATH/errors/find_best_params
+
+
+## Визуализация структуры + изображение
+
+export IMG="$DATA_PATH/float_images/result-img-num=551025000_time-ps=1102050_bbox=(x=(1.489-4.742)_y=(2.078-5.332)_z=(4.881-8.134))_resolution=0.013015000.npy"
+
+python -m gex.vis_struct_trajectory $DATA_PATH "$IMG" --num 2
+python -m gex.vis_atoms_struct $DATA_PATH "$IMG" --index 551025000 --time-ps 1102050
+python -m gex.vis_struct_pnm "$IMG" $DATA_PATH/pnm/pnm-num=551025000_time-ps=1102050_bbox=...

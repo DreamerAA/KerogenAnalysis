@@ -1,3 +1,4 @@
+import argparse
 import json
 import pickle
 import sys
@@ -266,7 +267,8 @@ def plot_distributions(path_to_save: str):
 
 
 if __name__ == "__main__":
-    path_to_save = join(
-        "/media/andrey/Samsung_T5/PHD/Kerogen/", "type1matrix", "300K", "ch4"
-    )
-    plot_distributions(path_to_save)
+    parser = argparse.ArgumentParser(description="Plot PIL distributions")
+    parser.add_argument("path", type=Path, help="Data directory")
+    args = parser.parse_args()
+
+    plot_distributions(str(args.path))

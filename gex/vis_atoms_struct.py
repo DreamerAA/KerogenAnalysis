@@ -134,39 +134,16 @@ def read_and_draw_atoms_struct(
 
 
 if "__main__" == __name__:
-    main_path = "/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/"
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--path_to_data',
-        type=str,
-        default=main_path,
-    )
-    parser.add_argument(
-        '--path_to_img',
-        type=str,
-        default=join(
-            main_path,
-            "float_images",
-            "result-img-num=551025000_time-ps=1102050_bbox=(x=(1.489-4.742)_y=(2.078-5.332)_z=(4.881-8.134))_resolution=0.013015000.npy",
-        ),
-    )
-    parser.add_argument(
-        '--index',
-        type=int,
-        default=551025000,
-    )
-    parser.add_argument(
-        '--time_ps',
-        type=int,
-        default=551025000,
-    )
-
+    parser = argparse.ArgumentParser(description="Visualize atom structure with image overlay")
+    parser.add_argument("path", type=Path, help="Data directory")
+    parser.add_argument("img", type=Path, help="Float image .npy file")
+    parser.add_argument("--index", type=int, required=True, help="Frame index (num=)")
+    parser.add_argument("--time-ps", type=int, required=True, help="Frame time in ps")
     args = parser.parse_args()
 
     read_and_draw_atoms_struct(
-        args.path_to_data,
-        args.path_to_img,
+        str(args.path),
+        str(args.img),
         args.index,
         args.time_ps,
     )

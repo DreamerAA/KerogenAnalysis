@@ -1,3 +1,4 @@
+import argparse
 import os
 import pickle
 from os.path import join, isfile
@@ -261,88 +262,46 @@ def run(path_to_main: str, gas: str, step: int, t_min_max, ax1):
         plot_trap_tim_distr(trap_list, prefix, t_min, t_max, ax1)
 
 
+_DEFAULT_T_MIN_MAX: Dict[str, Dict[str, Tuple[float, float]]] = {
+    "CH4": {
+        "SIB": (1e-12, 5e-7),
+        "Hybrid": (1e-12, 5e-7),
+        "Distance-matrix": (1e-12, 8e-7),
+        "SIB_Neamann-Pearson": (1e-12, 5e-7),
+    },
+    "H2": {
+        "SIB": (1e-12, 5e-8),
+        "Hybrid": (1e-12, 5e-8),
+        "Distance-matrix": (1e-12, 1.5e-7),
+        "SIB_Neamann-Pearson": (1e-12, 5e-8),
+    },
+}
+
 if __name__ == '__main__':
-    path_to_data = "/media/andrey/Samsung_T5/PHD/Kerogen/"
-    input_data = [
-        (
-            path_to_data + "type1matrix/300K/ch4/",
-            "CH4",
-            1,
-            {
-                "SIB": (1e-12, 5e-7),
-                "Hybrid": (1e-12, 5e-7),
-                "Distance-matrix": (1e-12, 8e-7),
-                "SIB_Neamann-Pearson": (1e-12, 5e-7),
-            },
-        ),
-        (
-            path_to_data + "type1matrix/300K/h2/",
-            "H2",
-            2,
-            {
-                "SIB": (1e-12, 5e-8),
-                "Hybrid": (1e-12, 5e-8),
-                "Distance-matrix": (1e-12, 1.5e-7),
-                "SIB_Neamann-Pearson": (1e-12, 5e-8),
-            },
-        ),
-        # (path_to_data + "type1matrix/300K/ch4/", "type1-300K-CH4", 1),
-        # (path_to_data + "type1matrix/300K/h2/", "type1-300K-H2", 2),
-        # (path_to_data + "type1matrix/400K/ch4/", "type1-400K-CH4", 1),
-        # (path_to_data + "type1matrix/400K/h2/", "type1-400K-H2", 2),
-        # (path_to_data + "type2matrix/300K/ch4/", "type2-300K-CH4", 1),
-        # (path_to_data + "type2matrix/300K/h2/", "type2-300K-H2", 2),
-    ]
-    for input in input_data:
-        fig, ax = plt.subplots(figsize=(7, 5))
-        # fig2, ax2 = plt.subplots(figsize=(8, 5))
-        run(*input, ax)
+    parser = argparse.ArgumentParser(description="Trap time distribution builder")
+    parser.add_argument("path", type=Path, help="Data directory")
+    parser.add_argument("--label", type=str, required=True, help="Gas label (e.g. CH4, H2)")
+    parser.add_argument("--num", type=int, default=1, help="Molecule step (default: 1)")
+    args = parser.parse_args()
+
+    t_min_max = _DEFAULT_T_MIN_MAX.get(args.label, _DEFAULT_T_MIN_MAX["CH4"])
+    fig, ax = plt.subplots(figsize=(7, 5))
+    run(str(args.path), args.label, args.num, t_min_max, ax)
 
         # ======================
         # Figure 1 — Survival
         # ======================
-        ax.set_xscale("log")
-        ax.set_yscale("log")
-
-        ax.set_xlabel(r"$t, \mu s$", fontsize=20)
-        ax.set_ylabel(r"$P(t)$", fontsize=20)
-
-        ax.tick_params(axis="both", labelsize=12)
-        # fig1.subplots_adjust(right=0.72)
-
-        # легенда вне графика справа
-        ax.legend(
-            frameon=False,
-            fontsize=20,
-            # loc="center left",
-            # bbox_to_anchor=(1.02, 0.5),
-        )
-
-        fig.tight_layout()
-
-        fig.savefig(
-            join(input[0], "traps", "P(t)_loglog.svg"),
-            dpi=300,
-            bbox_inches="tight",
-        )
-        plt.close(fig)
-
-        # output_path = join(input[0], "traps", f"{input[1]}.png")
-        # fig1.savefig(output_path, dpi=300, bbox_inches="tight")
-        # print(f"Saved to {output_path}")
-
-        # # ======================
-        # # Figure 2 — Local alpha
-        # # ======================
-        # ax2.set_xscale("log")  # semilog-x уже используется, но явно задаём
-        # ax2.set_xlabel(r"$t, sec$", fontsize=16)
-        # ax2.set_ylabel(
-        #     r"$\alpha(t) = - \frac{d \log S}{d \log t}$", fontsize=16
-        # )
-
-        # ax2.tick_params(axis="both", labelsize=14)
-        # ax2.legend(frameon=False, fontsize=14)
-
-        # fig2.tight_layout()
-
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel(r"$t, \mu s$", fontsize=20)
+    ax.set_ylabel(r"$P(t)$", fontsize=20)
+    ax.tick_params(axis="both", labelsize=12)
+    ax.legend(frameon=False, fontsize=20)
+    fig.tight_layout()
+    fig.savefig(
+        join(str(args.path), "traps", "P(t)_loglog.svg"),
+        dpi=300,
+        bbox_inches="tight",
+    )
+    plt.close(fig)
     plt.show()
