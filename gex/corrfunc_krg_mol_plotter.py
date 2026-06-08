@@ -93,7 +93,7 @@ def plot_corrfunc_and_md(
         ax.annotate(
             rf"$\sim t^{{{slope:.2f}}}$",
             xy=(t_line[ai], r_line[ai]),
-            xytext=(0, -30),
+            xytext=(0, -40),
             textcoords="offset points",
             color=color_msd,
             fontsize=24,

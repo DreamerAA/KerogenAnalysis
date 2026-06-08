@@ -211,6 +211,6 @@ if __name__ == '__main__':
     plt.xscale('log')
     plt.yscale('log')
     plt.xlabel("Time (ps)")
-    plt.ylabel("MSD (A^2)")
+    plt.ylabel(r"MSD (nm$^2$)")
     plt.legend()
     plt.show()
