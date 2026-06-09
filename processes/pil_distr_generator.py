@@ -152,58 +152,6 @@ class PiLDistrGenerator:
         self._d_unit_sorted = d_unit
         return d_unit
 
-    def get_curve(
-        self, pore_radiuses: np.ndarray, step: int = 10
-    ) -> np.ndarray:
-        pore_radiuses = np.asarray(pore_radiuses, dtype=f32)
-        pore_radiuses = np.sort(pore_radiuses)
-
-        max_rad = float(pore_radiuses[-1])
-
-        # Максимальная длина
-        max_length = np.sqrt(3.0 * ((1.5 * max_rad) ** 2))
-
-        cl = 100
-        nx_len = np.linspace(0.0, max_length, cl, dtype=f32)
-        dl = float(
-            nx_len[1] - nx_len[0]
-        )  # ширина бина в СКАЛИРОВАННОМ пространстве
-
-        # Один раз готовим отсортированные расстояния в единичном шаре
-        d_unit_sorted = self._prepare_unit_distances()
-
-        # Радиусы, которые реально считаем
-        sample_rad = pore_radiuses[::step].astype(f32)
-
-        def sim(i: int, radius: float) -> np.ndarray:
-            # Бины для unit-расстояний: d_unit in [L/r, R/r]
-            edges_unit = (nx_len / radius).astype(f32)
-
-            # Индексы в отсортированном массиве
-            idx = np.searchsorted(d_unit_sorted, edges_unit, side="right")
-            counts = np.diff(idx).astype(f32)  # shape (cl-1,)
-
-            # Нормировка как у тебя: интеграл pi(l) dl = 1
-            norm = float(np.sum(counts) * dl)
-            res = (counts / norm) if norm != 0.0 else counts
-            return res
-
-        # ВАЖНО: чтобы не копировать огромный d_unit_sorted в процессы,
-        # используем потоки (общая память). searchsorted в numpy обычно отпускает GIL.
-        pres = Parallel(n_jobs=8, prefer="threads")(
-            delayed(sim)(i, float(rad)) for i, rad in enumerate(sample_rad)
-        )
-
-        pi_l_d = np.vstack(pres)  # (m, cl-1)
-        pi_l = np.mean(pi_l_d, axis=0).astype(f32)  # (cl-1,)
-
-        new_l = nx_len[:-1] + 0.5 * (nx_len[1:] - nx_len[:-1])
-
-        pi_l_save = np.zeros((pi_l.shape[0], 2), dtype=f32)
-        pi_l_save[:, 0] = new_l
-        pi_l_save[:, 1] = pi_l
-        return pi_l_save
-
     def get_conditional_curves(self, pore_radiuses: np.ndarray, step: int = 10):
         pore_radiuses = np.asarray(pore_radiuses, dtype=f32)
         pore_radiuses = np.sort(pore_radiuses)

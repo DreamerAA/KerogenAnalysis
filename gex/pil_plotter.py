@@ -22,7 +22,7 @@ from processes.pil_distr_generator import PiLDistrGenerator
 
 def plot_distributions(path_to_save: str):
     rad_max = 0.025
-    rad_min = 0.0
+    rad_min = 0.05
 
     path_units = join(path_to_save, "pnm_distribution_units.json")
     if not isfile(path_units):
@@ -32,9 +32,15 @@ def plot_distributions(path_to_save: str):
     if units.get("length_unit") != "nm":
         raise RuntimeError("PIL distribution cache must be regenerated in nm")
 
-    radiuses = np.load(join(path_to_save, "radiuses.npy"))
+    path_rads = Path(join(path_to_save, "radiuses.npy"))
+
+    radiuses = np.load(path_rads)
+    radiuses = radiuses[radiuses > rad_min]
     kprint("Count radiuses: ", len(radiuses))
-    # radiuses = radiuses[radiuses < x_max]
+
+    rad_max = radiuses.max()
+    kprint(f"Max radius: {rad_max}")
+    kprint(f"Min radius: {radiuses.min()}")
 
     # --- fit P(r) ---
     params = exponweib.fit(radiuses[::10])
@@ -42,11 +48,7 @@ def plot_distributions(path_to_save: str):
     r_fit = np.linspace(rad_min, rad_max, 300)
     pr_fit = exponweib.pdf(r_fit, *params)
 
-    # kprint("min. radiuses: ", radiuses.min())
     generator = PiLDistrGenerator()
-    # sample_rad, l_vals, pi_cond = generator.get_conditional_curves(
-    #     radiuses, step=50
-    # )
 
     sample_rad, l_vals, pi_cond, pr_sample = (
         generator.get_conditional_curves_from_fit(
@@ -102,10 +104,18 @@ def plot_distributions(path_to_save: str):
     kprint("pr_sample.shape: ", pr_sample.shape)
 
     # --- fit Π(l|r) ---
-    data = generator.gen_set(radiuses)
-    kprint("Finish gen_set")
-    gfitter = GammaFitter()
-    gfitter.fit(data)
+
+    path_pi_l_gf = Path(join(path_to_save, "pi_l_gamma_fitter.pkl"))
+    if not path_pi_l_gf.exists():
+        data = generator.gen_set(radiuses)
+        gfitter = GammaFitter()
+        gfitter.fit(data)
+        with open(path_pi_l_gf, "wb") as f:
+            pickle.dump(gfitter, f)
+    else:
+        with open(path_pi_l_gf, "rb") as f:
+            gfitter = pickle.load(f)
+        kprint("Using cached gamma fitter")
     kprint("Finish fit")
 
     x = np.linspace(0, rad_max, 300)

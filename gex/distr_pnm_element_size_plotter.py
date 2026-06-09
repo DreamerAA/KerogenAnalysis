@@ -17,6 +17,8 @@ from processes.pil_distr_generator import PiLDistrGenerator
 from base.reader import Reader
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
+from utils.utils import kprint
+
 
 def compute_density(
     data: np.ndarray,
@@ -24,6 +26,8 @@ def compute_density(
     smooth: bool = True,
     window_length: int = 25,
     polyorder: int = 3,
+    x_min: float = 0.05,
+    x_max: float = 2,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Строит нормированную гистограмму-плотность.
@@ -45,7 +49,7 @@ def compute_density(
 
     x = x[:-10]
     pn = pn[:-10]
-    mask = x < 0.12
+    mask = np.logical_and(x > x_min, x < x_max)
     x = x[mask]
     pn = pn[mask]
 
@@ -71,7 +75,7 @@ def get_sorted_pnm_files(path_to_pnms: str) -> list[tuple[int, str]]:
     onlyfiles = [
         file
         for file in onlyfiles
-        if "_link1" in file and file.startswith("num")
+        if "_link1" in file and file.startswith("pnm-num")
     ]
 
     steps = [int((file.split("=")[1]).split("_")[0]) for file in onlyfiles]
@@ -86,10 +90,12 @@ def convert_step_to_time_us(step: int) -> float:
 
 def build_3d_distributions(
     paths: Tuple[str, str, str],
-    pnm_step: int = 10,
+    pnm_step: int = 40,
     bins: int = 50,
     smooth: bool = True,
     border: float = 0.0015,
+    x_min: float = 0.05,
+    x_max: float = 2,
     scale: float = Reader.PNM_M_TO_NM,
 ) -> None:
     fig = plt.figure(figsize=(11, 8))
@@ -105,9 +111,10 @@ def build_3d_distributions(
     label_added_pr = False
 
     path_to_pnms, dataset_label, path_to_save = paths
+    kprint(path_to_pnms)
     sorted_files = get_sorted_pnm_files(path_to_pnms)
 
-    for step, file in sorted_files[::pnm_step]:
+    for step, file in sorted_files[pnm_step::pnm_step]:
         base_path = join(path_to_pnms, file[:-10])
         radiuses, throat_lengths = Reader.read_pnm_data(
             base_path,
@@ -123,6 +130,8 @@ def build_3d_distributions(
             throat_lengths,
             bins=bins,
             smooth=smooth,
+            x_min=x_min,
+            x_max=x_max,
         )
         y_l = np.full_like(x_l, time_us, dtype=float)
         ax.plot(
@@ -135,7 +144,7 @@ def build_3d_distributions(
         )
         ax.text(
             x_l[-1] - 0.01,  # небольшой сдвиг вправо
-            y_l[-1],  # то же время
+            y_l[-1] - 0.5,  # то же время
             p_l[-1] + 0.5,  # конец кривой по z
             rf"{time_us:.2f}",
             zdir=(1, -0.5, 0),  # размещаем текст в плоскости x-z
@@ -151,6 +160,8 @@ def build_3d_distributions(
             radiuses,
             bins=bins,
             smooth=smooth,
+            x_min=x_min,
+            x_max=x_max,
         )
         p_r = p_r * 0.5
         y_r = np.full_like(x_r, time_us, dtype=float)
@@ -206,7 +217,7 @@ def build_3d_distributions(
     res_xlabels = []
     print("xlabels=", list(enumerate(xlabels)))
     for i, x in enumerate(xlabels):
-        if i in [3, 4, 5]:
+        if i in [4, 5, 6, 7]:
             x._text = ""
         res_xlabels.append(x)
 
@@ -248,7 +259,7 @@ def build_3d_distributions(
         ax.view_init(elev=e, azim=a)
         f_name = "fill" if is_fill else "proj"
         fig.savefig(
-            path_to_save + f"{f_name}_elev_{e}_azim_{a}.svg",
+            join(path_to_save, f"{f_name}_elev_{e}_azim_{a}.svg"),
             # bbox_inches="tight",
         )
 
@@ -257,13 +268,17 @@ def build_3d_distributions(
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="3D PNM element size distributions")
+    parser = argparse.ArgumentParser(
+        description="3D PNM element size distributions"
+    )
     parser.add_argument("pnm_dir", type=Path, help="PNM directory")
     parser.add_argument("figs_dir", type=Path, help="Output figures directory")
     parser.add_argument("--label", type=str, default="", help="Series label")
-    parser.add_argument("--pnm-step", type=int, default=30)
+    parser.add_argument("--pnm-step", type=int, default=100)
     parser.add_argument("--bins", type=int, default=50)
     parser.add_argument("--no-smooth", action="store_true")
+    parser.add_argument("--x-min", type=float, default=0.05)
+    parser.add_argument("--x-max", type=float, default=2.0)
     args = parser.parse_args()
 
     build_3d_distributions(
@@ -271,4 +286,6 @@ if __name__ == '__main__':
         pnm_step=args.pnm_step,
         bins=args.bins,
         smooth=not args.no_smooth,
+        x_min=args.x_min,
+        x_max=args.x_max,
     )

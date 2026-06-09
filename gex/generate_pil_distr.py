@@ -117,29 +117,22 @@ def generate_pil_distribution(path_to_pnms: str, path_to_save: str):
 
     generator = PiLDistrGenerator()
 
-    paht_pi_l = join(path_to_save, "pi_l_curve.npy")
-    if isfile(paht_pi_l) and use_cached_samples:
-        pi_l = np.load(paht_pi_l)
-    else:
-        pi_l = generator.get_curve(radiuses, step=10)
-        np.save(paht_pi_l, pi_l)
-
     timer = Timer()
     timer.start()
-    paht_pi_l_gf = join(path_to_save, "pi_l_gamma_fitter.pkl")
-    if not paht_pi_l_gf.exist() and use_cached_samples:
+    path_pi_l_gf = Path(join(path_to_save, "pi_l_gamma_fitter.pkl"))
+    if not path_pi_l_gf.exists():
         data = generator.gen_set(radiuses)
         gfitter = GammaFitter()
         gfitter.fit(data)
-        with open(paht_pi_l_gf, "wb") as f:
+        with open(path_pi_l_gf, "wb") as f:
             pickle.dump(gfitter, f)
     else:
         kprint("Using cached gamma fitter")
     timer.stop("Gamma fitter")
 
     timer.start()
-    path_tl_wf = join(path_to_save, "throat_lengths_weibull_fitter.pkl")
-    if not path_tl_wf.exist() and use_cached_samples:
+    path_tl_wf = Path(join(path_to_save, "throat_lengths_weibull_fitter.pkl"))
+    if not path_tl_wf.exists():
         wfitter = WeibullFitter()
         wfitter.fit(throat_lengths)
         with open(path_tl_wf, "wb") as f:

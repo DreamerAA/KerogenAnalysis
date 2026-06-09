@@ -39,6 +39,19 @@ export EXTRACTOR_CONFIG="/media/andrey/Samsung_T5/DCore/SSM-2/pore-network-extra
 python -m gex.pnm_extractor $DATA_PATH $EXTRACTOR_PATH $EXTRACTOR_CONFIG
 
 
+## Распределения по PNM
+
+python -m gex.distr_pnm_element_size_plotter $DATA_PATH/pnm $DATA_PATH/figs --label 'CH4' --pnm-step 120 --x-max 1.7
+
+
+
+## PIL распределения (одна директория)
+
+python -m gex.generate_pil_distr $DATA_PATH/pnm $DATA_PATH
+
+python -m gex.pil_plotter $DATA_PATH
+
+
 
 
 
@@ -79,6 +92,16 @@ pymol -q external_scripts/visualize_kerogen_part_cell_with_molecula.pml
 # NEW NEED CHECK
 
 
+## Распределения по PNM
+
+python -m gex.distr_pnm_connectivity \
+  --pnm ${DATA_PATH}/../ch4/pnm:type1-300K-CH4 \
+  --pnm ${DATA_PATH}/../h2/pnm:type1-300K-H2
+
+python -m gex.distr_pnm_count_pores_throats \
+  --pnm $DATA_PATH/pnm:type1-300K-CH4 \
+  --pnm ${DATA_PATH/ch4/h2}/pnm:type1-300K-H2
+
 
 ## Извлечение молекулы керогена из PDB
 
@@ -92,11 +115,7 @@ python -m gex.extract_one_molecula $DATA_PATH/Ker.pdb $DATA_PATH/KRG_chainA_res1
 python -m gex.euler_distribution $DATA_PATH --config $EXTRACTOR_CONFIG --extractor $EXTRACTOR_PATH
 
 
-## PIL распределения (одна директория)
 
-python -m gex.generate_pil_distr $DATA_PATH/pnm $DATA_PATH
-
-python -m gex.pil_plotter $DATA_PATH
 
 
 ## Распределения по PNM

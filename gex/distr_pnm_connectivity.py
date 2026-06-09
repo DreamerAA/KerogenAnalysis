@@ -76,9 +76,11 @@ def _parse_trj(s: str) -> Tuple[str, str]:
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="PNM connectivity distributions")
+    parser = argparse.ArgumentParser(
+        description="PNM connectivity distributions"
+    )
     parser.add_argument(
-        "--trj",
+        "--pnm",
         action="append",
         type=_parse_trj,
         required=True,
