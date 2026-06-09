@@ -12,18 +12,12 @@ from scipy.stats import exponweib
 from processes.distribution_fitter import GammaFitter
 from utils.utils import kprint
 from matplotlib.colors import PowerNorm
-
-path = Path(realpath(__file__))
-parent_dir = str(path.parent.parent.absolute())
-sys.path.append(parent_dir)
+from matplotlib.ticker import MaxNLocator
 
 from processes.pil_distr_generator import PiLDistrGenerator
 
 
-def plot_distributions(path_to_save: str):
-    rad_max = 0.025
-    rad_min = 0.05
-
+def plot_distributions(path_to_save: str, radius_min: float):
     path_units = join(path_to_save, "pnm_distribution_units.json")
     if not isfile(path_units):
         raise RuntimeError("PIL distribution cache must be regenerated in nm")
@@ -35,7 +29,7 @@ def plot_distributions(path_to_save: str):
     path_rads = Path(join(path_to_save, "radiuses.npy"))
 
     radiuses = np.load(path_rads)
-    radiuses = radiuses[radiuses > rad_min]
+    radiuses = radiuses[radiuses > radius_min]
     kprint("Count radiuses: ", len(radiuses))
 
     rad_max = radiuses.max()
@@ -45,7 +39,7 @@ def plot_distributions(path_to_save: str):
     # --- fit P(r) ---
     params = exponweib.fit(radiuses[::10])
     kprint("Fit radiuses params: ", params)
-    r_fit = np.linspace(rad_min, rad_max, 300)
+    r_fit = np.linspace(radius_min, rad_max, 300)
     pr_fit = exponweib.pdf(r_fit, *params)
 
     generator = PiLDistrGenerator()
@@ -53,7 +47,7 @@ def plot_distributions(path_to_save: str):
     sample_rad, l_vals, pi_cond, pr_sample = (
         generator.get_conditional_curves_from_fit(
             params=params,
-            r_min=rad_min,
+            r_min=radius_min,
             r_max=rad_max,
             r_points=300,
             step=2,
@@ -260,6 +254,8 @@ def plot_distributions(path_to_save: str):
     cbar = fig.colorbar(mesh, ax=ax, fraction=0.046, pad=0.06)
     cbar.set_label(r"$\Pi(l \mid r)$", fontsize=20)
     cbar.ax.tick_params(labelsize=14)
+    cbar.locator = MaxNLocator(integer=True)
+    cbar.update_ticks()
 
     fig.savefig(
         join(path_to_save, "figs", "pilr_2d.svg"),
@@ -279,6 +275,7 @@ def plot_distributions(path_to_save: str):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Plot PIL distributions")
     parser.add_argument("path", type=Path, help="Data directory")
+    parser.add_argument("--x-min", type=float, default=0.025)
     args = parser.parse_args()
 
-    plot_distributions(str(args.path))
+    plot_distributions(str(args.path), args.x_min)

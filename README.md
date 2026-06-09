@@ -1,37 +1,70 @@
 # KerogenAnalysis
 !!!TODO!!!
 
+## Использование скриптов 
++ atom_visualization.py
++ binarization_structs.py
+complexity_estimation.py
++ corrfunc_krg_mol_plotter.py
++ corrfunc_struct_plotter.py
+distance_map_structs.py
+distr_pnm_connectivity.py
+distr_pnm_count_pores_throats.py
+distr_pnm_element_size_plotter.py
++ dynamic_struct_extractor.py
+errors_params.py
+euler_distribution.py
++ extract_gas_trajectory_to_file.py
++ extract_krg_trajectory_to_file.py
+extract_one_molecula.py
+find_best_params.py
++ generate_pil_distr.py
+msdt_builder.py
++ pil_plotter.py
++ pnm_extractor.py
+powerlaw_analysis.py
+sim_algo_check.py
+simulate_trajectory.py
+stationarity.py
+structure_image_utils.py
+trap_distr_builder.py
+vis_atoms_struct.py
+vis_slice_struct.py
+vis_struct_pnm.py
+vis_struct_trajectory.py
+vis_traject.py
 
-## Check main logic
+
+## Базовые скрипты расчетов и визуализация 
 
 export DATA_PATH="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/"
 
-## Экстракция траектории молекулы газа
+### Экстракция траектории молекулы газа
 python -m gex.extract_gas_trajectory_to_file $DATA_PATH/type1.ch4.300.gro $DATA_PATH/trj.gro
 
 
-## Экстракция фреймов структур
+### Экстракция фреймов структур
 python -m gex.dynamic_struct_extractor $DATA_PATH/type1.ch4.300.gro $DATA_PATH/structures
 
 python3 -m gex.dynamic_struct_extractor $DATA_PATH/type1.ch4.300.gro $DATA_PATH/structures --auto-indexes --mode all --count-structures 5 --dry-run
 python3 -m gex.dynamic_struct_extractor $DATA_PATH/type1.ch4.300.gro $DATA_PATH/structures --auto-indexes --mode all --count-structures 500
 
-## Бинаризация
+### Бинаризация
 python3 -m gex.binarization_structs $DATA_PATH/structures $DATA_PATH/bin_images $DATA_PATH/raw_images --ref-size 250 --mode all --count-slices 500 --num_workers 10
 
-## Экстракция молекулы керогена
+### Экстракция молекулы керогена
 
 python -m gex.extract_krg_trajectory_to_file ${DATA_PATH}/type1.ch4.300.gro ${DATA_PATH}/trj_krg/krg_99.gro --select KRG:99
 
-## Построение Корреляционной функции молекулы керогена
+### Построение Корреляционной функции молекулы керогена
 
 python -m gex.corrfunc_krg_mol_plotter ${DATA_PATH}/trj_krg/krg_99.gro ${DATA_PATH}/figs/corrfunc_krg_99.svg ${DATA_PATH}/msd/krg_99.pickle
 
-## Построение Корреляционной функции структуры керогена
+### Построение Корреляционной функции структуры керогена
 
 python -m gex.corrfunc_struct_plotter ${DATA_PATH}/bin_images ${DATA_PATH}/ct_pore.npy ${DATA_PATH}/figs/corrfunc.svg --trj ${DATA_PATH}/../ch4/trj.gro:CH4 --trj ${DATA_PATH}/../h2/trj.gro:H2 --pore --max-t 2.8
 
-## PNM экстракция
+### PNM экстракция
 
 export EXTRACTOR_PATH="/media/andrey/Samsung_T5/DCore/SSM-2/pore-network-extraction_new/build/clang-15-release-cpu/bin/extractor_example"
 export EXTRACTOR_CONFIG="/media/andrey/Samsung_T5/DCore/SSM-2/pore-network-extraction_new/build/clang-15-release-cpu/example/config/ExtractorExampleConfig.json"
@@ -39,17 +72,24 @@ export EXTRACTOR_CONFIG="/media/andrey/Samsung_T5/DCore/SSM-2/pore-network-extra
 python -m gex.pnm_extractor $DATA_PATH $EXTRACTOR_PATH $EXTRACTOR_CONFIG
 
 
-## Распределения по PNM
+### Распределения по PNM
 
 python -m gex.distr_pnm_element_size_plotter $DATA_PATH/pnm $DATA_PATH/figs --label 'CH4' --pnm-step 120 --x-max 1.7
 
 
+### PIL распределения (одна директория)
 
-## PIL распределения (одна директория)
+python -m gex.generate_pil_distr $DATA_PATH/pnm $DATA_PATH --x-min 0.025
+python -m gex.pil_plotter $DATA_PATH --x-min 0.025
 
-python -m gex.generate_pil_distr $DATA_PATH/pnm $DATA_PATH
 
-python -m gex.pil_plotter $DATA_PATH
+
+## Дополнительная визуализация для анализа
+
+### Визуализация атомов
+
+python -m gex.atom_visualization
+
 
 
 
@@ -61,8 +101,6 @@ python -m gex.pil_plotter $DATA_PATH
 
 ## Экстракция DM 
 python3 -m gex.distance_map_structs $DATA_PATH/type1.ch4.300.gro $DATA_PATH/structures --auto-indexes --mode all --count-structures 500
-
-
 
 
 ## Визуализация молекулы керогена
@@ -108,8 +146,6 @@ python -m gex.distr_pnm_count_pores_throats \
 python -m gex.extract_one_molecula $DATA_PATH/Ker.pdb $DATA_PATH/KRG_chainA_res1.pdb --chain A --resid 1
 
 
-
-
 ## Числа Эйлера (PNM vs image)
 
 python -m gex.euler_distribution $DATA_PATH --config $EXTRACTOR_CONFIG --extractor $EXTRACTOR_PATH
@@ -128,7 +164,6 @@ python -m gex.distr_pnm_count_pores_throats \
   --trj $DATA_PATH/pnm:type1-300K-CH4 \
   --trj ${DATA_PATH/ch4/h2}/pnm:type1-300K-H2
 
-python -m gex.distr_pnm_element_size_plotter $DATA_PATH/pnm $DATA_PATH/figs --label 'CH4'
 
 
 ## MSD (mean square displacement)

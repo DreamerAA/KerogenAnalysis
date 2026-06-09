@@ -148,10 +148,10 @@ def plot_corrfunc_and_md(
             ax2.annotate(
                 rf"$\sim t^{{{slope:.2f}}}$",
                 xy=(t_line[ai], r_line[ai]),
-                xytext=(0, -30),
+                xytext=(20, -40),
                 textcoords="offset points",
                 color=color_md,
-                fontsize=16,
+                fontsize=24,
                 ha="center",
                 va="bottom",
                 bbox=dict(

@@ -277,7 +277,7 @@ if __name__ == '__main__':
     parser.add_argument("--pnm-step", type=int, default=100)
     parser.add_argument("--bins", type=int, default=50)
     parser.add_argument("--no-smooth", action="store_true")
-    parser.add_argument("--x-min", type=float, default=0.05)
+    parser.add_argument("--x-min", type=float, default=0.025)
     parser.add_argument("--x-max", type=float, default=2.0)
     args = parser.parse_args()
 
