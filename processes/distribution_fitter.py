@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import Optional
-
+import numpy as np
 from utils.types import NPFArray, f32
 from scipy.stats import exponweib, gamma
 
@@ -19,7 +19,7 @@ class WeibullFitter:
     def fit(self, data: NPFArray):
         assert self.params is None
         # exponweib.fit возвращает (a, c, loc, scale)
-        self.params = tuple(float(v) for v in exponweib.fit(np.asarray(data)))
+        self.params = tuple(float(v) for v in exponweib.fit(data))
 
     def rvs(self, size: int) -> NPFArray:
         assert self.params is not None

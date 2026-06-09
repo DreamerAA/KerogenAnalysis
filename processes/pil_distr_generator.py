@@ -152,15 +152,15 @@ class PiLDistrGenerator:
         self._d_unit_sorted = d_unit
         return d_unit
 
-    def get_curve(self, pore_radiuses: np.ndarray) -> np.ndarray:
+    def get_curve(
+        self, pore_radiuses: np.ndarray, step: int = 10
+    ) -> np.ndarray:
         pore_radiuses = np.asarray(pore_radiuses, dtype=f32)
-        pore_radiuses = np.sort(
-            pore_radiuses
-        )  # ВАЖНО: np.sort не сортирует inplace
+        pore_radiuses = np.sort(pore_radiuses)
 
         max_rad = float(pore_radiuses[-1])
 
-        # Максимальная длина (как у тебя)
+        # Максимальная длина
         max_length = np.sqrt(3.0 * ((1.5 * max_rad) ** 2))
 
         cl = 100
@@ -173,7 +173,7 @@ class PiLDistrGenerator:
         d_unit_sorted = self._prepare_unit_distances()
 
         # Радиусы, которые реально считаем
-        sample_rad = pore_radiuses[::10].astype(f32)
+        sample_rad = pore_radiuses[::step].astype(f32)
 
         def sim(i: int, radius: float) -> np.ndarray:
             # Бины для unit-расстояний: d_unit in [L/r, R/r]

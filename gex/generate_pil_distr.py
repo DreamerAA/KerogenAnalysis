@@ -102,7 +102,9 @@ def generate_pil_distribution(path_to_pnms: str, path_to_save: str):
         with open(path_units) as f:
             has_nm_cache = json.load(f).get("length_unit") == "nm"
 
-    use_cached_samples = isfile(path_lens) and isfile(path_rads) and has_nm_cache
+    use_cached_samples = (
+        isfile(path_lens) and isfile(path_rads) and has_nm_cache
+    )
     if use_cached_samples:
         radiuses = np.load(path_rads)
         throat_lengths = np.load(path_lens)
@@ -119,32 +121,42 @@ def generate_pil_distribution(path_to_pnms: str, path_to_save: str):
     if isfile(paht_pi_l) and use_cached_samples:
         pi_l = np.load(paht_pi_l)
     else:
-        pi_l = generator.get_curve(radiuses)
+        pi_l = generator.get_curve(radiuses, step=10)
         np.save(paht_pi_l, pi_l)
 
     timer = Timer()
     timer.start()
     paht_pi_l_gf = join(path_to_save, "pi_l_gamma_fitter.pkl")
-    data = generator.gen_set(radiuses)
-    gfitter = GammaFitter()
-    gfitter.fit(data)
-    with open(paht_pi_l_gf, "wb") as f:
-        pickle.dump(gfitter, f)
+    if not paht_pi_l_gf.exist() and use_cached_samples:
+        data = generator.gen_set(radiuses)
+        gfitter = GammaFitter()
+        gfitter.fit(data)
+        with open(paht_pi_l_gf, "wb") as f:
+            pickle.dump(gfitter, f)
+    else:
+        kprint("Using cached gamma fitter")
     timer.stop("Gamma fitter")
 
     timer.start()
     path_tl_wf = join(path_to_save, "throat_lengths_weibull_fitter.pkl")
-    wfitter = WeibullFitter()
-    wfitter.fit(throat_lengths)
-    with open(path_tl_wf, "wb") as f:
-        pickle.dump(wfitter, f)
+    if not path_tl_wf.exist() and use_cached_samples:
+        wfitter = WeibullFitter()
+        wfitter.fit(throat_lengths)
+        with open(path_tl_wf, "wb") as f:
+            pickle.dump(wfitter, f)
+    else:
+        kprint("Using cached Weibull fitter")
     timer.stop("Weibull fitter")
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Generate PIL distributions from PNM data")
+    parser = argparse.ArgumentParser(
+        description="Generate PIL distributions from PNM data"
+    )
     parser.add_argument("pnm_dir", type=Path, help="PNM directory (input)")
-    parser.add_argument("output_dir", type=Path, help="Output directory for fitter pickles")
+    parser.add_argument(
+        "output_dir", type=Path, help="Output directory for fitter pickles"
+    )
     args = parser.parse_args()
 
     generate_pil_distribution(str(args.pnm_dir), str(args.output_dir))
