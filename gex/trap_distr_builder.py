@@ -19,7 +19,6 @@ from processes.trajectory_analyzer.dm import (
     DistanceMatrixAnalyzer,
 )
 from processes.trajectory_analyzer.sib import (
-    StructureInformedBayesAnalyzer,
     StructureInformedBayesParams,
 )
 from processes.trajectory_analyzer.sib_np import (
@@ -199,11 +198,6 @@ def run(path_to_main: str, gas: str, step: int, t_min_max, ax1):
     struct_params = get_struct_params(gas)
 
     pap = StructureInformedBayesParams(1e-3)
-    sib_analyzer = StructureInformedBayesAnalyzer(
-        pap,
-        pil_gamma_fitter,
-        throat_lengths_weibull_fitter,
-    )
     hybrid_analyzer = HybridAnalyzer(
         HybridParams(pap, struct_params, 0.1),
         pil_gamma_fitter,
@@ -264,10 +258,10 @@ def run(path_to_main: str, gas: str, step: int, t_min_max, ax1):
 
 _DEFAULT_T_MIN_MAX: Dict[str, Dict[str, Tuple[float, float]]] = {
     "CH4": {
-        "SIB": (1e-12, 5e-7),
-        "Hybrid": (1e-12, 5e-7),
+        "SIB": (1e-12, 3e-7),
+        "Hybrid": (1e-12, 3e-7),
         "Distance-matrix": (1e-12, 8e-7),
-        "SIB_Neamann-Pearson": (1e-12, 5e-7),
+        "SIB_Neamann-Pearson": (1e-12, 3e-7),
     },
     "H2": {
         "SIB": (1e-12, 5e-8),
@@ -278,19 +272,31 @@ _DEFAULT_T_MIN_MAX: Dict[str, Dict[str, Tuple[float, float]]] = {
 }
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Trap time distribution builder")
+    parser = argparse.ArgumentParser(
+        description="Trap time distribution builder"
+    )
     parser.add_argument("path", type=Path, help="Data directory")
-    parser.add_argument("--label", type=str, required=True, help="Gas label (e.g. CH4, H2)")
-    parser.add_argument("--num", type=int, default=1, help="Molecule step (default: 1)")
+    parser.add_argument(
+        "--label", type=str, required=True, help="Gas label (e.g. CH4, H2)"
+    )
+    parser.add_argument(
+        "--num", type=int, default=1, help="Molecule step (default: 1)"
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="Output SVG path (default: <path>/traps/P(t)_loglog.svg)",
+    )
     args = parser.parse_args()
 
     t_min_max = _DEFAULT_T_MIN_MAX.get(args.label, _DEFAULT_T_MIN_MAX["CH4"])
     fig, ax = plt.subplots(figsize=(7, 5))
     run(str(args.path), args.label, args.num, t_min_max, ax)
 
-        # ======================
-        # Figure 1 — Survival
-        # ======================
+    # ======================
+    # Figure 1 — Survival
+    # ======================
     ax.set_xscale("log")
     ax.set_yscale("log")
     ax.set_xlabel(r"$t, \mu s$", fontsize=20)
@@ -298,10 +304,9 @@ if __name__ == '__main__':
     ax.tick_params(axis="both", labelsize=12)
     ax.legend(frameon=False, fontsize=20)
     fig.tight_layout()
-    fig.savefig(
-        join(str(args.path), "traps", "P(t)_loglog.svg"),
-        dpi=300,
-        bbox_inches="tight",
+    out_path = (
+        args.output if args.output else args.path / "traps" / "P(t)_loglog.svg"
     )
+    fig.savefig(str(out_path), dpi=300, bbox_inches="tight")
     plt.close(fig)
     plt.show()

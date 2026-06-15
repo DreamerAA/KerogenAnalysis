@@ -24,14 +24,21 @@ from processes.trajectory_analyzer.dm import (
     DistanceMatrixAnalyzer,
     DistanceMatrixParams,
 )
-from processes.trajectory_analyzer.sib import (
-    StructureInformedBayesParams,
-    StructureInformedBayesAnalyzer,
+
+from processes.trajectory_analyzer.sib_np import (
+    StructureInformedBayesNeynamPearsonParams,
+    StructureInformedBayesNeynamPearsonAnalyzer,
 )
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Complexity estimation for trajectory analyzers")
-    parser.add_argument("path", type=Path, help="Data directory (contains pi_l_gamma_fitter.pkl etc.)")
+    parser = argparse.ArgumentParser(
+        description="Complexity estimation for trajectory analyzers"
+    )
+    parser.add_argument(
+        "path",
+        type=Path,
+        help="Data directory (contains pi_l_gamma_fitter.pkl etc.)",
+    )
     parser.add_argument("output", type=Path, help="Output PDF path")
     args = parser.parse_args()
     path_to_main = str(args.path)
@@ -78,15 +85,13 @@ if __name__ == '__main__':
         )
 
     def get_prob_params():
-        return StructureInformedBayesParams(
-            critical_probability=1e-3,
-        )
+        return StructureInformedBayesNeynamPearsonParams()
 
     def get_dm_analyzer():
         return DistanceMatrixAnalyzer(get_struct_params())
 
     def get_sib_analyzer():
-        return StructureInformedBayesAnalyzer(
+        return StructureInformedBayesNeynamPearsonAnalyzer(
             get_prob_params(), pil_gamma_fitter, throat_lengths_weibull_fitter
         )
 

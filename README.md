@@ -27,7 +27,7 @@ sim_algo_check.py
 simulate_trajectory.py
 stationarity.py
 structure_image_utils.py
-trap_distr_builder.py
++ trap_distr_builder.py
 vis_atoms_struct.py
 vis_slice_struct.py
 vis_struct_pnm.py
@@ -62,7 +62,7 @@ python -m gex.corrfunc_krg_mol_plotter ${DATA_PATH}/trj_krg/krg_99.gro ${DATA_PA
 
 ### Построение Корреляционной функции структуры керогена
 
-python -m gex.corrfunc_struct_plotter ${DATA_PATH}/bin_images ${DATA_PATH}/ct_pore.npy ${DATA_PATH}/figs/corrfunc.svg --trj ${DATA_PATH}/../ch4/trj.gro:CH4 --trj ${DATA_PATH}/../h2/trj.gro:H2 --pore --max-t 2.8
+python -m gex.corrfunc_struct_plotter ${DATA_PATH}/bin_images ${DATA_PATH}/ct_pore.npy ${DATA_PATH}/../figs/corrfunc.svg --trj ${DATA_PATH}/../ch4/trj.gro:CH4 --trj ${DATA_PATH}/../h2/trj.gro:H2 --pore --max-t 2.8
 
 ### PNM экстракция
 
@@ -82,6 +82,20 @@ python -m gex.distr_pnm_element_size_plotter $DATA_PATH/pnm $DATA_PATH/figs --la
 python -m gex.generate_pil_distr $DATA_PATH/pnm $DATA_PATH --x-min 0.025
 python -m gex.pil_plotter $DATA_PATH --x-min 0.025
 
+
+## Распределение времён ловушек
+export DATA_PATH_CH4="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/"
+export DATA_PATH_H2="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/h2/"
+python -m gex.trap_distr_builder $DATA_PATH_CH4/ --label CH4 --num 1 --output $DATA_PATH_CH4/figs/Pt_loglog.svg
+python -m gex.trap_distr_builder $DATA_PATH_H2/ --label H2 --num 2 --output $DATA_PATH_H2/figs/Pt_loglog.svg
+
+
+## Power law analysis
+
+export DATA_PATH_CH4="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/"
+export DATA_PATH_H2="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/h2/"
+python -m gex.powerlaw_analysis $DATA_PATH_CH4 --prefix SIB --mode xmin --n_synth 2500
+python -m gex.powerlaw_analysis $DATA_PATH_H2 --prefix SIB --mode xmin --n_synth 2500
 
 
 ## Дополнительная визуализация для анализа
