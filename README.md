@@ -52,6 +52,15 @@ python3 -m gex.dynamic_struct_extractor $DATA_PATH/type1.ch4.300.gro $DATA_PATH/
 ### Бинаризация
 python3 -m gex.binarization_structs $DATA_PATH/structures $DATA_PATH/bin_images $DATA_PATH/raw_images --ref-size 250 --mode all --count-slices 500 --num_workers 10
 
+### Экстракция DM 
+
+#### All
+python3 -m gex.distance_map_structs $DATA_PATH_CH4/structures $DATA_PATH_CH4/float_images --mode all --count-slices 500 --ref-size 250
+
+#### Part
+python3 -m gex.distance_map_structs $DATA_PATH_CH4/structures $DATA_PATH_CH4/float_images --mode part --count-slices 10 --ref-size 250
+
+
 ### Экстракция молекулы керогена
 
 python -m gex.extract_krg_trajectory_to_file ${DATA_PATH}/type1.ch4.300.gro ${DATA_PATH}/trj_krg/krg_99.gro --select KRG:99
@@ -104,6 +113,17 @@ python -m gex.powerlaw_analysis $DATA_PATH_H2 --prefix SIB --mode xmin --n_synth
 
 python -m gex.atom_visualization
 
+### Визуализация траектория и структура
+export DATA_PATH_CH4="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/"
+export IMG1="$DATA_PATH_CH4/float_images/result-img-num=25000_time-ps=50_bbox=(x=(1.489-4.742)_y=(2.078-5.332)_z=(4.881-8.134))_resolution=0.013015000.npy"
+export IMG2="$DATA_PATH_CH4/float_images/result-img-num=3275000_time-ps=6550_bbox=(x=(1.489-4.742)_y=(2.078-5.332)_z=(4.881-8.134))_resolution=0.013015000.npy"
+
+
+python -m gex.vis_struct_trajectory $DATA_PATH_CH4 "$IMG1" --num 2
+python -m gex.vis_struct_trajectory $DATA_PATH_CH4 "$IMG2" --num 2
+
+
+
 
 
 
@@ -113,8 +133,7 @@ python -m gex.atom_visualization
 # OLD BUT NEED CHECK
 
 
-## Экстракция DM 
-python3 -m gex.distance_map_structs $DATA_PATH/type1.ch4.300.gro $DATA_PATH/structures --auto-indexes --mode all --count-structures 500
+
 
 
 ## Визуализация молекулы керогена

@@ -7,6 +7,7 @@ import numpy as np
 from gex.structure_image_utils import (
     build_segmentator,
     collect_processing_indexes,
+    extract_settings,
     image_base_name,
     iter_structure_files,
     kprint,
@@ -27,9 +28,10 @@ def build_distance_maps(
     structure_files = iter_structure_files(structures_dir, indexes)
     for i, structure_file in enumerate(structure_files):
         structure = load_structure(structure_file)
-        num, time_ps, bbox, resolution, segmentator = build_segmentator(
+        num, time_ps, bbox, resolution, img_size = extract_settings(
             structure, ref_size=ref_size, dev=dev
         )
+        segmentator = build_segmentator(structure, bbox, img_size)
         base_name = image_base_name(num, time_ps, bbox, resolution)
         float_path = float_image_dir / f"{base_name}.npy"
 
