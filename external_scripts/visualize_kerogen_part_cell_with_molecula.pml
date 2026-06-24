@@ -48,6 +48,7 @@ def parse_args():
     parser.add_argument("--output", default=None, help="Optional PNG output path")
     parser.add_argument("--width", type=int, default=2200)
     parser.add_argument("--height", type=int, default=1800)
+    parser.add_argument("--dpi", type=int, default=300)
     parser.add_argument(
         "--camera-rot",
         nargs=3,
@@ -64,9 +65,17 @@ def parse_args():
     )
     parser.add_argument(
         "--ray",
+        dest="ray",
         action="store_true",
-        help="Use ray tracing for PNG output. Slower, but publication-quality.",
+        help="Use ray tracing for PNG output.",
     )
+    parser.add_argument(
+        "--no-ray",
+        dest="ray",
+        action="store_false",
+        help="Use the OpenGL framebuffer for PNG output.",
+    )
+    parser.set_defaults(ray=True)
     return parser.parse_args(script_args)
 
 
@@ -273,5 +282,5 @@ cmd.disable("subbox_obj")
 if args.output:
     out = Path(args.output)
     out.parent.mkdir(parents=True, exist_ok=True)
-    cmd.png(str(out), width=args.width, height=args.height, dpi=300, ray=int(args.ray))
+    cmd.png(str(out), width=args.width, height=args.height, dpi=args.dpi, ray=int(args.ray))
 python end
