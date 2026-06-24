@@ -20,7 +20,7 @@ from base.empiricalcdf import EmpiricalCDF
 
 def run(path_to_main: str):
     ps_type = 'uniform'  # poisson uniform
-    ps = ps_generate(ps_type, max_count_step=50)
+    ps = ps_generate(ps_type, mean_count=50)
 
     path_to_radiuses: str = join(path_to_main, "radiuses.npy")
     if isfile(path_to_radiuses):
@@ -41,17 +41,17 @@ def run(path_to_main: str):
     bs_psd = BufferedSampler(EmpiricalCDF(psd), "psd", size=100_000)
     bs_ptl = BufferedSampler(throat_lengths_weibull_fitter, "ptl", size=100_000)
 
-    k = 0.
-    p = 0.
+    k = 1 
+    p = 1
     simulator = KerogenWalkSimulator(bs_psd, bs_ps, bs_ptl, k, p, with_history=False)
-    traj = simulator.run(300)
+    traj = simulator.run(4)
     Visualizer.draw_trajectoryes(
         [traj],
-        radius=0.1,
+        radius=0.02,
         periodic=False,
         wrap_mode=WrapMode.EMPTY,
         with_points=True,
-        color_type='clusters'
+        color_type='dist'
     )
     Visualizer.show()
 

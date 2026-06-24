@@ -284,6 +284,12 @@ class DistanceMatrixAnalyzer(TrajectoryAnalyzer):
         matrix = ndimage.binary_fill_holes(matrix)
 
         #  init analysis
+        list_vertical, list_diagonal, list_parallel = self.extract_invariants(
+            matrix, N
+        )
+        return list_vertical, list_diagonal, list_parallel
+
+    def extract_invariants(self, matrix, N) -> Tuple[NPIArray, NPIArray, NPIArray]:  
         list_diagonal = np.zeros(shape=(N,), dtype=np.int64)
         list_vertical = np.zeros(shape=(N,), dtype=np.int64)
         list_parallel = np.zeros(shape=(N,), dtype=np.int64)

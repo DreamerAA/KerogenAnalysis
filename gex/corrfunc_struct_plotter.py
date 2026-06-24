@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import List
 
 from matplotlib import pyplot as plt
+from matplotlib.ticker import FormatStrFormatter
 import numpy as np
 from scipy.stats import linregress
 
@@ -98,6 +99,7 @@ def plot_corrfunc_and_md(
     y_name += " space"
     ax1.set_xlabel(r"Time delay, $\mu$s", fontsize=16)
     ax1.set_ylabel(y_name, fontsize=16)
+    ax1.yaxis.set_major_formatter(FormatStrFormatter("%.2f"))
     ax1.tick_params(axis="both", labelsize=12)
     ax1.tick_params(axis="y", labelcolor=color_ct)
 
