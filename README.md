@@ -29,16 +29,16 @@ stationarity.py
 structure_image_utils.py
 + trap_distr_builder.py
 vis_atoms_struct.py
-vis_slice_struct.py
++ vis_slice_struct.py
 vis_struct_pnm.py
 + vis_struct_trajectory.py
 vis_traject.py
 inv_plot.py
 
-external_scripts/visualize_atom_legend.pml
-external_scripts/visualize_kerogen_cell.tcl
-external_scripts/visualize_kerogen_molecula.pml
-external_scripts/visualize_kerogen_part_cell_with_molecula.pml
++ external_scripts/visualize_atom_legend.pml
++ external_scripts/visualize_kerogen_cell.tcl
++ external_scripts/visualize_kerogen_molecula.pml
++ external_scripts/visualize_kerogen_part_cell_with_molecula.pml
 external_scripts/visualize_kerogen_part_cell.pml
 external_scripts/visualize_kerogen_part_cell.tcl
 
@@ -158,6 +158,41 @@ pymol -q external_scripts/visualize_kerogen_part_cell_with_molecula.pml
 ### Визуализация легенды атомов
 
 pymol -q external_scripts/visualize_atom_legend.pml
+
+### Визуализация всей ячейки керогена (VMD)
+
+export VMD_SCRIPT_ARGS="--ker-pdb '$DATA_PATH_CH4/ker.pdb' --cell '62.309 74.106 130.150 90 90 90'"
+vmd -e external_scripts/visualize_kerogen_cell.tcl
+
+### Визуализация одной молекулы керогена (PyMOL)
+
+export PYMOL_SCRIPT_ARGS="--ker-pdb '$DATA_PATH_CH4/ker.pdb' --chain A --resi 1"
+pymol -q external_scripts/visualize_kerogen_molecula.pml
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### Визуализация кусочка ячейки без атомов (только PDB, PyMOL)
+
+export PYMOL_SCRIPT_ARGS="--ker-pdb '$DATA_PATH_CH4/ker.pdb' --box-size 30"
+pymol -q external_scripts/visualize_kerogen_part_cell.pml
+
+### Визуализация кусочка ячейки (VMD)
+
+export VMD_SCRIPT_ARGS="--ker-pdb '$DATA_PATH_CH4/ker.pdb' --box-size 30"
+vmd -e external_scripts/visualize_kerogen_part_cell.tcl
+
+
 
 
 
