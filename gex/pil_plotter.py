@@ -163,7 +163,7 @@ def plot_distributions(path_to_save: str, radius_min: float):
     )
 
     ax.fill_between(r_fit, y_pr, 0.0, color="orange", alpha=0.35, linewidth=0)
-    ax.plot(r_fit, y_pr, color="darkorange", linewidth=1.5, label=r"$P(r)$")
+    ax.plot(r_fit, y_pr, color="darkorange", linewidth=2.5, label=r"$P(r)$")
 
     # divider / x-axis at y = 0
     ax.axhline(0.0, color="black", linewidth=1.2)
@@ -243,7 +243,7 @@ def plot_distributions(path_to_save: str, radius_min: float):
     )
     # --- legend
     ax.legend(
-        loc="upper left",
+        loc="lower right",
         fontsize=24,
         frameon=False,
         fancybox=False,

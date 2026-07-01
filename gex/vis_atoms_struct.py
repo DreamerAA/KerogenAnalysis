@@ -129,6 +129,7 @@ def read_and_draw_atoms_struct(
         scale='non',
         isovalue=0.11,
         img_opacity=0.8,
+        volume_mode=False,
     )
     Visualizer.show()
 

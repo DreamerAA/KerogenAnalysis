@@ -780,7 +780,7 @@ def analysis(main_path: str, pnm_dir: str, oputput_dir: str):
     onlyfiles = [
         file
         for file in onlyfiles
-        if "_link1" in file and file.startswith("num")
+        if "_link1" in file
     ]
     steps = [int((file.split("=")[1]).split("_")[0]) for file in onlyfiles]
     sorted_lfiles = list(zip(steps, onlyfiles))

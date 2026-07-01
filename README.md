@@ -28,9 +28,9 @@ simulate_trajectory.py
 stationarity.py
 structure_image_utils.py
 + trap_distr_builder.py
-vis_atoms_struct.py
++ vis_atoms_struct.py
 + vis_slice_struct.py
-vis_struct_pnm.py
++ vis_struct_pnm.py
 + vis_struct_trajectory.py
 vis_traject.py
 inv_plot.py
@@ -39,8 +39,8 @@ inv_plot.py
 + external_scripts/visualize_kerogen_cell.tcl
 + external_scripts/visualize_kerogen_molecula.pml
 + external_scripts/visualize_kerogen_part_cell_with_molecula.pml
-external_scripts/visualize_kerogen_part_cell.pml
-external_scripts/visualize_kerogen_part_cell.tcl
++ external_scripts/visualize_kerogen_part_cell.pml
++ external_scripts/visualize_kerogen_part_cell.tcl
 
 
 
@@ -169,21 +169,18 @@ vmd -e external_scripts/visualize_kerogen_cell.tcl
 export PYMOL_SCRIPT_ARGS="--ker-pdb '$DATA_PATH_CH4/ker.pdb' --chain A --resi 1"
 pymol -q external_scripts/visualize_kerogen_molecula.pml
 
+### Визуализация кусочка ячейки с атомами МД (PDB топология + GRO координаты, PyMOL)
 
+# vis_atoms_struct выводит координаты в нм, скрипт ожидает Å → умножить на 10
+# выбор фрейма: по step= из заголовка GRO ("Kerogen t= 50.00000 step= 25000")
+export PYMOL_SCRIPT_ARGS="--ker-pdb '$DATA_PATH_CH4/ker.pdb' --sim-gro '$DATA_PATH_CH4/type1.ch4.300.gro' --step 25000 --xmin 14.9 --xmax 47.4 --ymin 20.8 --ymax 53.3 --zmin 48.8 --zmax 81.3"
+pymol -q external_scripts/visualize_kerogen_part_cell.pml
 
+# альтернатива: по времени в пс
+export PYMOL_SCRIPT_ARGS="--ker-pdb '$DATA_PATH_CH4/ker.pdb' --sim-gro '$DATA_PATH_CH4/type1.ch4.300.gro' --time 50.0 --xmin 14.9 --xmax 47.4 --ymin 20.8 --ymax 53.3 --zmin 48.8 --zmax 81.3"
+pymol -q external_scripts/visualize_kerogen_part_cell.pml
 
-
-
-
-
-
-
-
-
-
-
-### Визуализация кусочка ячейки без атомов (только PDB, PyMOL)
-
+# без GRO — только PDB, куб 30 Å из центра ячейки
 export PYMOL_SCRIPT_ARGS="--ker-pdb '$DATA_PATH_CH4/ker.pdb' --box-size 30"
 pymol -q external_scripts/visualize_kerogen_part_cell.pml
 
@@ -192,8 +189,26 @@ pymol -q external_scripts/visualize_kerogen_part_cell.pml
 export VMD_SCRIPT_ARGS="--ker-pdb '$DATA_PATH_CH4/ker.pdb' --box-size 30"
 vmd -e external_scripts/visualize_kerogen_part_cell.tcl
 
+# явный диапазон (координаты в Å, т.е. нм × 10)
+export VMD_SCRIPT_ARGS="--ker-pdb '$DATA_PATH_CH4/ker.pdb' --xmin 14.9 --xmax 47.4 --ymin 20.8 --ymax 53.3 --zmin 48.8 --zmax 81.3"
+vmd -e external_scripts/visualize_kerogen_part_cell.tcl
+
+### Визуализация атомов и поверхности порового пространства
+
+export DATA_PATH_CH4="/media/andrey/Samsung_T5/PHD/Kerogen/type1matrix/300K/ch4/"
+export IMG="$DATA_PATH_CH4/float_images/result-img-num=25000_time-ps=50_bbox=(x=(1.489-4.742)_y=(2.078-5.332)_z=(4.881-8.134))_resolution=0.013015000.npy"
+
+python -m gex.vis_atoms_struct $DATA_PATH_CH4 $IMG --index 25000 --time-ps 50
 
 
+## Визуализация структуры + изображение
+
+export IMG="$DATA_PATH_CH4/float_images/result-img-num=25000_time-ps=50_bbox=(x=(1.489-4.742)_y=(2.078-5.332)_z=(4.881-8.134))_resolution=0.013015000.npy"
+
+export PNM="$DATA_PATH_CH4/pnm/pnm-num=25000_time-ps=50_bbox=(x=(0.000-6.231)_y=(0.590-6.821)_z=(3.392-9.623))_resolution=0.024923800"
+
+
+python -m gex.vis_struct_pnm "$IMG" "$PNM" 
 
 
 
@@ -274,9 +289,4 @@ python -m gex.errors_params $DATA_PATH_CH4
 python -m gex.find_best_params $DATA_PATH_CH4/errors/find_best_params
 
 
-## Визуализация структуры + изображение
 
-export IMG="$DATA_PATH_CH4/float_images/result-img-num=551025000_time-ps=1102050_bbox=(x=(1.489-4.742)_y=(2.078-5.332)_z=(4.881-8.134))_resolution=0.013015000.npy"
-
-python -m gex.vis_atoms_struct $DATA_PATH_CH4 "$IMG" --index 551025000 --time-ps 1102050
-python -m gex.vis_struct_pnm "$IMG" $DATA_PATH_CH4/pnm/pnm-num=551025000_time-ps=1102050_bbox=...
