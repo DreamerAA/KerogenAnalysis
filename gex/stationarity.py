@@ -35,9 +35,10 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple, Union
 from scipy.stats import kstwobign
 import numpy as np
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from scipy.stats import ks_2samp, gaussian_kde
-import matplotlib.cm as cm
 from base.reader import Reader
 from matplotlib.ticker import MultipleLocator, FuncFormatter
 
@@ -70,7 +71,7 @@ def _select_indices(
 
 def _make_color_map(idx: Sequence[int]):
     # стабильные цвета (tab10/tab20) — один и тот же idx -> один и тот же цвет
-    cmap = cm.get_cmap("tab10" if len(idx) <= 10 else "tab20", len(idx))
+    cmap = matplotlib.colormaps["tab10" if len(idx) <= 10 else "tab20"].resampled(len(idx))
     return {k: cmap(pos) for pos, k in enumerate(idx)}
 
 
@@ -794,7 +795,7 @@ def analysis(main_path: str, pnm_dir: str, oputput_dir: str):
             continue
 
         radiuses, throat_lengths = Reader.read_pnm_data(
-            join(path_to_pnms, file[:-10]), border=0.0015
+            join(path_to_pnms, file[:-10]), border=0.015
         )
         time = int(50 + (step - 25000.0) * 500.0 / 250000.0)
 
