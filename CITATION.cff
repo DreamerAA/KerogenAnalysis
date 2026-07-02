@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: Vaganova
+    given-names: Mariia
+    affiliation: "Moscow Institute of Physics and Technology, Institutskiy per., 9, Dolgoprudny, 141701, Moscow Region, Russian Federation"
+  - family-names: Nesterova
+    given-names: Irina
+    affiliation: "Moscow Institute of Physics and Technology, Institutskiy per., 9, Dolgoprudny, 141701, Moscow Region, Russian Federation"
+    orcid: https://orcid.org/0000-0001-6225-3909
+  - family-names: Kanygin
+    given-names: Yuriy
+    affiliation: "Moscow Institute of Physics and Technology, Institutskiy per., 9, Dolgoprudny, 141701, Moscow Region, Russian Federation"
+  - family-names: Kazennov
+    given-names: Andrey
+    affiliation: "Moscow Institute of Physics and Technology, Institutskiy per., 9, Dolgoprudny, 141701, Moscow Region, Russian Federation"
+  - family-names: Khlyupin
+    given-names: Aleksey
+    affiliation: "Moscow Institute of Physics and Technology, Institutskiy per., 9, Dolgoprudny, 141701, Moscow Region, Russian Federation"
+    orcid: https://orcid.org/0000-0002-6686-7243
+title: "Linking theoretical and simulation approaches to study fluids in nanoporous media: Molecular dynamics and classical density functional theory"
+year: 2022
+journal: Chemical Engineering Science
+volume: 250
+doi: 10.1016/j.ces.2021.117383
+url: https://doi.org/10.1016/j.ces.2021.117383
