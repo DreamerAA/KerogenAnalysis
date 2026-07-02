@@ -94,13 +94,10 @@ def plot_corrfunc_and_md(
         color=color_ct,
         label=r"$C(t)$",
     )
-    y_name = r"Autocorrelation $C(t)$ of"
-    y_name += " pore" if pore_mode else " solid"
-    y_name += " space"
-    ax1.set_xlabel(r"Time delay, $\mu$s", fontsize=16)
-    ax1.set_ylabel(y_name, fontsize=16)
+    ax1.set_xlabel(r"Time delay, $\mu$s", fontsize=20)
+    
     ax1.yaxis.set_major_formatter(FormatStrFormatter("%.2f"))
-    ax1.tick_params(axis="both", labelsize=12)
+    ax1.tick_params(axis="both", labelsize=16)
     ax1.tick_params(axis="y", labelcolor=color_ct)
 
     lines = line1
@@ -167,8 +164,8 @@ def plot_corrfunc_and_md(
     if x_max is not None:
         ax1.set_xlim(right=x_max)
         ax2.set_xlim(right=x_max)
-    ax2.set_ylabel(r"$\mathrm{RMSD}(t)$, nm", fontsize=16, color=color_md)
-    ax2.tick_params(axis="both", labelsize=12)
+    ax2.set_ylabel(r"$\mathrm{RMSD}(t)$, nm", fontsize=20, color=color_md)
+    ax2.tick_params(axis="both", labelsize=16)
     ax2.tick_params(axis="y", labelcolor=color_md)
 
     positive_r = []
@@ -186,7 +183,7 @@ def plot_corrfunc_and_md(
         labels,
         loc="upper right",
         borderaxespad=0.0,
-        fontsize=16,
+        fontsize=18,
         frameon=False,
     )
 

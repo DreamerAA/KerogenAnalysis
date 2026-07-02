@@ -10,6 +10,7 @@ from pathlib import Path
 import time
 
 from matplotlib import pyplot as plt
+from matplotlib.ticker import FixedLocator, FixedFormatter
 import numpy as np
 from base.trajectory import Trajectory
 from utils.utils import kprint
@@ -44,7 +45,6 @@ def plot_corrfunc_and_md(
     trj_msd: RMSDResult,
     save_path: Path,
     max_t: float = 2.8,
-    fit_t_range: tuple[float, float] | None = None,
 ) -> None:
     fig, ax1 = plt.subplots(figsize=(9, 5))
 
@@ -68,39 +68,15 @@ def plot_corrfunc_and_md(
     plt.yscale("log")
     plt.xscale("log")
 
-    positive_r = r[np.isfinite(r) & (r > 0)]
-    plt.ylim(bottom=min(positive_r) * 0.8, top=max(positive_r) * 5)
+    plt.ylim(bottom=0.08, top=1.5)
 
     ax = plt.gca()
 
-    fit_mask = np.isfinite(t) & np.isfinite(r) & (t > 0) & (r > 0)
-    if fit_t_range is not None:
-        fit_mask &= (t >= fit_t_range[0]) & (t <= fit_t_range[1])
-    if fit_mask.sum() >= 2:
-        slope, intercept, *_ = linregress(
-            np.log(t[fit_mask]), np.log(r[fit_mask])
-        )
-        t_line = np.logspace(
-            np.log10(t[fit_mask].min()), np.log10(t[fit_mask].max()), 200
-        )
-        count = t_line.shape[0]
-        r_line = np.exp(intercept) * t_line**slope
-        start = count // 2 - 5
-        t_line = t_line[start:]
-        r_line = r_line[start:]
-        ax.plot(t_line, r_line, '--', linewidth=1.5, color=color_msd)
-        ai = int(0.55 * (len(t_line) - 1))
-        ax.annotate(
-            rf"$\sim t^{{{slope:.2f}}}$",
-            xy=(t_line[ai], r_line[ai]),
-            xytext=(0, -40),
-            textcoords="offset points",
-            color=color_msd,
-            fontsize=24,
-            ha="center",
-            va="bottom",
-            bbox=dict(facecolor="white", edgecolor="none", alpha=0.7, pad=1.5),
-        )
+    yticks = [0.1, 0.2, 1.0]
+    ylabels = ["0.1", "0.2", "1.0"]
+    ax.yaxis.set_major_locator(FixedLocator(yticks))
+    ax.yaxis.set_major_formatter(FixedFormatter(ylabels))
+    ax.yaxis.set_minor_locator(plt.NullLocator())
 
     # Оставляем рамку целиком
     for spine in ax.spines.values():
@@ -109,8 +85,8 @@ def plot_corrfunc_and_md(
     # Название оси Y переносим вправо
     ax.yaxis.set_label_position("right")
 
-    plt.xlabel(r"Time delay, $\mu$s", fontsize=16)
-    plt.ylabel(r"$\mathrm{RMSD}(t)$, nm", fontsize=16)
+    plt.xlabel(r"Time delay, $\mu$s", fontsize=20)
+    plt.ylabel(r"$\mathrm{RMSD}(t)$, nm", fontsize=20)
 
     # Убираем тики и подписи слева
     ax.tick_params(
@@ -120,10 +96,14 @@ def plot_corrfunc_and_md(
         labelleft=False,
         right=True,
         labelright=True,
-        labelsize=12,
+        labelsize=16,
+    )
+    ax.tick_params(
+        axis="x",
+        labelsize=16,
     )
 
-    plt.legend(fontsize=16, frameon=False)
+    # plt.legend(fontsize=20, frameon=False)
     plt.tight_layout()
 
     save_path.parent.mkdir(parents=True, exist_ok=True)

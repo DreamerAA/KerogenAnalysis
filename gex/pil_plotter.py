@@ -17,7 +17,28 @@ from matplotlib.ticker import MaxNLocator
 from processes.pil_distr_generator import PiLDistrGenerator
 
 
-def plot_distributions(path_to_save: str, radius_min: float):
+def _centers_to_edges(values: np.ndarray) -> np.ndarray:
+    values = np.asarray(values, dtype=float)
+    if values.ndim != 1 or values.size < 2:
+        raise ValueError("Expected at least two grid centers")
+
+    edges = np.empty(values.size + 1, dtype=float)
+    edges[1:-1] = 0.5 * (values[:-1] + values[1:])
+    edges[0] = values[0] - 0.5 * (values[1] - values[0])
+    edges[-1] = values[-1] + 0.5 * (values[-1] - values[-2])
+    return edges
+
+
+def plot_distributions(
+    path_to_save: str,
+    radius_min: float,
+    r_points: int,
+    r_step: int,
+    l_bins: int,
+    heatmap_mode: str,
+    heatmap_interpolation: str,
+    heatmap_dpi: int,
+):
     path_units = join(path_to_save, "pnm_distribution_units.json")
     if not isfile(path_units):
         raise RuntimeError("PIL distribution cache must be regenerated in nm")
@@ -49,8 +70,9 @@ def plot_distributions(path_to_save: str, radius_min: float):
             params=params,
             r_min=radius_min,
             r_max=rad_max,
-            r_points=300,
-            step=2,
+            r_points=r_points,
+            step=r_step,
+            cl=l_bins,
         )
     )
 
@@ -133,14 +155,30 @@ def plot_distributions(path_to_save: str, radius_min: float):
         clip=True,
     )
 
-    mesh = ax.pcolormesh(
-        sample_rad,
-        l_vals,
-        pi_masked.T,
-        cmap=cmap,
-        norm=norm,
-        shading="auto",
-    )
+    if heatmap_mode == "mesh":
+        mesh = ax.pcolormesh(
+            sample_rad,
+            l_vals,
+            pi_masked.T,
+            cmap=cmap,
+            norm=norm,
+            shading="auto",
+        )
+    elif heatmap_mode == "smooth":
+        r_edges = _centers_to_edges(sample_rad)
+        l_edges = _centers_to_edges(l_vals)
+        mesh = ax.imshow(
+            pi_masked.T,
+            extent=(r_edges[0], r_edges[-1], l_edges[0], l_edges[-1]),
+            origin="lower",
+            aspect="auto",
+            cmap=cmap,
+            norm=norm,
+            interpolation=heatmap_interpolation,
+            resample=True,
+        )
+    else:
+        raise ValueError(f"Unexpected heatmap mode: {heatmap_mode}")
 
     # --- lower schematic part: scaled P(r), y < 0 ---
     coeff = 0.5
@@ -259,12 +297,13 @@ def plot_distributions(path_to_save: str, radius_min: float):
 
     fig.savefig(
         join(path_to_save, "figs", "pilr_2d.svg"),
+        dpi=heatmap_dpi,
         bbox_inches="tight",
         facecolor="white",
     )
     fig.savefig(
         join(path_to_save, "figs", "pilr_2d.png"),
-        dpi=300,
+        dpi=heatmap_dpi,
         bbox_inches="tight",
         facecolor="white",
     )
@@ -276,6 +315,50 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Plot PIL distributions")
     parser.add_argument("path", type=Path, help="Data directory")
     parser.add_argument("--x-min", type=float, default=0.025)
+    parser.add_argument(
+        "--r-points",
+        type=int,
+        default=900,
+        help="Number of fitted radius grid points used for the heatmap",
+    )
+    parser.add_argument(
+        "--r-step",
+        type=int,
+        default=1,
+        help="Stride for radius grid points used for the heatmap",
+    )
+    parser.add_argument(
+        "--l-bins",
+        type=int,
+        default=300,
+        help="Number of length-grid nodes used for the heatmap",
+    )
+    parser.add_argument(
+        "--heatmap-mode",
+        choices=("smooth", "mesh"),
+        default="smooth",
+        help="Use a smoothed high-DPI image layer or a vector pcolormesh",
+    )
+    parser.add_argument(
+        "--heatmap-interpolation",
+        default="bicubic",
+        help="Matplotlib interpolation used when --heatmap-mode=smooth",
+    )
+    parser.add_argument(
+        "--heatmap-dpi",
+        type=int,
+        default=600,
+        help="DPI used for SVG image layers and PNG output",
+    )
     args = parser.parse_args()
 
-    plot_distributions(str(args.path), args.x_min)
+    plot_distributions(
+        str(args.path),
+        args.x_min,
+        args.r_points,
+        args.r_step,
+        args.l_bins,
+        args.heatmap_mode,
+        args.heatmap_interpolation,
+        args.heatmap_dpi,
+    )
